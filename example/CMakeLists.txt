@@ -1,3 +1,3 @@
-project(xroute_etest)
-add_library(xroute_etest SHARED test.cpp)
-target_link_libraries(xroute_etest xroute)
+project(grape_etest)
+add_library(grape_etest SHARED test.cpp)
+target_link_libraries(grape_etest grape)

@@ -1,9 +1,9 @@
 #include <boost/lexical_cast.hpp>
 
-#include <xroute/xroute.hpp>
-#include <xroute/elliptics.hpp>
+#include <grape/grape.hpp>
+#include <grape/elliptics.hpp>
 
-using namespace ioremap::xroute;
+using namespace ioremap::grape;
 
 extern "C" {
 	void init(topology_t &);
@@ -17,7 +17,7 @@ class test_node0_t : public elliptics_node_t {
 
 			std::string ndata = data.substr(header.event_size) + "-" + boost::lexical_cast<std::string>(getpid()) + "-node0";
 
-			emit("test-key", "libxroute_etest.so/event1", ndata);
+			emit("test-key", "libgrape_etest.so/event1", ndata);
 
 			return std::string();
 		}
@@ -30,7 +30,7 @@ class test_node1_t : public elliptics_node_t {
 			xlog(__LOG_NOTICE, "node1::procress: '%s'\n", data.c_str());
 			std::string ndata = data.substr(header.event_size) + "-" + boost::lexical_cast<std::string>(getpid()) + "-node0";
 
-			emit("test-key", "libxroute_etest.so/event2", ndata);
+			emit("test-key", "libgrape_etest.so/event2", ndata);
 
 			return std::string();
 		}
@@ -65,10 +65,10 @@ void init(class topology_t &top)
 	top.add_slot("event1", node1);
 	top.add_slot("event2", node2);
 
-	std::string event = "libxroute_etest.so/event0";
+#if 0
+	std::string event = "libgrape_etest.so/event0";
 	std::string data = "some data";
 
-#if 0
 	struct sph header;
 	memset(&header, 0, sizeof(struct sph));
 	header.event_size = event.size();

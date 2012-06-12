@@ -4,12 +4,12 @@
 #include <elliptics/cppdef.h>
 #include <elliptics/srw/shared.hpp>
 
-#include <xroute/node.hpp>
-#include <xroute/xroute.hpp>
+#include <grape/node.hpp>
+#include <grape/grape.hpp>
 
 using namespace ioremap::srw;
 
-namespace ioremap { namespace xroute {
+namespace ioremap { namespace grape {
 
 typedef void (* topology_init_t)(topology_t &top);
 

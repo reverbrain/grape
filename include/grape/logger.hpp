@@ -7,7 +7,7 @@
 
 #define __LOG_CHECK  __attribute__ ((format(printf, 3, 4)))
 
-namespace ioremap { namespace xroute {
+namespace ioremap { namespace grape {
 
 #define __LOG_NOTICE			(1<<0)
 #define __LOG_INFO			(1<<1)

@@ -3,9 +3,9 @@
 
 #include <elliptics/srw/base.h>
 
-#include <xroute/logger.hpp>
+#include <grape/logger.hpp>
 
-namespace ioremap { namespace xroute {
+namespace ioremap { namespace grape {
 
 static inline std::string xget_event(const struct sph &header, const char *data) {
 	std::string event;

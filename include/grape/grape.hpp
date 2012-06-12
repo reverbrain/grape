@@ -7,10 +7,10 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/algorithm/string.hpp>
 
-#include <xroute/node.hpp>
-#include <xroute/logger.hpp>
+#include <grape/node.hpp>
+#include <grape/logger.hpp>
 
-namespace ioremap { namespace xroute {
+namespace ioremap { namespace grape {
 
 class topology_t {
 	public:

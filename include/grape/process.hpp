@@ -1,7 +1,7 @@
 #ifndef __XROUTE_PROCESS_HPP
 #define __XROUTE_PROCESS_HPP
 
-namespace ioremap { namespace xroute {
+namespace ioremap { namespace grape {
 
 class process_t {
 	public:

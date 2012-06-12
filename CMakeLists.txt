@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.6)
-project (xroute)
+project (grape)
 # The version number.
-set (xroute_VERSION "0.0.1")
+set (grape_VERSION "0.0.1")
 
 find_package(Boost REQUIRED system thread)
 set(CMAKE_CXX_FLAGS "-g -W -Wall")
@@ -12,8 +12,8 @@ find_package(elliptics REQUIRED)
 include_directories(${PROJECT_SOURCE_DIR} ${elliptics_INCLUDE_DIRS})
 
 include_directories("${PROJECT_BINARY_DIR}", "${PROJECT_SOURCE_DIR}/include")
-FILE(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/include/xroute/*.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/include/xroute/*.h")
-install(FILES ${headers} DESTINATION include/xroute)
+FILE(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/include/grape/*.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/include/grape/*.h")
+install(FILES ${headers} DESTINATION include/grape)
 
 add_subdirectory(src)
 add_subdirectory(example)

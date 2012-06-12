@@ -1,8 +1,8 @@
 #include <stdarg.h>
 
-#include <xroute/logger.hpp>
+#include <grape/logger.hpp>
 
-using namespace ioremap::xroute;
+using namespace ioremap::grape;
 
 static boost::mutex logger_init_lock_;
 logger *logger::logger_ = NULL;
