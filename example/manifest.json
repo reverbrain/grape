@@ -1,0 +1,21 @@
+{
+	"type" : "binary",
+	"engine" : {
+		"heartbeat-timeout" : 60,
+		"pool-limit" : 10,
+		"queue-limit" : 2000,
+		"grow-threshold" : 0,
+		"slave" : "/tmp/cocaine/bin/cocaine-slave"
+	},
+	"args" : {
+		"name" : "libgrape_etest.so",
+		"config" : {
+	                "nodes" : {
+				"localhost": 1025
+                	},
+	                "groups" : [1, 2],
+			"log-mask" : 31,
+			"log" : "/dev/stdout"
+		}
+	}
+}
