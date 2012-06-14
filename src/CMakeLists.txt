@@ -1,5 +1,5 @@
-add_library(grape SHARED logger.cpp grape.cpp elliptics/handler.cpp)
-target_link_libraries(grape ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${elliptics_LIBRARIES})
+add_library(grape SHARED logger.cpp grape.cpp elliptics/elliptics.cpp)
+target_link_libraries(grape ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} json)
 
 set_target_properties(grape PROPERTIES VERSION ${grape_VERSION} SOVERSION ${grape_VERSION})
 
