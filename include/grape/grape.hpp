@@ -25,6 +25,9 @@ class topology_t {
 		}
 
 		std::string run_slot(const std::string &event, const char *data, const size_t dsize) {
+			xlog(__LOG_DSA, "topology::run_slot: event: %s, data: %p, size: %zd\n",
+					event.c_str(), data, dsize);
+
 			boost::lock_guard<boost::mutex> lock(m_lock);
 			std::map<std::string, node_t *>::iterator it = m_slots.find(event);
 
@@ -34,10 +37,8 @@ class topology_t {
 				throw std::runtime_error(str.str());
 			}
 
-			std::string ret = it->second->process(event, data, dsize);
-			xlog(__LOG_NOTICE, "topology::run_slot: event: '%s', total-size: %zd, return-data: '%s'\n",
-					event.c_str(), dsize, ret.c_str());
-			return ret;
+
+			return it->second->process(event, data, dsize);
 		}
 
 	private:
