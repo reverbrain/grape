@@ -43,8 +43,8 @@ class logger {
 
 #define xlog(mask, msg...) \
 	do { \
-		if (logger::instance()->log_mask_ & (mask)) \
-			logger::instance()->do_log((mask), ##msg); \
+		if (ioremap::grape::logger::instance()->log_mask_ & (mask)) \
+			ioremap::grape::logger::instance()->do_log((mask), ##msg); \
 	} while (0)
 
 }}
