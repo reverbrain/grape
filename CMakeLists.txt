@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.6)
 project (grape)
 # The version number.
-set (grape_VERSION "0.0.1")
+set (grape_VERSION "0.0.2")
 
 find_package(Boost REQUIRED system thread)
 set(CMAKE_CXX_FLAGS "-g -W -Wall")
@@ -27,6 +27,6 @@ add_subdirectory(example)
 
 set(ARCHIVE_NAME ${CMAKE_PROJECT_NAME})
 add_custom_target(dist
-    COMMAND git archive --prefix=${ARCHIVE_NAME}-${smack_VERSION}/ HEAD
-    | bzip2 > ${CMAKE_BINARY_DIR}/${ARCHIVE_NAME}-${smack_VERSION}.tar.bz2
+    COMMAND git archive --prefix=${ARCHIVE_NAME}-${grape_VERSION}/ HEAD
+    | bzip2 > ${CMAKE_BINARY_DIR}/${ARCHIVE_NAME}-${grape_VERSION}.tar.bz2
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
