@@ -20,13 +20,13 @@ else
 CROSS= --build $(DEB_BUILD_GNU_TYPE)
 endif
 
-SMACK_DESTDIR=$(CURDIR)/debian/grape/usr
+GRAPE_DESTDIR=$(CURDIR)/debian/grape/usr
 
 build: build-stamp
 
 build-stamp:
 	dh_testdir
-	cmake -D CMAKE_INSTALL_PREFIX=$(SMACK_DESTDIR) .
+	cmake -D CMAKE_INSTALL_PREFIX=$(GRAPE_DESTDIR) .
 
 	$(MAKE)
 
