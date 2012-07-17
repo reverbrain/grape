@@ -1,6 +1,9 @@
 #ifndef __XROUTE_NODE_HPP
 #define __XROUTE_NODE_HPP
 
+#include <vector>
+#include <string>
+
 #include <elliptics/srw.h>
 
 #include <grape/logger.hpp>
