@@ -26,6 +26,7 @@ class node_t {
 		virtual void emit(const std::string &key, const std::string &event, const std::string &data) = 0;
 		virtual void put(const std::string &key, const std::string &data) = 0;
 		virtual std::string get(const std::string &key) = 0;
+		virtual std::vector<std::string> mget(const std::vector<std::string> &keys) = 0;
 };
 
 }}

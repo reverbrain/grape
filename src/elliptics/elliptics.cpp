@@ -77,3 +77,10 @@ std::string elliptics_node_t::get(const std::string &key)
 
 	return m_node->read_data_wait(key, offset, size, cflags, ioflags, type);
 }
+
+std::vector<std::string> elliptics_node_t::mget(const std::vector<std::string> &keys)
+{
+	uint64_t cflags = 0;
+
+	return m_node->bulk_read(keys, cflags);
+}
