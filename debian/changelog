@@ -1,0 +1,5 @@
+grape (0.0.2) unstable; urgency=low
+
+  * Realtime pipeline processing engine
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Tue, 17 Jul 2012 22:27:13 +0400
