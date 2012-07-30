@@ -4,16 +4,14 @@ Priority: optional
 Maintainer: Evgeniy Polyakov <zbr@ioremap.net>
 Build-Depends: debhelper (>= 7), cmake, elliptics-2.10, libboost-dev, libboost-thread-dev, libboost-iostreams-dev
 Standards-Version: 3.8.0
-Homepage: http://www.ioremap.net/projects/eblob
+Homepage: http://github.com/ioremap/grape
 
 Package: grape
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: SMACK data container
-  SMACK - low-level IO storage which packs data into sorted (zlib/bzip2/snappy compressed) blobs
+Description: Realtime pipeline processing engine
 
 Package: grape-dbg
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: SMACK data container
-  SMACK - low-level IO storage which packs data into sorted (zlib/bzip2/snappy compressed) blobs
+Description: Realtime pipeline processing engine

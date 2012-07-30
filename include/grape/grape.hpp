@@ -24,21 +24,16 @@ class topology_t {
 			m_slots.insert(std::make_pair(event, node));
 		}
 
-		std::string run_slot(const std::string &event, const char *data, const size_t dsize) {
-			xlog(__LOG_DSA, "topology::run_slot: event: %s, data: %p, size: %zd\n",
-					event.c_str(), data, dsize);
+		std::string run_slot(struct sph *sph) {
+			std::string event = xget_event(sph, (char *)(sph + 1));
 
 			boost::lock_guard<boost::mutex> lock(m_lock);
 			std::map<std::string, node_t *>::iterator it = m_slots.find(event);
 
-			if (it == m_slots.end()) {
-				std::ostringstream str;
-				str << event << ": no slot in topology";
-				throw std::runtime_error(str.str());
-			}
+			if (it == m_slots.end())
+				throw std::runtime_error(event + ": no slot in topology");
 
-
-			return it->second->process(event, data, dsize);
+			return it->second->handle(sph);
 		}
 
 	private:

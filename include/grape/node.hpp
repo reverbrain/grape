@@ -25,8 +25,11 @@ class node_t {
 			xlog(__LOG_DSA, "node is being destroyed\n");
 		}
 
-		virtual std::string process(const std::string &event, const char *data, const size_t dsize) = 0;
-		virtual void emit(const std::string &key, const std::string &event, const std::string &data) = 0;
+		virtual std::string handle(struct sph *sph) = 0;
+
+		virtual void emit(struct sph *sph, const std::string &key, const std::string &event, const std::string &data) = 0;
+		virtual void reply(struct sph *sph, const std::string &event, const std::string &data) = 0;
+
 		virtual void put(const std::string &key, const std::string &data) = 0;
 		virtual std::string get(const std::string &key) = 0;
 		virtual std::vector<std::string> mget(const std::vector<std::string> &keys) = 0;

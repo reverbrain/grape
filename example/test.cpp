@@ -13,21 +13,22 @@ class test_node0_t : public elliptics_node_t {
 	public:
 		test_node0_t(const std::string &config) : elliptics_node_t(config) {}
 
-		virtual std::string process(const std::string &event, const char *data, const size_t ) {
-			struct sph *sph = (struct sph *)data;
+		virtual std::string handle(struct sph *sph) {
 			char *payload = (char *)(sph + 1);
 			char *real_data = payload + sph->event_size;
+
+			std::string event = xget_event(sph, payload);
 
 			xlog(__LOG_NOTICE, "node0::process: %s: data-size: %zd, binary-size: %zd, event-size: %d: data: %.*s\n",
 					event.c_str(), sph->data_size, sph->binary_size, sph->event_size,
 					(int)sph->data_size, real_data);
 
 			if (event == "event0")
-				emit("test-key", "test-app@event1", std::string(real_data, sph->data_size) + "1");
+				emit(NULL, "test-key", "test-app@event1", std::string(real_data, sph->data_size) + "1");
 			if (event == "event1")
-				emit("test-key", "test-app@event2", std::string(real_data, sph->data_size) + "2");
+				emit(NULL, "test-key", "test-app@event2", std::string(real_data, sph->data_size) + "2");
 			if (event == "event2")
-				emit("test-key", "test-app@finish", std::string(real_data, sph->data_size) + "3");
+				emit(NULL, "test-key", "test-app@finish", std::string(real_data, sph->data_size) + "3");
 
 			if (event == "finish")
 				return std::string(real_data, sph->data_size);

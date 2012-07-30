@@ -33,21 +33,8 @@ int process(void *__ev, struct binary_io *io)
 		return -E2BIG;
 	}
 
-	std::string event = xget_event(sph, io->chunk.data + sizeof(struct sph));
-	xlog(__LOG_NOTICE, "grape-process: chunk-data: %p, chunk-size: %zd, event-size: %d, binary-size: %zd, data-size: %zd, event: %s\n",
-			io->chunk.data, io->chunk.size, sph->event_size, sph->binary_size, sph->data_size,
-			event.c_str());
-
-	std::vector<std::string> strs;
-	boost::split(strs, event, boost::is_any_of("@"));
-
-	if (strs.size() != 2) {
-		xlog(__LOG_ERROR, "grape-process: %s: must be app-name@event-name\n", event.c_str());
-		return -EINVAL;
-	}
-
 	std::string ret;
-	ret = top->run_slot(strs[1], io->chunk.data, io->chunk.size);
+	ret = top->run_slot(sph);
 	if (ret.size())
 		io->write(io, ret.data(), ret.size());
 

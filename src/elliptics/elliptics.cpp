@@ -43,7 +43,7 @@ elliptics_node_t::elliptics_node_t(const std::string &config)
 		throw std::runtime_error("elliptics_topology_t: no remote nodes added, exiting");
 }
 
-void elliptics_node_t::emit(const std::string &key, const std::string &event, const std::string &data)
+void elliptics_node_t::emit(struct sph *orig_sph, const std::string &key, const std::string &event, const std::string &data)
 {
 	struct dnet_id id;
 	m_node->transform(key, id);
@@ -53,8 +53,31 @@ void elliptics_node_t::emit(const std::string &key, const std::string &event, co
 	xlog(__LOG_NOTICE, "elliptics::emit: key: '%s', event: '%s', data-size: %zd\n",
 			key.c_str(), event.c_str(), data.size());
 
-	std::string binary;
-	m_node->push(&id, event, data, binary);
+	if (orig_sph) {
+		std::vector<char> vec(event.size() + data.size() + sizeof(struct sph));
+		std::string ret_str;
+
+		struct sph *sph = (struct sph *)&vec[0];
+
+		memset(sph, 0, sizeof(struct sph));
+
+		sph->src = orig_sph->src;
+		sph->src_key = orig_sph->src_key;
+		sph->key = orig_sph->key;
+		sph->flags = 0;
+		sph->data_size = data.size();
+		sph->event_size = event.size();
+
+		memcpy(sph->src.id, id.id, sizeof(sph->src.id));
+
+		memcpy(sph->data, event.data(), event.size());
+		memcpy(sph->data + event.size(), data.data(), data.size());
+
+		m_node->request(sph, false);
+	} else {
+		std::string binary;
+		m_node->push(&id, event, data, binary);
+	}
 }
 
 void elliptics_node_t::put(const std::string &key, const std::string &data)
@@ -83,4 +106,21 @@ std::vector<std::string> elliptics_node_t::mget(const std::vector<std::string> &
 	uint64_t cflags = 0;
 
 	return m_node->bulk_read(keys, cflags);
+}
+
+std::vector<std::string> elliptics_node_t::mget(const std::vector<struct dnet_io_attr> &keys)
+{
+	uint64_t cflags = 0;
+
+	return m_node->bulk_read(keys, cflags);
+}
+
+void elliptics_node_t::reply(struct sph *sph, const std::string &event, const std::string &data)
+{
+	sph->flags &= ~DNET_SPH_FLAGS_SRC_BLOCK;
+	sph->flags |= DNET_SPH_FLAGS_REPLY;
+
+	std::string binary;
+
+	return m_node->reply(sph, event, data, binary);
 }

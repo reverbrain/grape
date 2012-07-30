@@ -23,11 +23,14 @@ class elliptics_node_t : public node_t {
 	public:
 		elliptics_node_t(const std::string &config);
 
-		virtual void emit(const std::string &key, const std::string &event, const std::string &data);
+		void emit(struct sph *sph, const std::string &key, const std::string &event, const std::string &data);
+		void reply(struct sph *sph, const std::string &event, const std::string &data);
 
 		void put(const std::string &key, const std::string &data);
 		std::string get(const std::string &key);
+
 		std::vector<std::string> mget(const std::vector<std::string> &keys);
+		std::vector<std::string> mget(const std::vector<struct dnet_io_attr> &keys);
 
 	private:
 		std::auto_ptr<elliptics::log_file> m_elog;

@@ -22,6 +22,15 @@ add_library(json
 	foreign/jsoncpp-src-0.6.0-rc2/src/lib_json/json_writer)
 set_target_properties(json PROPERTIES COMPILE_FLAGS -fPIC)
 
+install(TARGETS json
+	RUNTIME DESTINATION bin COMPONENT runtime
+	LIBRARY DESTINATION lib COMPONENT runtime
+	ARCHIVE DESTINATION lib COMPONENT developement)
+
+install(DIRECTORY foreign/jsoncpp-src-0.6.0-rc2/include/
+	DESTINATION include
+	COMPONENT development)
+
 add_subdirectory(src)
 add_subdirectory(example)
 
