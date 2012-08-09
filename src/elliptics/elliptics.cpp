@@ -80,6 +80,14 @@ void elliptics_node_t::emit(struct sph *orig_sph, const std::string &key, const 
 	}
 }
 
+void elliptics_node_t::remove(const std::string &key)
+{
+	int type = 0;
+
+	m_node->remove(key, type);
+}
+
+
 void elliptics_node_t::put(const std::string &key, const std::string &data)
 {
 	uint64_t remote_offset = 0;

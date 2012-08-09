@@ -26,6 +26,7 @@ class elliptics_node_t : public node_t {
 		void emit(struct sph *sph, const std::string &key, const std::string &event, const std::string &data);
 		void reply(struct sph *sph, const std::string &event, const std::string &data);
 
+		void remove(const std::string &key);
 		void put(const std::string &key, const std::string &data);
 		std::string get(const std::string &key);
 
