@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.6)
 project (grape)
 # The version number.
-set (grape_VERSION "0.1.0")
+set (grape_VERSION "0.1.1")
 
 find_package(Boost REQUIRED system thread)
 set(CMAKE_CXX_FLAGS "-g -W -Wall")

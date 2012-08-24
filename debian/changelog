@@ -1,3 +1,9 @@
+grape (0.1.1) unstable; urgency=low
+
+  * Use log levels instead of obscure log mask
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Fri, 24 Aug 2012 18:14:53 +0400
+
 grape (0.0.2) unstable; urgency=low
 
   * Realtime pipeline processing engine
