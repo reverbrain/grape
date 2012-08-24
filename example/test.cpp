@@ -39,7 +39,7 @@ class test_node0_t : public elliptics_node_t {
 
 void *initialize(const char *config, const size_t size)
 {
-	topology_t *top = new topology_t("/dev/stdout", 15);
+	topology_t *top = new topology_t("/dev/stdout", __LOG_INFO);
 	xlog(__LOG_INFO, "init: %s\n", config);
 	/*
 	 * Everything below is a proof-of-concept code

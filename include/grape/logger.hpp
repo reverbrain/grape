@@ -19,7 +19,7 @@ enum grape_log_levels {
 
 class logger {
 	public:
-		int log_level();
+		int m_log_level;
 
 		static logger *instance(void);
 		void init(const std::string &path, int log_level, bool flush = true);
@@ -27,7 +27,6 @@ class logger {
 		void do_log(const int log_level, const char *format, ...) __LOG_CHECK;
 
 	private:
-		int m_log_level;
 		FILE *m_log;
 		bool m_flush;
 		boost::mutex m_lock;
@@ -45,7 +44,7 @@ class logger {
 
 #define xlog(level, msg...) \
 	do { \
-		if (ioremap::grape::logger::instance()->log_level() >= (level)) \
+		if (ioremap::grape::logger::instance()->m_log_level >= (level)) \
 			ioremap::grape::logger::instance()->do_log((level), ##msg); \
 	} while (0)
 
