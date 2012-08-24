@@ -22,7 +22,7 @@ class node_t {
 		node_t() {
 		}
 		virtual ~node_t() {
-			xlog(__LOG_DSA, "node is being destroyed\n");
+			xlog(__LOG_DEBUG, "node is being destroyed\n");
 		}
 
 		virtual std::string handle(struct sph *sph) = 0;

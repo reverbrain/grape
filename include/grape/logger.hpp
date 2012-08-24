@@ -9,26 +9,28 @@
 
 namespace ioremap { namespace grape {
 
-#define __LOG_NOTICE			(1<<0)
-#define __LOG_INFO			(1<<1)
-#define __LOG_TRANS			(1<<2)
-#define __LOG_ERROR			(1<<3)
-#define __LOG_DSA			(1<<4)
-#define __LOG_DATA			(1<<5)
+enum grape_log_levels {
+	__LOG_DATA = 0,
+	__LOG_ERROR,
+	__LOG_INFO,
+	__LOG_NOTICE,
+	__LOG_DEBUG,
+};
 
 class logger {
 	public:
-		int log_mask_;
+		int log_level();
 
 		static logger *instance(void);
-		void init(const std::string &path, int log_mask, bool flush = true);
+		void init(const std::string &path, int log_level, bool flush = true);
 
-		void do_log(const int mask, const char *format, ...) __LOG_CHECK;
+		void do_log(const int log_level, const char *format, ...) __LOG_CHECK;
 
 	private:
-		FILE *log_;
-		bool flush_;
-		boost::mutex lock_;
+		int m_log_level;
+		FILE *m_log;
+		bool m_flush;
+		boost::mutex m_lock;
 
 		logger(void);
 		logger(const logger &);
@@ -38,13 +40,13 @@ class logger {
 
 		static void destroy(void);
 
-		static logger *logger_;
+		static logger *m_logger;
 };
 
-#define xlog(mask, msg...) \
+#define xlog(level, msg...) \
 	do { \
-		if (ioremap::grape::logger::instance()->log_mask_ & (mask)) \
-			ioremap::grape::logger::instance()->do_log((mask), ##msg); \
+		if (ioremap::grape::logger::instance()->log_level() >= (level)) \
+			ioremap::grape::logger::instance()->do_log((level), ##msg); \
 	} while (0)
 
 }}

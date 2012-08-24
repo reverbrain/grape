@@ -4,36 +4,36 @@
 
 using namespace ioremap::grape;
 
-static boost::mutex logger_init_lock_;
-logger *logger::logger_ = NULL;
+static boost::mutex logger_init_lock;
+logger *logger::m_logger = NULL;
 
-logger::logger(void) : log_mask_(__LOG_ERROR | __LOG_INFO | __LOG_DATA), log_(NULL), flush_(true)
+logger::logger(void) : m_log_level(__LOG_ERROR), m_log(NULL), m_flush(true)
 {
 }
 
 logger *logger::instance(void)
 {
-	if (!logger_) {
-		boost::mutex::scoped_lock(logger_init_lock_);
-		if (!logger_)
-			logger_ = new logger();
+	if (!m_logger) {
+		boost::mutex::scoped_lock(logger_init_lock);
+		if (!m_logger)
+			m_logger = new logger();
 	}
 
-	return logger_;
+	return m_logger;
 }
 
-void logger::init(const std::string &path, int log_mask, bool flush)
+void logger::init(const std::string &path, int log_level, bool flush)
 {
-	boost::mutex::scoped_lock guard(lock_);
+	boost::mutex::scoped_lock guard(m_lock);
 
-	log_mask_ = log_mask;
-	flush_ = flush;
+	m_log_level = log_level;
+	m_flush = flush;
 
-	if (log_)
-		fclose(log_);
+	if (m_log)
+		fclose(m_log);
 
-	log_ = fopen(path.c_str(), "a");
-	if (!log_) {
+	m_log = fopen(path.c_str(), "a");
+	if (!m_log) {
 		int err = -errno;
 		std::ostringstream str;
 
@@ -42,11 +42,11 @@ void logger::init(const std::string &path, int log_mask, bool flush)
 	}
 }
 
-void logger::do_log(const int mask, const char *format, ...)
+void logger::do_log(const int level, const char *format, ...)
 {
-	boost::mutex::scoped_lock guard(lock_);
+	boost::mutex::scoped_lock guard(m_lock);
 
-	if (log_) {
+	if (m_log) {
 		char str[64];
 		struct tm tm;
 		struct timeval tv;
@@ -63,10 +63,10 @@ void logger::do_log(const int mask, const char *format, ...)
 		va_start(args, format);
 		vsnprintf(buf, buflen, format, args);
 		buf[buflen-1] = '\0';
-		fprintf(log_, "%s.%06lu %1x: %s", str, (unsigned long)tv.tv_usec, mask, buf);
+		fprintf(m_log, "%s.%06lu %1d: %s", str, (unsigned long)tv.tv_usec, level, buf);
 		va_end(args);
 
-		if (flush_)
-			fflush(log_);
+		if (m_flush)
+			fflush(m_log);
 	}
 }
