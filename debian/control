@@ -2,7 +2,7 @@ Source: grape
 Section: net
 Priority: optional
 Maintainer: Evgeniy Polyakov <zbr@ioremap.net>
-Build-Depends: debhelper (>= 7), cmake, elliptics-2.10, libboost-dev, libboost-thread-dev, libboost-iostreams-dev
+Build-Depends: debhelper (>= 7), cmake, elliptics (>= 2.18.0), libboost-dev, libboost-thread-dev, libboost-iostreams-dev
 Standards-Version: 3.8.0
 Homepage: http://github.com/ioremap/grape
 
