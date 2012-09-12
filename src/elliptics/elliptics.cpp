@@ -11,7 +11,7 @@ elliptics_node_t::elliptics_node_t(const std::string &config)
 
 	reader.parse(config, root);
 
-	m_elog.reset(new elliptics::log_file(root["log"].asString().c_str(), root["log-mask"].asInt()));
+	m_elog.reset(new elliptics::log_file(root["log"].asString().c_str(), root["log-level"].asInt()));
 
 	m_node.reset(new elliptics::node(*m_elog));
 
@@ -43,7 +43,7 @@ elliptics_node_t::elliptics_node_t(const std::string &config)
 		throw std::runtime_error("elliptics_topology_t: no remote nodes added, exiting");
 }
 
-void elliptics_node_t::emit(struct sph *orig_sph, const std::string &key, const std::string &event, const std::string &data)
+void elliptics_node_t::emit(const struct sph &sph, const std::string &key, const std::string &event, const std::string &data)
 {
 	struct dnet_id id;
 	m_node->transform(key, id);
@@ -53,31 +53,23 @@ void elliptics_node_t::emit(struct sph *orig_sph, const std::string &key, const 
 	xlog(__LOG_NOTICE, "elliptics::emit: key: '%s', event: '%s', data-size: %zd\n",
 			key.c_str(), event.c_str(), data.size());
 
-	if (orig_sph) {
-		std::vector<char> vec(event.size() + data.size() + sizeof(struct sph));
-		std::string ret_str;
+	std::string binary;
+	m_node->push_unlocked(&id, sph, event, data, binary);
+}
 
-		struct sph *sph = (struct sph *)&vec[0];
+void elliptics_node_t::reply(const struct sph &orig_sph, const std::string &event, const std::string &data, bool finish)
+{
+	struct sph sph = orig_sph;
 
-		memset(sph, 0, sizeof(struct sph));
+	sph.flags &= ~DNET_SPH_FLAGS_SRC_BLOCK;
+	sph.flags |= DNET_SPH_FLAGS_REPLY;
 
-		sph->src = orig_sph->src;
-		sph->src_key = orig_sph->src_key;
-		sph->key = orig_sph->key;
-		sph->flags = 0;
-		sph->data_size = data.size();
-		sph->event_size = event.size();
+	if (finish)
+		sph.flags |= DNET_SPH_FLAGS_FINISH;
 
-		memcpy(sph->src.id, id.id, sizeof(sph->src.id));
+	std::string binary;
 
-		memcpy(sph->data, event.data(), event.size());
-		memcpy(sph->data + event.size(), data.data(), data.size());
-
-		m_node->request(sph, false);
-	} else {
-		std::string binary;
-		m_node->push(&id, event, data, binary);
-	}
+	return m_node->reply(sph, event, data, binary);
 }
 
 void elliptics_node_t::remove(const std::string &key)
@@ -86,7 +78,6 @@ void elliptics_node_t::remove(const std::string &key)
 
 	m_node->remove(key, type);
 }
-
 
 void elliptics_node_t::put(const std::string &key, const std::string &data)
 {
@@ -121,14 +112,4 @@ std::vector<std::string> elliptics_node_t::mget(const std::vector<struct dnet_io
 	uint64_t cflags = 0;
 
 	return m_node->bulk_read(keys, cflags);
-}
-
-void elliptics_node_t::reply(struct sph *sph, const std::string &event, const std::string &data)
-{
-	sph->flags &= ~DNET_SPH_FLAGS_SRC_BLOCK;
-	sph->flags |= DNET_SPH_FLAGS_REPLY;
-
-	std::string binary;
-
-	return m_node->reply(sph, event, data, binary);
 }

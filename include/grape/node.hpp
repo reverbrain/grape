@@ -25,10 +25,10 @@ class node_t {
 			xlog(__LOG_DEBUG, "node is being destroyed\n");
 		}
 
-		virtual std::string handle(struct sph *sph) = 0;
+		virtual void handle(struct sph *sph) = 0;
 
-		virtual void emit(struct sph *sph, const std::string &key, const std::string &event, const std::string &data) = 0;
-		virtual void reply(struct sph *sph, const std::string &event, const std::string &data) = 0;
+		virtual void emit(const struct sph &sph, const std::string &key, const std::string &event, const std::string &data) = 0;
+		virtual void reply(const struct sph &sph, const std::string &event, const std::string &data, bool finish) = 0;
 
 		virtual void put(const std::string &key, const std::string &data) = 0;
 		virtual std::string get(const std::string &key) = 0;

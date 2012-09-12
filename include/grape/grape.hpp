@@ -24,7 +24,7 @@ class topology_t {
 			m_slots.insert(std::make_pair(event, node));
 		}
 
-		std::string run_slot(struct sph *sph) {
+		void run_slot(struct sph *sph) {
 			std::string event = xget_event(sph, (char *)(sph + 1));
 
 			boost::lock_guard<boost::mutex> lock(m_lock);
@@ -33,7 +33,7 @@ class topology_t {
 			if (it == m_slots.end())
 				throw std::runtime_error(event + ": no slot in topology");
 
-			return it->second->handle(sph);
+			it->second->handle(sph);
 		}
 
 	private:

@@ -33,10 +33,6 @@ int process(void *__ev, struct binary_io *io)
 		return -E2BIG;
 	}
 
-	std::string ret;
-	ret = top->run_slot(sph);
-	if (ret.size())
-		io->write(io, ret.data(), ret.size());
-
+	top->run_slot(sph);
 	return 0;
 }
