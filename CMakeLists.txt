@@ -16,19 +16,19 @@ install(FILES ${headers} DESTINATION include/grape)
 include_directories(BEFORE ${PROJECT_SOURCE_DIR}/foreign/jsoncpp-src-0.6.0-rc2/include)
 include_directories(${PROJECT_SOURCE_DIR} ${elliptics_INCLUDE_DIRS} ${PROJECT_BINARY_DIR} "${PROJECT_SOURCE_DIR}/include")
 
-add_library(json
+add_library(grapejson
 	foreign/jsoncpp-src-0.6.0-rc2/src/lib_json/json_value
 	foreign/jsoncpp-src-0.6.0-rc2/src/lib_json/json_reader
 	foreign/jsoncpp-src-0.6.0-rc2/src/lib_json/json_writer)
-set_target_properties(json PROPERTIES COMPILE_FLAGS -fPIC)
+set_target_properties(grapejson PROPERTIES COMPILE_FLAGS -fPIC)
 
-install(TARGETS json
+install(TARGETS grapejson
 	RUNTIME DESTINATION bin COMPONENT runtime
 	LIBRARY DESTINATION lib COMPONENT runtime
 	ARCHIVE DESTINATION lib COMPONENT developement)
 
 install(DIRECTORY foreign/jsoncpp-src-0.6.0-rc2/include/
-	DESTINATION include
+	DESTINATION include/grape
 	COMPONENT development)
 
 add_subdirectory(src)
