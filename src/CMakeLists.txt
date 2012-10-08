@@ -1,7 +1,7 @@
 add_library(grape SHARED logger.cpp grape.cpp elliptics/elliptics.cpp)
 target_link_libraries(grape ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} grapejson ${elliptics_LIBRARIES})
 
-set_target_properties(grape PROPERTIES VERSION ${grape_VERSION} SOVERSION ${grape_VERSION})
+set_target_properties(grape PROPERTIES VERSION ${grape_VERSION_MAJOR} SOVERSION ${grape_VERSION_MAJOR})
 
 SET(LIB_SUFFIX "")
 IF(CMAKE_SIZEOF_VOID_P EQUAL 8)
