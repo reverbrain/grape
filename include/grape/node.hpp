@@ -28,6 +28,7 @@ class node_t {
 		virtual void handle(struct sph *sph) = 0;
 
 		virtual void emit(const struct sph &sph, const std::string &key, const std::string &event, const std::string &data) = 0;
+		virtual std::string emit_blocked(const std::string &key, const std::string &event, const std::string &data) = 0;
 		virtual void reply(const struct sph &sph, const std::string &event, const std::string &data, bool finish) = 0;
 
 		virtual void put(const std::string &key, const std::string &data) = 0;

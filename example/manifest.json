@@ -5,7 +5,7 @@
 		"pool-limit" : 10,
 		"queue-limit" : 2000,
 		"grow-threshold" : 1,
-		"slave" : "/tmp/cocaine/bin/cocaine-slave"
+		"slave" : "/tmp/build/bin/cocaine-slave"
 	},
 	"args" : {
 		"name" : "libgrape_etest.so",

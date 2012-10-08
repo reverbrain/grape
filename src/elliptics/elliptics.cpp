@@ -1,6 +1,6 @@
-#include <json/reader.h>
+#include "json/reader.h"
 
-#include <grape/elliptics.hpp>
+#include "grape/elliptics.hpp"
 
 using namespace ioremap::grape;
 
@@ -55,6 +55,20 @@ void elliptics_node_t::emit(const struct sph &sph, const std::string &key, const
 
 	std::string binary;
 	m_node->push_unlocked(&id, sph, event, data, binary);
+}
+
+std::string elliptics_node_t::emit_blocked(const std::string &key, const std::string &event, const std::string &data)
+{
+	struct dnet_id id;
+	m_node->transform(key, id);
+	id.group_id = 0;
+	id.type = 0;
+
+	xlog(__LOG_NOTICE, "elliptics::emit_blocked: key: '%s', event: '%s', data-size: %zd\n",
+			key.c_str(), event.c_str(), data.size());
+
+	std::string binary;
+	return m_node->exec_unlocked(&id, event, data, binary);
 }
 
 void elliptics_node_t::reply(const struct sph &orig_sph, const std::string &event, const std::string &data, bool finish)
