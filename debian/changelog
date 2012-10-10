@@ -1,3 +1,10 @@
+Grape (0.4.0) unstable; urgency=low
+
+  * Merge with 2.19 upstream elliptics version
+  * Added sessions - this allows to configure and set per-request parameters (like groups)
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Wed, 10 Oct 2012 19:56:20 +0400
+
 grape (0.3.0) unstable; urgency=low
 
   * Added blocked events to application calls.
