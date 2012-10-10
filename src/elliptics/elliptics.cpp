@@ -50,7 +50,7 @@ void elliptics_node_t::emit(const struct sph &sph, const std::string &key, const
 	id.group_id = 0;
 	id.type = 0;
 
-	xlog(__LOG_NOTICE, "elliptics::emit: key: '%s', event: '%s', data-size: %zd\n",
+	xlog(__LOG_NOTICE, "grape::emit: key: '%s', event: '%s', data-size: %zd\n",
 			key.c_str(), event.c_str(), data.size());
 
 	std::string binary;
@@ -64,7 +64,7 @@ std::string elliptics_node_t::emit_blocked(const std::string &key, const std::st
 	id.group_id = 0;
 	id.type = 0;
 
-	xlog(__LOG_NOTICE, "elliptics::emit_blocked: key: '%s', event: '%s', data-size: %zd\n",
+	xlog(__LOG_NOTICE, "grape::emit_blocked: key: '%s', event: '%s', data-size: %zd\n",
 			key.c_str(), event.c_str(), data.size());
 
 	std::string binary;
