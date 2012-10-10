@@ -37,6 +37,7 @@ class elliptics_node_t : public node_t {
 	private:
 		std::auto_ptr<elliptics::log_file> m_elog;
 		std::auto_ptr<elliptics::node> m_node;
+		std::auto_ptr<elliptics::session> m_session;
 };
 
 }}

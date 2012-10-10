@@ -14,6 +14,7 @@ elliptics_node_t::elliptics_node_t(const std::string &config)
 	m_elog.reset(new elliptics::log_file(root["log"].asString().c_str(), root["log-level"].asInt()));
 
 	m_node.reset(new elliptics::node(*m_elog));
+	m_session.reset(new elliptics::session(*m_node));
 
 	Json::Value groups(root["groups"]);
 	if (groups.empty() || !groups.isArray())
@@ -21,9 +22,10 @@ elliptics_node_t::elliptics_node_t(const std::string &config)
 
 	std::vector<int> group_numbers;
 	std::transform(groups.begin(), groups.end(), std::back_inserter(group_numbers), json_digitizer());
-	m_node->add_groups(group_numbers);
 
-	if (m_node->get_groups().size() == 0)
+	m_session->add_groups(group_numbers);
+
+	if (m_session->get_groups().size() == 0)
 		throw std::runtime_error("elliptics_topology_t: no groups added, exiting");
 
 	Json::Value nodes(root["nodes"]);
@@ -39,14 +41,14 @@ elliptics_node_t::elliptics_node_t(const std::string &config)
 		}
 	}
 
-	if (m_node->state_num() == 0)
+	if (m_session->state_num() == 0)
 		throw std::runtime_error("elliptics_topology_t: no remote nodes added, exiting");
 }
 
 void elliptics_node_t::emit(const struct sph &sph, const std::string &key, const std::string &event, const std::string &data)
 {
 	struct dnet_id id;
-	m_node->transform(key, id);
+	m_session->transform(key, id);
 	id.group_id = 0;
 	id.type = 0;
 
@@ -54,13 +56,13 @@ void elliptics_node_t::emit(const struct sph &sph, const std::string &key, const
 			key.c_str(), event.c_str(), data.size());
 
 	std::string binary;
-	m_node->push_unlocked(&id, sph, event, data, binary);
+	m_session->push_unlocked(&id, sph, event, data, binary);
 }
 
 std::string elliptics_node_t::emit_blocked(const std::string &key, const std::string &event, const std::string &data)
 {
 	struct dnet_id id;
-	m_node->transform(key, id);
+	m_session->transform(key, id);
 	id.group_id = 0;
 	id.type = 0;
 
@@ -68,7 +70,7 @@ std::string elliptics_node_t::emit_blocked(const std::string &key, const std::st
 			key.c_str(), event.c_str(), data.size());
 
 	std::string binary;
-	return m_node->exec_unlocked(&id, event, data, binary);
+	return m_session->exec_unlocked(&id, event, data, binary);
 }
 
 void elliptics_node_t::reply(const struct sph &orig_sph, const std::string &event, const std::string &data, bool finish)
@@ -83,14 +85,14 @@ void elliptics_node_t::reply(const struct sph &orig_sph, const std::string &even
 
 	std::string binary;
 
-	return m_node->reply(sph, event, data, binary);
+	return m_session->reply(sph, event, data, binary);
 }
 
 void elliptics_node_t::remove(const std::string &key)
 {
 	int type = 0;
 
-	m_node->remove(key, type);
+	m_session->remove(key, type);
 }
 
 void elliptics_node_t::put(const std::string &key, const std::string &data)
@@ -100,7 +102,7 @@ void elliptics_node_t::put(const std::string &key, const std::string &data)
 	unsigned int ioflags = 0;
 	int type = 0;
 
-	m_node->write_data_wait(key, data, remote_offset, cflags, ioflags, type);
+	m_session->write_data_wait(key, data, remote_offset, cflags, ioflags, type);
 }
 
 std::string elliptics_node_t::get(const std::string &key)
@@ -111,19 +113,19 @@ std::string elliptics_node_t::get(const std::string &key)
 	unsigned int ioflags = 0;
 	int type = 0;
 
-	return m_node->read_data_wait(key, offset, size, cflags, ioflags, type);
+	return m_session->read_data_wait(key, offset, size, cflags, ioflags, type);
 }
 
 std::vector<std::string> elliptics_node_t::mget(const std::vector<std::string> &keys)
 {
 	uint64_t cflags = 0;
 
-	return m_node->bulk_read(keys, cflags);
+	return m_session->bulk_read(keys, cflags);
 }
 
 std::vector<std::string> elliptics_node_t::mget(const std::vector<struct dnet_io_attr> &keys)
 {
 	uint64_t cflags = 0;
 
-	return m_node->bulk_read(keys, cflags);
+	return m_session->bulk_read(keys, cflags);
 }
