@@ -1,4 +1,4 @@
-Grape (0.4.0) unstable; urgency=low
+grape (0.4.0) unstable; urgency=low
 
   * Merge with 2.19 upstream elliptics version
   * Added sessions - this allows to configure and set per-request parameters (like groups)
