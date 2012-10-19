@@ -34,7 +34,7 @@ class elliptics_node_t : public node_t {
 		std::vector<std::string> mget(const std::vector<std::string> &keys);
 		std::vector<std::string> mget(const std::vector<struct dnet_io_attr> &keys);
 
-	private:
+	protected:
 		std::auto_ptr<elliptics::log_file> m_elog;
 		std::auto_ptr<elliptics::node> m_node;
 		std::auto_ptr<elliptics::session> m_session;
