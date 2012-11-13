@@ -48,5 +48,6 @@ Grape was made for C/C++ code processing for now,
 but will work with Python, Perl and JavaScript as soon as we create bindings.
 
 Links:
-Elliptics: http://www.ioremap.net/projects/elliptics
+Elliptics: http://www.reverbrain.com/elliptics/
 Cocaine: https://github.com/cocaine/cocaine-core
+Google group: https://groups.google.com/forum/?fromgroups=#!forum/reverbrain

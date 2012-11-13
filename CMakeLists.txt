@@ -1,8 +1,12 @@
 cmake_minimum_required (VERSION 2.6)
 project (grape)
+
 # The version number.
-set (grape_VERSION_MAJOR "0.3")
-set (grape_VERSION_MINOR "1")
+FILE (READ "${CMAKE_CURRENT_SOURCE_DIR}/debian/changelog" DEBCHANGELOG)
+string(REGEX MATCH "([0-9]+\\.[0-9]+\\.[0-9]+)" DEBFULLVERSION "${DEBCHANGELOG}")
+STRING (REGEX MATCH "([0-9]+\\.[0-9]+)" grape_VERSION_MAJOR "${DEBFULLVERSION}")
+STRING (REGEX MATCH "([0-9]+$)" grape_VERSION_MINOR "${DEBFULLVERSION}")
+set(${grape_VERSION} "${grape_VERSION_MAJOR}.${grape_VERSION_MINOR}")
 
 find_package(Boost REQUIRED system thread)
 set(CMAKE_CXX_FLAGS "-g -W -Wall")

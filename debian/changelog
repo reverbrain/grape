@@ -1,3 +1,10 @@
+grape (0.4.1) unstable; urgency=low
+
+  * Made internal elliptics-specific members protected, so that elliptics_node_t siblings could access to all its power.
+  * This is temporal decision - we better extend node_t interface, but his step will help us find out what needs to be moved to node_t
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Fri, 19 Oct 2012 22:20:00 +0400
+
 grape (0.4.0) unstable; urgency=low
 
   * Merge with 2.19 upstream elliptics version

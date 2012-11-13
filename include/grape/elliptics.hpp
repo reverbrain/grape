@@ -37,7 +37,7 @@ class elliptics_node_t : public node_t {
 		void calculate_checksum(const std::string &data, struct dnet_id &id);
 		void compare_and_swap(const std::string &key, const std::string &data,
 							  const struct dnet_id &old_csum);
-	private:
+	protected:
 		std::auto_ptr<elliptics::log_file> m_elog;
 		std::auto_ptr<elliptics::node> m_node;
 		std::auto_ptr<elliptics::session> m_session;
