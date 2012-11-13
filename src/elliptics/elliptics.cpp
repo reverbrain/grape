@@ -123,6 +123,19 @@ std::vector<std::string> elliptics_node_t::mget(const std::vector<std::string> &
 	return m_session->bulk_read(keys, cflags);
 }
 
+void elliptics_node_t::calculate_checksum(const std::string &data, struct dnet_id &id) {
+	m_session->transform(data, id);
+}
+
+void elliptics_node_t::compare_and_swap(const std::string &key, const std::string &data, const struct dnet_id &old_csum) {
+	uint64_t remote_offset = 0;
+	uint64_t cflags = 0;
+	unsigned int ioflags = 0;
+	int type = 0;
+
+ 	m_session->write_compare_and_swap(key, data, old_csum, remote_offset, cflags, ioflags, type);
+}
+
 std::vector<std::string> elliptics_node_t::mget(const std::vector<struct dnet_io_attr> &keys)
 {
 	uint64_t cflags = 0;
