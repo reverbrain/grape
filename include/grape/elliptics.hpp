@@ -34,6 +34,9 @@ class elliptics_node_t : public node_t {
 		std::vector<std::string> mget(const std::vector<std::string> &keys);
 		std::vector<std::string> mget(const std::vector<struct dnet_io_attr> &keys);
 
+		void calculate_checksum(const std::string &data, struct dnet_id &id);
+		void compare_and_swap(const std::string &key, const std::string &data,
+							  const struct dnet_id &old_csum);
 	protected:
 		std::auto_ptr<elliptics::log_file> m_elog;
 		std::auto_ptr<elliptics::node> m_node;
