@@ -1,3 +1,11 @@
+grape (0.5.0) unstable; urgency=low
+
+  * Update to elliptics-2.20
+  * Compare and swap support
+  * Added google groups link
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Mon, 10 Dec 2012 20:30:03 +0400
+
 grape (0.4.1) unstable; urgency=low
 
   * Made internal elliptics-specific members protected, so that elliptics_node_t siblings could access to all its power.
