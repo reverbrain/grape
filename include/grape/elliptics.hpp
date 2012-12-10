@@ -38,7 +38,7 @@ class elliptics_node_t : public node_t {
 		void compare_and_swap(const std::string &key, const std::string &data,
 							  const struct dnet_id &old_csum);
 	protected:
-		std::auto_ptr<elliptics::log_file> m_elog;
+		std::auto_ptr<elliptics::file_logger> m_elog;
 		std::auto_ptr<elliptics::node> m_node;
 		std::auto_ptr<elliptics::session> m_session;
 };
