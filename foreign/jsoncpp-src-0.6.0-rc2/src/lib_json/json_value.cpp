@@ -1711,7 +1711,7 @@ Path::makePath( const std::string &path,
 
 
 void 
-Path::addPathInArg( const std::string &path, 
+Path::addPathInArg( const std::string &path __attribute__ ((unused)),
                     const InArgs &in, 
                     InArgs::const_iterator &itInArg, 
                     PathArgument::Kind kind )
@@ -1732,8 +1732,8 @@ Path::addPathInArg( const std::string &path,
 
 
 void 
-Path::invalidPath( const std::string &path, 
-                   int location )
+Path::invalidPath( const std::string &path __attribute__ ((unused)), 
+                   int location __attribute__ ((unused)))
 {
    // Error: invalid path.
 }
