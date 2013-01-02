@@ -5,7 +5,7 @@
 		"pool-limit" : 10,
 		"queue-limit" : 2000,
 		"grow-threshold" : 1,
-		"slave" : "/opt/elliptics/build/bin/cocaine-slave"
+		"slave" : "/home/zbr/build/bin/cocaine-slave"
 	},
 	"args" : {
 		"name" : "libgrape_etest_single.so",
@@ -13,9 +13,14 @@
 	                "nodes" : {
 				"localhost": 1025
                 	},
-	                "groups" : [1, 2],
-			"log-level" : 4,
-			"log" : "/dev/stdout"
+	                "groups" : [2],
+			"log-level" : 3,
+			"log" : "/tmp/grape-etest.log",
+			"write-type" : "random",
+			"ioflags" : 3072,
+			"cflags" : 0,
+			"event-base" : "test-single@event",
+			"event-num" : 5
 		}
 	}
 }
