@@ -2,8 +2,8 @@
 	"type" : "binary",
 	"engine" : {
 		"heartbeat-timeout" : 60,
-		"pool-limit" : 10,
-		"queue-limit" : 2000,
+		"pool-limit" : 20,
+		"queue-limit" : 3000,
 		"grow-threshold" : 1,
 		"slave" : "/home/zbr/build/bin/cocaine-slave"
 	},
@@ -14,9 +14,9 @@
 				"localhost": 1025
                 	},
 	                "groups" : [2],
-			"log-level" : 3,
+			"log-level" : 1,
 			"log" : "/tmp/grape-etest.log",
-			"write-type" : "random",
+			"write-type" : "random1",
 			"ioflags" : 3072,
 			"cflags" : 0,
 			"event-base" : "test-single@event",

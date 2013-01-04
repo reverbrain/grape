@@ -24,7 +24,10 @@ class test_node0_t : public elliptics_node_t {
 	public:
 		test_node0_t(const std::string &config) :
 			elliptics_node_t(config), m_wtype(TEST_WRITE_NONE), m_cflags(0), m_ioflags(0), m_event_num(0) {
-			srand(time(NULL));
+			struct timeval tv;
+
+			gettimeofday(&tv, NULL);
+			srand(tv.tv_sec + tv.tv_usec);
 
 			Json::Reader reader;
 			Json::Value root;
@@ -76,36 +79,39 @@ class test_node0_t : public elliptics_node_t {
 				int pos = 0;
 				sscanf(event.c_str(), (m_event_base + "%d").c_str(), &pos);
 				
-				if (pos + 1 < m_event_num)
-					emit_event = m_event_base + boost::lexical_cast<std::string>(pos + 1);
+				pos++;
+				if (pos < m_event_num)
+					emit_event = m_event_base + boost::lexical_cast<std::string>(pos);
 				else
 					final = true;
 			}
 
 			io();
 			if (emit_event.size() > 0) {
-				std::string rand_key = boost::lexical_cast<std::string>(rand());
+				std::string rand_key = boost::lexical_cast<std::string>(rand()) + "test-single";
 				emit(orig_sph, rand_key, emit_event, data);
 			}
 
-			char date_str[64];
-			struct tm tm;
-			struct timeval tv;
+			if (final) {
+				char date_str[64];
+				struct tm tm;
+				struct timeval tv;
 
-			gettimeofday(&tv, NULL);
-			localtime_r((time_t *)&tv.tv_sec, &tm);
-			strftime(date_str, sizeof(date_str), "%F %R:%S", &tm);
+				gettimeofday(&tv, NULL);
+				localtime_r((time_t *)&tv.tv_sec, &tm);
+				strftime(date_str, sizeof(date_str), "%F %R:%S", &tm);
 
-			std::ostringstream reply_data;
-			reply_data << date_str << "." << tv.tv_usec << ": " << event << ": " << data << "\n";
-			/*
-			 * Reply adds not only your data, but also the whole sph header to the original caller's waiting container
-			 */
-			reply(orig_sph, event, reply_data.str(), final);
+				std::ostringstream reply_data;
+				reply_data << date_str << "." << tv.tv_usec << ": " << event << ": " << data << "\n";
+				/*
+				 * Reply adds not only your data, but also the whole sph header to the original caller's waiting container
+				 */
+				reply(orig_sph, event, reply_data.str(), final);
+			}
 
-			xlog(__LOG_NOTICE, "grape::test-node0: %s: data-size: %zd, binary-size: %zd, event-size: %d: data: '%.*s'\n",
-					event.c_str(), sph->data_size, sph->binary_size, sph->event_size,
-					(int)sph->data_size, real_data);
+			xlog(__LOG_INFO, "%s: grape::test-node0: %s -> %s: data-size: %zd, binary-size: %zd, final: %d\n",
+					dnet_dump_id_str(sph->src.id),
+					event.c_str(), emit_event.c_str(), sph->data_size, sph->binary_size, final);
 		}
 
 	private:
