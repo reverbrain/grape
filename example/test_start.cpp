@@ -22,7 +22,7 @@ using namespace ioremap;
 
 class starter : public grape::elliptics_node_t {
 	public:
-		starter(Json::Value &root, const std::string &config, int thread_num, int request_num, int start_event):
+		starter(Json::Value &root, const std::string &config, const std::string &start_event, int thread_num, int request_num):
 		elliptics_node_t(config),
 		m_limit(request_num),
 		m_jconf(root),
@@ -35,7 +35,9 @@ class starter : public grape::elliptics_node_t {
 
 			for (int i = 0; i < thread_num; ++i)
 				m_tgroup.create_thread(boost::bind(&starter::loop, this));
+		}
 
+		~starter() {
 			m_tgroup.join_all();
 		}
 
@@ -47,7 +49,7 @@ class starter : public grape::elliptics_node_t {
 		std::atomic_int m_limit;
 		std::string m_base_event;
 		Json::Value m_jconf;
-		int m_start_event;
+		std::string m_start_event;
 
 		long gettid(void) {
 			return syscall(SYS_gettid);
@@ -56,7 +58,6 @@ class starter : public grape::elliptics_node_t {
 		void loop() {
 			elliptics::session s(*m_node);
 
-			std::string base_event(m_jconf["event-base"].asString() + boost::lexical_cast<std::string>(m_start_event));
 			Json::Value groups(m_jconf["groups"]);
 			if (!groups.empty() && groups.isArray()) {
 				std::vector<int> gr;
@@ -72,7 +73,7 @@ class starter : public grape::elliptics_node_t {
 				struct dnet_id id;
 				s.transform(key, id);
 				id.group_id = 0;
-				std::string reply = s.exec_unlocked(&id, base_event, data, binary);
+				std::string reply = s.exec_unlocked(&id, m_start_event, data, binary);
 			}
 		}
 
@@ -83,7 +84,8 @@ int main(int argc, char *argv[])
 	int thread_num;
 	long request_num;
 	int log_level;
-	int start_event;
+	int connection_num;
+	std::string start_event;
 	std::string mpath, log;
 
 	po::options_description desc("Allowed options");
@@ -95,7 +97,8 @@ int main(int argc, char *argv[])
 		("log,l", po::value<std::string>(&log), "log file")
 		("log-level,L", po::value<int>(&log_level)->default_value(2), "log level")
 		("request,r", po::value<long>(&request_num)->default_value(1000000))
-		("start-event,s", po::value<int>(&start_event)->default_value(0), "starting event position (0 - event-num from manifest)")
+		("start-event,s", po::value<std::string>(&start_event), "starting event")
+		("connections,c", po::value<int>(&connection_num)->default_value(1))
 	;
 
 	po::variables_map vm;
@@ -109,6 +112,11 @@ int main(int argc, char *argv[])
 
 	if (!vm.count("manifest")) {
 		std::cerr << "You must provide manifest path\n" << desc << std::endl;
+		return -1;
+	}
+
+	if (!vm.count("start-event")) {
+		std::cerr << "You must provide starting event path\n" << desc << std::endl;
 		return -1;
 	}
 
@@ -129,7 +137,15 @@ int main(int argc, char *argv[])
 	std::string config = writer.write(root["args"]["config"]);
 
 	pt::ptime time_start(pt::microsec_clock::local_time());
-	starter start(root["args"]["config"], config, thread_num, request_num, start_event);
+	{
+		std::vector<boost::shared_ptr<starter> > proc;
+
+		for (int i = 0; i < connection_num; ++i) {
+			boost::shared_ptr<starter> start(new starter(root["args"]["config"], config,
+						start_event, thread_num, request_num / connection_num));
+			proc.push_back(start);
+		}
+	}
 	pt::ptime time_end(pt::microsec_clock::local_time());
 
 	pt::time_duration duration(time_end - time_start);
