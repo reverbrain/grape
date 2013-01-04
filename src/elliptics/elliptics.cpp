@@ -52,8 +52,16 @@ void elliptics_node_t::emit(const struct sph &sph, const std::string &key, const
 	id.group_id = 0;
 	id.type = 0;
 
-	xlog(__LOG_NOTICE, "grape::emit: key: '%s', event: '%s', data-size: %zd\n",
-			key.c_str(), event.c_str(), data.size());
+	char id_str[DNET_DUMP_NUM * 2 + 1];
+	char sph_str[DNET_DUMP_NUM * 2 + 1];
+
+	dnet_dump_id_len_raw(id.id, DNET_DUMP_NUM, id_str);
+	dnet_dump_id_len_raw(sph.src.id, DNET_DUMP_NUM, sph_str);
+
+	id_str[2 * DNET_DUMP_NUM] = '\0';
+	sph_str[2 * DNET_DUMP_NUM] = '\0';
+
+	xlog(__LOG_INFO, "%s: sph: %s: %s: grape::emit: data-size: %zd\n", id_str, sph_str, event.c_str(), data.size());
 
 	std::string binary;
 	m_session->push_unlocked(&id, sph, event, data, binary);
