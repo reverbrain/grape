@@ -2,9 +2,9 @@
 
 #include <stdlib.h>
 
-#include <atomic>
 #include <iostream>
 
+#include <boost/detail/atomic_count.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/thread.hpp>
@@ -46,7 +46,7 @@ class starter : public grape::elliptics_node_t {
 
 	private:
 		boost::thread_group m_tgroup;
-		std::atomic_int m_limit;
+		boost::detail::atomic_count m_limit;
 		std::string m_base_event;
 		Json::Value m_jconf;
 		std::string m_start_event;
