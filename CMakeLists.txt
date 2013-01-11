@@ -1,6 +1,8 @@
 cmake_minimum_required (VERSION 2.6)
 project (grape)
 
+add_definitions("-std=c++0x")
+
 # The version number.
 FILE (READ "${CMAKE_CURRENT_SOURCE_DIR}/debian/changelog" DEBCHANGELOG)
 string(REGEX MATCH "([0-9]+\\.[0-9]+\\.[0-9]+)" DEBFULLVERSION "${DEBCHANGELOG}")

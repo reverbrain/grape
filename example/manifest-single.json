@@ -1,12 +1,6 @@
 {
 	"type" : "binary",
-	"engine" : {
-		"heartbeat-timeout" : 60,
-		"pool-limit" : 20,
-		"queue-limit" : 3000,
-		"grow-threshold" : 1,
-		"slave" : "/home/zbr/build/bin/cocaine-slave"
-	},
+	"slave" : "/opt/elliptics/build/bin/cocaine-worker-generic",
 	"args" : {
 		"name" : "libgrape_etest_single.so",
 		"config" : {
