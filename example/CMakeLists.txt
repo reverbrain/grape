@@ -1,5 +1,6 @@
 project(grape_etest)
 add_library(grape_etest SHARED test.cpp)
+set_target_properties(grape_etest PROPERTIES COMPILE_FLAGS "-std=c++0x")
 target_link_libraries(grape_etest grape ${elliptics_LIBRARIES})
 
 project(grape_etest_single)
