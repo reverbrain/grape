@@ -142,12 +142,12 @@ class test_node0_t : public elliptics_node_t {
 			s.set_cflags(m_cflags);
 
 			try {
-				s.read_data_wait(key.str(), 0, 0);
+				s.read_data(key.str(), 0, 0);
 			} catch (...) {
 			}
 
 			try {
-				s.write_data_wait(key.str(), data, 0);
+				s.write_data(key.str(), data, 0);
 			} catch (...) {
 			}
 
