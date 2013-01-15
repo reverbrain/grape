@@ -105,7 +105,7 @@ void elliptics_node_t::put(const std::string &key, const std::string &data)
 {
 	uint64_t remote_offset = 0;
 
-	m_session->write_data_wait(key, data, remote_offset);
+	m_session->write_data(key, data, remote_offset);
 }
 
 std::string elliptics_node_t::get(const std::string &key)
@@ -113,12 +113,28 @@ std::string elliptics_node_t::get(const std::string &key)
 	uint64_t offset = 0;
 	uint64_t size = 0;
 
-	return m_session->read_data_wait(key, offset, size);
+	return m_session->read_data(key, offset, size)->file().to_string();
+}
+
+static inline std::vector<std::string> convert(const ioremap::elliptics::bulk_read_result &ret)
+{
+	std::vector<std::string> result;
+	for (size_t i = 0; i < ret.size(); ++i) {
+		const ioremap::elliptics::read_result_entry entry = ret[i];
+		const uint64_t size = entry.file().size();
+		std::string line;
+		line.reserve(DNET_ID_SIZE + sizeof(uint64_t) + size);
+		line.append(reinterpret_cast<char*>(entry.io_attribute()->id), DNET_ID_SIZE);
+		line.append(reinterpret_cast<const char*>(&size), sizeof(uint64_t));
+		line.append(reinterpret_cast<char*>(entry.file().data()), size);
+		result.push_back(line);
+	}
+	return result;
 }
 
 std::vector<std::string> elliptics_node_t::mget(const std::vector<std::string> &keys)
 {
-	return m_session->bulk_read(keys);
+	return convert(m_session->bulk_read(keys));
 }
 
 void elliptics_node_t::calculate_checksum(const std::string &data, struct dnet_id &id) {
@@ -133,5 +149,5 @@ void elliptics_node_t::compare_and_swap(const std::string &key, const std::strin
 
 std::vector<std::string> elliptics_node_t::mget(const std::vector<struct dnet_io_attr> &keys)
 {
-	return m_session->bulk_read(keys);
+	return convert(m_session->bulk_read(keys));
 }

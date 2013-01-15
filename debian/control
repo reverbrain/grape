@@ -4,9 +4,9 @@ Priority: optional
 Maintainer: Evgeniy Polyakov <zbr@ioremap.net>
 Build-Depends:	debhelper (>= 7),
 		cmake,
-		elliptics-dev (>= 2.20),
-		elliptics (>= 2.20),
-		elliptics-client (>= 2.20),
+		elliptics-dev (>= 2.21),
+		elliptics (>= 2.21),
+		elliptics-client (>= 2.21),
 		libboost-dev,
 		libboost-thread-dev,
 		libboost-iostreams-dev,
