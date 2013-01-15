@@ -20,7 +20,7 @@ FILE(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/include/grape/*.hpp" "${CMAKE_CUR
 install(FILES ${headers} DESTINATION include/grape)
 
 include_directories(BEFORE ${PROJECT_SOURCE_DIR}/foreign/jsoncpp-src-0.6.0-rc2/include)
-include_directories(${PROJECT_SOURCE_DIR} ${elliptics_INCLUDE_DIRS} ${PROJECT_BINARY_DIR} "${PROJECT_SOURCE_DIR}/include")
+include_directories(${PROJECT_SOURCE_DIR}/include ${elliptics_INCLUDE_DIRS} ${PROJECT_BINARY_DIR} "${PROJECT_SOURCE_DIR}/include")
 
 add_library(grapejson
 	foreign/jsoncpp-src-0.6.0-rc2/src/lib_json/json_value
