@@ -1,3 +1,14 @@
+grape (0.5.2) unstable; urgency=low
+
+  * Test app should use new elliptics interfaces
+  * Use correct include path
+  * Update source base to new elliptics
+  * Updated to 0.10 cocaine
+  * Use boost::detail::atomic_count instead of std::atomic, which is not present in lucid
+  * Added libboost-system-dev dependency
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Wed, 16 Jan 2013 18:05:39 +0400
+
 grape (0.5.1) unstable; urgency=low
 
   * Updated test-single and added start/benchmark tool for this test
