@@ -5,7 +5,6 @@
 #include <iostream>
 
 #include <boost/detail/atomic_count.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/thread.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -34,7 +33,7 @@ class starter : public grape::elliptics_node_t {
 			srand(tv.tv_sec + tv.tv_usec);
 
 			for (int i = 0; i < thread_num; ++i)
-				m_tgroup.create_thread(boost::bind(&starter::loop, this));
+				m_tgroup.create_thread(boost::bind(&starter::loop_io, this));
 		}
 
 		~starter() {
@@ -55,7 +54,27 @@ class starter : public grape::elliptics_node_t {
 			return syscall(SYS_gettid);
 		}
 
-		void loop() {
+		static std::string lexical_cast(size_t value) {
+			if (value == 0) {
+				return std::string("0");
+			}
+			std::string result;
+			size_t length = 0;
+			size_t calculated = value;
+			while (calculated) {
+				calculated /= 10;
+				++length;
+			}
+			result.resize(length);
+			while (value) {
+				--length;
+				result[length] = '0' + (value % 10);
+				value /= 10;
+			}
+			return result;
+		}
+
+		void loop(void) {
 			elliptics::session s(*m_node);
 
 			Json::Value groups(m_jconf["groups"]);
@@ -69,7 +88,7 @@ class starter : public grape::elliptics_node_t {
 			std::string data("Test data");
 
 			while (--m_limit >= 0) {
-				std::string key = boost::lexical_cast<std::string>(rand()) + "starter";
+				std::string key = lexical_cast(rand()) + "starter";
 				struct dnet_id id;
 				s.transform(key, id);
 				id.group_id = 0;
@@ -77,6 +96,33 @@ class starter : public grape::elliptics_node_t {
 			}
 		}
 
+		void loop_io(void) {
+			elliptics::session s(*m_node);
+
+			Json::Value groups(m_jconf["groups"]);
+			if (!groups.empty() && groups.isArray()) {
+				std::vector<int> gr;
+				std::transform(groups.begin(), groups.end(), std::back_inserter(gr), grape::json_digitizer());
+				s.set_groups(gr);
+			}
+
+			s.set_ioflags(DNET_IO_FLAGS_CACHE | DNET_IO_FLAGS_CACHE_ONLY);
+
+			std::string data("Test data");
+
+			while (--m_limit >= 0) {
+				std::string key = lexical_cast(rand()) + "starter";
+
+				struct dnet_id id;
+				s.transform(key, id);
+				id.group_id = 0;
+
+				try {
+					s.read_data(id, 0, 0);
+				} catch (...) {
+				}
+			}
+		}
 };
 
 int main(int argc, char *argv[])
