@@ -21,7 +21,8 @@ using namespace ioremap;
 
 class starter : public grape::elliptics_node_t {
 	public:
-		starter(Json::Value &root, const std::string &config, const std::string &start_event, int thread_num, int request_num):
+		starter(Json::Value &root, const std::string &config, const std::string &start_event, int thread_num, int request_num,
+				bool run_io):
 		elliptics_node_t(config),
 		m_limit(request_num),
 		m_jconf(root),
@@ -33,7 +34,7 @@ class starter : public grape::elliptics_node_t {
 			srand(tv.tv_sec + tv.tv_usec);
 
 			for (int i = 0; i < thread_num; ++i)
-				m_tgroup.create_thread(boost::bind(&starter::loop_io, this));
+				m_tgroup.create_thread(boost::bind(run_io ? &starter::loop_io : &starter::loop, this));
 		}
 
 		~starter() {
@@ -109,16 +110,14 @@ class starter : public grape::elliptics_node_t {
 			s.set_ioflags(DNET_IO_FLAGS_CACHE | DNET_IO_FLAGS_CACHE_ONLY);
 
 			std::string data("Test data");
+			std::string key = lexical_cast(rand()) + "starter";
 
+			s.write_data(key, data, 0);
+
+			s.set_cflags(DNET_FLAGS_NOLOCK);
 			while (--m_limit >= 0) {
-				std::string key = lexical_cast(rand()) + "starter";
-
-				struct dnet_id id;
-				s.transform(key, id);
-				id.group_id = 0;
-
 				try {
-					s.read_data(id, 0, 0);
+					s.read_data(key, 0, 0);
 				} catch (...) {
 				}
 			}
@@ -144,7 +143,8 @@ int main(int argc, char *argv[])
 		("log-level,L", po::value<int>(&log_level)->default_value(2), "log level")
 		("request,r", po::value<long>(&request_num)->default_value(1000000))
 		("start-event,s", po::value<std::string>(&start_event), "starting event")
-		("connections,c", po::value<int>(&connection_num)->default_value(1))
+		("connections,c", po::value<int>(&connection_num)->default_value(1), "number of network connections")
+		("run-io,i", "run io test instead of exec")
 	;
 
 	po::variables_map vm;
@@ -165,6 +165,8 @@ int main(int argc, char *argv[])
 		std::cerr << "You must provide starting event path\n" << desc << std::endl;
 		return -1;
 	}
+
+	bool run_io = vm.count("run-io") ? true : false; 
 
 	Json::Reader reader;
 	Json::Value root;
@@ -188,7 +190,7 @@ int main(int argc, char *argv[])
 
 		for (int i = 0; i < connection_num; ++i) {
 			boost::shared_ptr<starter> start(new starter(root["args"]["config"], config,
-						start_event, thread_num, request_num / connection_num));
+						start_event, thread_num, request_num / connection_num, run_io));
 			proc.push_back(start);
 		}
 	}
