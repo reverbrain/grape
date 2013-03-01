@@ -18,7 +18,7 @@ elliptics_node_t::elliptics_node_t(const std::string &config)
 
 	Json::Value groups(root["groups"]);
 	if (groups.empty() || !groups.isArray())
-		throw std::runtime_error("no groups has been specified");
+		throw ioremap::elliptics::error(-ENOENT, "no groups has been specified");
 
 	std::vector<int> group_numbers;
 	std::transform(groups.begin(), groups.end(), std::back_inserter(group_numbers), json_digitizer());
@@ -26,23 +26,23 @@ elliptics_node_t::elliptics_node_t(const std::string &config)
 	m_session->set_groups(group_numbers);
 
 	if (m_session->get_groups().size() == 0)
-		throw std::runtime_error("elliptics_topology_t: no groups added, exiting");
+		throw ioremap::elliptics::error(-ENOENT, "elliptics_topology_t: no groups added, exiting");
 
 	Json::Value nodes(root["nodes"]);
 	if (nodes.empty() || !nodes.isObject())
-		throw std::runtime_error("no nodes has been specified");
+		throw ioremap::elliptics::error(-ENOENT, "no nodes has been specified");
 
 	Json::Value::Members node_names(nodes.getMemberNames());
 
 	for(Json::Value::Members::const_iterator it = node_names.begin(); it != node_names.end(); ++it) {
 		try {
 			m_node->add_remote(it->c_str(), nodes[*it].asInt());
-		} catch(const std::runtime_error&) {
+		} catch(const ioremap::elliptics::error&) {
 		}
 	}
 
 	if (m_session->state_num() == 0)
-		throw std::runtime_error("elliptics_topology_t: no remote nodes added, exiting");
+		throw ioremap::elliptics::error(-ENOENT, "elliptics_topology_t: no remote nodes added, exiting");
 }
 
 void elliptics_node_t::emit(const struct sph &sph, const std::string &key, const std::string &event, const std::string &data)
