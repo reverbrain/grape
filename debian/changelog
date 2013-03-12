@@ -1,3 +1,11 @@
+grape (0.5.5) unstable; urgency=low
+
+  * Do not send \n symbol in reply - this breaks fine prints
+  * Forgot to export proper initialize()
+  * Fixed compilation error about sph->binary_size
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Wed, 13 Mar 2013 01:17:27 +0400
+
 grape (0.5.4) unstable; urgency=low
 
   * Sycned with upstream elliptics and 0.10.0-rc4 cocaine binary loader
