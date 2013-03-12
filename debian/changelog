@@ -1,3 +1,10 @@
+grape (0.5.4) unstable; urgency=low
+
+  * Sycned with upstream elliptics and 0.10.0-rc4 cocaine binary loader
+  * Use ioremap::elliptics::error as base exception
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Wed, 13 Mar 2013 00:13:17 +0400
+
 grape (0.5.3) unstable; urgency=low
 
   * Fixed elliptics deps
