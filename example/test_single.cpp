@@ -104,7 +104,7 @@ class test_node0_t : public elliptics_node_t {
 				strftime(date_str, sizeof(date_str), "%F %R:%S", &tm);
 
 				std::ostringstream reply_data;
-				reply_data << date_str << "." << tv.tv_usec << ": " << event << ": " << data << "\n";
+				reply_data << date_str << "." << tv.tv_usec << ": " << event << ": " << data;
 				/*
 				 * Reply adds not only your data, but also the whole sph header to the original caller's waiting container
 				 */
