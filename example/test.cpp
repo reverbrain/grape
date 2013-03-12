@@ -23,8 +23,8 @@ class test_node0_t : public elliptics_node_t {
 
 			std::string event = xget_event(sph, payload);
 
-			xlog(__LOG_NOTICE, "grape::test-node0: %s: data-size: %zd, binary-size: %zd, event-size: %d: data: '%.*s'\n",
-					event.c_str(), sph->data_size, sph->binary_size, sph->event_size,
+			xlog(__LOG_NOTICE, "grape::test-node0: %s: data-size: %zd, event-size: %d: data: '%.*s'\n",
+					event.c_str(), sph->data_size, sph->event_size,
 					(int)sph->data_size, real_data);
 
 			if (event == "test-app@event0")
@@ -61,8 +61,8 @@ class test_node1_t : public elliptics_node_t {
 
 			std::string event = xget_event(sph, payload);
 
-			xlog(__LOG_NOTICE, "grape::test-node1: %s: data-size: %zd, binary-size: %zd, event-size: %d: data: '%.*s'\n",
-					event.c_str(), sph->data_size, sph->binary_size, sph->event_size,
+			xlog(__LOG_NOTICE, "grape::test-node1: %s: data-size: %zd, event-size: %d: data: '%.*s'\n",
+					event.c_str(), sph->data_size, sph->event_size,
 					(int)sph->data_size, real_data);
 
 			std::string data = std::string(real_data, sph->data_size) + event + "|";

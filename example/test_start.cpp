@@ -107,7 +107,8 @@ class starter : public grape::elliptics_node_t {
 				s.set_groups(gr);
 			}
 
-			s.set_ioflags(DNET_IO_FLAGS_CACHE | DNET_IO_FLAGS_CACHE_ONLY);
+			uint64_t ioflags = m_jconf["ioflags"].asInt();
+			s.set_ioflags(ioflags);
 
 			std::string data("Test data");
 			std::string key = lexical_cast(rand()) + "starter";

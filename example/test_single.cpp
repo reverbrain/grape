@@ -7,6 +7,8 @@
 #include <grape/grape.hpp>
 #include <grape/elliptics.hpp>
 
+#include <cocaine/logging.hpp>
+
 using namespace ioremap::grape;
 
 namespace {
@@ -17,7 +19,7 @@ namespace {
 }
 
 extern "C" {
-	void *initialize(const char *config, const size_t size);
+	void *initialize(cocaine::logging::log_t *logger, const char *config, const size_t size);
 }
 
 class test_node0_t : public elliptics_node_t {
@@ -109,9 +111,9 @@ class test_node0_t : public elliptics_node_t {
 				reply(orig_sph, event, reply_data.str(), final);
 			}
 
-			xlog(__LOG_INFO, "%s: grape::test-node0: %s -> %s: data-size: %zd, binary-size: %zd, final: %d\n",
+			xlog(__LOG_INFO, "%s: grape::test-node0: %s -> %s: data-size: %zd, final: %d\n",
 					dnet_dump_id_str(sph->src.id),
-					event.c_str(), emit_event.c_str(), sph->data_size, sph->binary_size, final);
+					event.c_str(), emit_event.c_str(), sph->data_size, final);
 		}
 
 	private:
