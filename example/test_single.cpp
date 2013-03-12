@@ -157,7 +157,7 @@ class test_node0_t : public elliptics_node_t {
 		}
 };
 
-void *initialize(const char *config, const size_t size)
+void *initialize(cocaine::logging::log_t *logger, const char *config, const size_t size)
 {
 	std::string cfg(config, size);
 
