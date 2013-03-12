@@ -26,10 +26,10 @@ int process(void *__ev, struct binary_io *io)
 
 	struct sph *sph = (struct sph *)io->chunk.data;
 
-	if (io->chunk.size != sizeof(struct sph) + sph->event_size + sph->data_size + sph->binary_size) {
+	if (io->chunk.size != sizeof(struct sph) + sph->event_size + sph->data_size) {
 		xlog(__LOG_ERROR, "grape::process: invalid chunk size: %zd, must be equal to sum of "
-				"sizeof(sph): %zd, event-size: %d, binary-size: %zd, data-size: %zd",
-				io->chunk.size, sizeof(struct sph), sph->event_size, sph->data_size, sph->binary_size);
+				"sizeof(sph): %zd, event-size: %d, data-size: %zd",
+				io->chunk.size, sizeof(struct sph), sph->event_size, sph->data_size);
 		return -E2BIG;
 	}
 
