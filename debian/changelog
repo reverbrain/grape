@@ -1,9 +1,13 @@
-grape (0.6~1local) unstable; urgency=low
+grape (0.6~2.gbpa6e877) UNRELEASED; urgency=low
 
-  * Adding queue and app building staff
-  * Dropping topology and pipelining (for now)
+  ** SNAPSHOT build @a6e877526c11d96bc70c929f4b2831f5cda93f80 **
 
- -- Ivan Chelubeev <ijon@yandex-team.ru>  Tue, 23 Apr 2013 18:29:37 +0400
+  [ Ivan Chelubeev ]
+  * [3109a1] jsoncpp had been packaged, so removing private copy of that library
+  * [c12433] Old stuff removed (may be to reincarnate later).
+  * [a6e877] Queue components (queue, driver, testerhead) fused together under the umbrella name "grape"
+
+ -- Ivan Chelubeev <ijon@yandex-team.ru>  Tue, 23 Apr 2013 21:41:16 +0400
 
 grape (0.5.5) unstable; urgency=low
 
