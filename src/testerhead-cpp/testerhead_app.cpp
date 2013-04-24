@@ -17,6 +17,9 @@ public:
 
 	// elliptics client generator
 	elliptics_client_state _elliptics_client_state;
+    
+    // reply delay, in milliseconds
+    int _delay;
 
 	app_context(std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
 	void initialize();
@@ -29,6 +32,8 @@ app_context::app_context(std::shared_ptr<cocaine::framework::service_manager_t> 
 {
 	// obtain logging facility
 	_log = service_manager->get_system_logger();
+
+    _delay = 0;
 }
 
 void app_context::initialize()
@@ -57,6 +62,11 @@ void app_context::initialize()
 			COCAINE_LOG_INFO(_log, "creating elliptics client");
 
 			_elliptics_client_state = elliptics_client_state::create(args);
+
+            _delay = args.get("delay", "0").asUInt();
+            COCAINE_LOG_INFO(_log, "reply delay = %d", _delay);
+            // actual delay must be in microseconds
+            _delay *= 1000;
 		}
 
 		COCAINE_LOG_INFO(_log, "registering event handlers");
@@ -95,6 +105,10 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 	//     app.assign(context.event().c_str(), p - context.event().c_str());
 	//     event.assign(p + 1);
 	// }
+
+    if (_delay) {
+        usleep(_delay);
+    }
 
 	reply(cocaine_event);
 
