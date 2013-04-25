@@ -40,9 +40,9 @@ queue_t::queue_t(context_t& context,
 	m_context(context),
 	m_app(app),
 	m_log(new log_t(context, cocaine::format("driver/%s", name))),
-	m_timer(reactor.native()),
-	m_timer_async(reactor.native()),
-	m_queue_async(reactor.native()),
+	m_idle_timer(reactor.native()),
+	m_idle_timer_async(reactor.native()),
+	m_local_queue_async(reactor.native()),
 	m_current_exec_count(0),
 	m_worker_event(args.get("emit", name).asString()),
 	m_queue_name(args.get("source-queue-app", "queue").asString()),
@@ -91,19 +91,19 @@ queue_t::queue_t(context_t& context,
 		throw configuration_error_t("no queue name has been specified");
 	}
 
-	m_timer.set<queue_t, &queue_t::on_event>(this);
-	m_timer.set(1.0f, 5.0f);
-	m_timer.again();
+	m_idle_timer.set<queue_t, &queue_t::on_idle_timer_event>(this);
+	m_idle_timer.set(1.0f, 5.0f);
+	m_idle_timer.again();
 
-	m_timer_async.set<queue_t, &queue_t::on_timer_async>(this);
-	m_timer_async.start();
+	m_idle_timer_async.set<queue_t, &queue_t::on_idle_timer_async>(this);
+	m_idle_timer_async.start();
 
-	m_queue_async.set<queue_t, &queue_t::on_queue_async>(this);
-	m_queue_async.start();
+	m_local_queue_async.set<queue_t, &queue_t::on_local_queue_async>(this);
+	m_local_queue_async.start();
 }
 
 queue_t::~queue_t() {
-	m_timer.stop();
+	m_idle_timer.stop();
 	m_node.reset();
 }
 
@@ -124,7 +124,37 @@ session queue_t::create_session()
 	return sess;
 }
 
-void queue_t::on_result(const ioremap::elliptics::exec_result_entry &result)
+void queue_t::on_idle_timer_event(ev::timer &, int) {
+	COCAINE_LOG_INFO(m_log, "idle timer commands to check queue for the data");
+	get_more_data();
+}
+
+void queue_t::on_idle_timer_async(ev::async &, int)
+{
+	m_idle_timer.again();
+}
+
+void queue_t::get_more_data()
+{
+	session sess = create_session();
+
+	++m_current_exec_count;
+
+	dnet_id queue_id;
+	queue_id.type = 0;
+	queue_id.group_id = 0;
+	sess.transform(m_queue_id, queue_id);
+
+	sess.set_exceptions_policy(session::no_exceptions);
+	sess.exec(&queue_id, m_queue_get_event, data_pointer()).connect(
+		std::bind(&queue_t::on_queue_request_data, this, std::placeholders::_1),
+		std::bind(&queue_t::on_queue_request_complete, this, std::placeholders::_1)
+	);
+
+	COCAINE_LOG_INFO(m_log, "sending %s to %s-%s", m_queue_get_event.c_str(), m_queue_name.c_str(), m_queue_id.c_str());
+}
+
+void queue_t::on_queue_request_data(const ioremap::elliptics::exec_result_entry &result)
 {
 	try {
 		if (result.error()) {
@@ -132,26 +162,36 @@ void queue_t::on_result(const ioremap::elliptics::exec_result_entry &result)
 			return;
 		}
 
+		// queue.pop returns no data when queue is empty.
+		// Idle timer handles queue emptiness firing periodically to check
+		// if there is new data in the queue.
+		//
+		// But every time when we actually got data we have to postpone idle timer.
+
 		exec_context context = result.context();
-		// check if queue is empty
-		if (context.data().empty()) {
-			return;
-		}
+		if (!context.data().empty()) {
+			COCAINE_LOG_INFO(m_log, "got data %p from %s-%s", context.data().data(), m_queue_name.c_str(), m_queue_id.c_str());
 
-		COCAINE_LOG_INFO(m_log, "got data %p from %s-%s", context.data().data(), m_queue_name.c_str(), m_queue_id.c_str());
+			//NOTE: combine m_idle_timer_async with m_local_queue_async may be
+			// as they both fired simultaneously?
 
-		{
-			std::lock_guard<std::mutex> lock(m_local_queue_mutex);
-			m_local_queue.push(context.data());
+			// command to postpone the idle timer
+			m_idle_timer_async.send();
+
+			// put received data to the local queue and command to process it
+			{
+				std::lock_guard<std::mutex> lock(m_local_queue_mutex);
+				m_local_queue.push(context.data());
+			}
+			m_local_queue_async.send();
 		}
-		m_queue_async.send();
 
 	} catch(const std::exception& e) {
-		COCAINE_LOG_ERROR(m_log, "unable to enqueue an event - %s", e.what());
+		COCAINE_LOG_ERROR(m_log, "on_queue_request_data error: %s", e.what());
 	}
 }
 
-void queue_t::on_request_finished(const error_info &error)
+void queue_t::on_queue_request_complete(const error_info &error)
 {
 	if (!error) {
 		COCAINE_LOG_INFO(m_log, "request to %s-%s finished", m_queue_name.c_str(), m_queue_id.c_str());
@@ -161,35 +201,45 @@ void queue_t::on_request_finished(const error_info &error)
 	--m_current_exec_count;
 }
 
-void queue_t::on_event(ev::timer &, int) {
-	get_more_data();
+void queue_t::on_local_queue_async(ev::async &, int)
+{
+	process_local_queue();
 }
 
-void queue_t::on_timer_async(ev::async &, int)
+void queue_t::process_local_queue()
 {
-	m_timer.again();
-}
+	// It's unwanted for the process_local_queue to run concurrently,
+	// fighing for the local queue access.
+	// All calls but the currently running one must fall off early.
 
-void queue_t::on_queue_async(ev::async &, int)
-{
-	process_queue();
+	if (!m_local_queue_processing_mutex.try_lock()) {
+		return;
+	}
+
+	data_pointer data;
+	for (;;) {
+		{
+			std::lock_guard<std::mutex> lock(m_local_queue_mutex);
+			if (m_local_queue.empty()) {
+				break;
+			}
+			data = m_local_queue.front();
+			m_local_queue.pop();
+		}
+		process_data(data);
+	}
+
+	m_local_queue_processing_mutex.unlock();
 }
 
 bool queue_t::process_data(const data_pointer &data)
 {
-	if (data.empty()) {
-		// queue.pop returns no data when queue has no data (queue is empty),
-		// sending async to initiate "retry" timer
-		COCAINE_LOG_INFO(m_log, "DEBUG: process_data() and data is empty");
-		m_timer_async.send();
-		return false;
-	}
-
+	// Data could not be empty here.
 	COCAINE_LOG_INFO(m_log, "forwarding data %p to worker", data.data());
 
 	auto result = m_scopes.insert(std::make_pair(data, scope_t(data)));
 	scope_t &scope = result.first->second;
-	if (result.second) {
+	if (!result.second) {
 		++scope.try_count;
 		if (scope.try_count > FAIL_LIMIT) {
 			m_scopes.erase(data);
@@ -197,6 +247,8 @@ bool queue_t::process_data(const data_pointer &data)
 			return true;
 		}
 	}
+
+	// Pass data to the worker, return it back to the local queue if failed.
 
 	try {
 		auto downstream = std::make_shared<downstream_t>(this, &scope);
@@ -209,6 +261,8 @@ bool queue_t::process_data(const data_pointer &data)
 			scope.upstream = upstream;
 			scope.downstream = downstream;
 
+			//NOTE: successful enqueueing cause boost for inbound data rate
+			// by calling to get more data
 			get_more_data();
 
 			return true;
@@ -225,13 +279,6 @@ bool queue_t::process_data(const data_pointer &data)
 	}
 	return false;
 
-	// scope_t &scope = m_scopes[data];
-	// ++scope.count;
-	// if (scope.count > FAIL_LIMIT) {
-	//     m_scopes.erase(data);
-	//     on_process_total_fail(data);
-	//     return true;
-	// }
 /*
 	try {
 		api::policy_t policy(false, m_timeout, m_deadline);
@@ -254,31 +301,13 @@ bool queue_t::process_data(const data_pointer &data)
 */
 }
 
-void queue_t::get_more_data()
-{
-	session sess = create_session();
-
-	++m_current_exec_count;
-
-	dnet_id queue_id;
-	queue_id.type = 0;
-	queue_id.group_id = 0;
-	sess.transform(m_queue_id, queue_id);
-
-	sess.set_exceptions_policy(session::no_exceptions);
-	sess.exec(&queue_id, m_queue_get_event, data_pointer()).connect(
-		std::bind(&queue_t::on_result, this, std::placeholders::_1),
-		std::bind(&queue_t::on_request_finished, this, std::placeholders::_1)
-	);
-
-	COCAINE_LOG_INFO(m_log, "sending %s to %s-%s", m_queue_get_event.c_str(), m_queue_name.c_str(), m_queue_id.c_str());
-}
-
 void queue_t::on_process_failed(const data_pointer &data)
 {
 	COCAINE_LOG_INFO(m_log, "failed to process data %p", data.data());
-	// try to repeat processing
-	process_data(data);
+
+	// Return data to the local queue and try to repeat processing.
+	std::lock_guard<std::mutex> lock(m_local_queue_mutex);
+	m_local_queue.push(data);
 }
 
 void queue_t::on_process_successed(const ioremap::elliptics::data_pointer &data)
@@ -312,11 +341,15 @@ void queue_t::on_process_successed(const ioremap::elliptics::data_pointer &data)
 		);
 	}
 
-	if (m_local_queue.empty()) {
-		get_more_data();
-	} else {
-		process_queue();
-	}
+	// Successful processing gives right to request more data,
+	// gives support to inbound data rate
+	get_more_data();
+
+	// if (m_local_queue.empty()) {
+	// 	get_more_data();
+	// } else {
+	// 	process_local_queue();
+	// }
 }
 
 void queue_t::on_process_total_fail(const data_pointer &data)
@@ -348,22 +381,6 @@ void queue_t::on_process_total_fail(const data_pointer &data)
 */
 }
 
-void queue_t::process_queue()
-{
-	data_pointer data;
-	for (;;) {
-		{
-			std::lock_guard<std::mutex> lock(m_local_queue_mutex);
-			if (m_local_queue.empty())
-				return;
-			data = m_local_queue.front();
-			m_local_queue.pop();
-		}
-		if (!process_data(data))
-			return;
-	}
-}
-
 queue_t::downstream_t::downstream_t(queue_t *queue, queue_t::scope_t *scope):
 	m_queue(queue), m_scope(scope), m_finished(false)
 {
@@ -387,8 +404,8 @@ void queue_t::downstream_t::error(error_code code, const std::string &msg)
 
 void queue_t::downstream_t::close()
 {
-	m_queue->get_more_data();
 	if (!m_finished) {
+		COCAINE_LOG_ERROR(m_queue->m_log, "downstream closing without error() or write() called, treating this as data process failure");
 		m_queue->on_process_failed(m_scope->data);
 	}
 }

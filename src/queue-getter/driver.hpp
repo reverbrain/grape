@@ -91,18 +91,20 @@ class queue_t:
 		ioremap::elliptics::session
 		create_session();
 
-		// handlers of requests to the queue 
+		// idle timer callbacks 
 		void
-		on_result(const ioremap::elliptics::exec_result_entry &result);
+		on_idle_timer_event(ev::timer&, int);
 		void
-		on_request_finished(const ioremap::elliptics::error_info &error);
+		on_idle_timer_async(ev::async&, int);
+
+		// requests to the queue callbacks
+		void
+		on_queue_request_data(const ioremap::elliptics::exec_result_entry &result);
+		void
+		on_queue_request_complete(const ioremap::elliptics::error_info &error);
 
 		void
-		on_event(ev::timer&, int);
-		void
-		on_timer_async(ev::async&, int);
-		void
-		on_queue_async(ev::async&, int);
+		on_local_queue_async(ev::async&, int);
 		bool
 		process_data(const ioremap::elliptics::data_pointer &data);
 		void
@@ -115,7 +117,7 @@ class queue_t:
 		on_process_total_fail(const ioremap::elliptics::data_pointer &data);
 
 		void
-		process_queue();
+		process_local_queue();
 
 	private:
 		struct data_pointer_comparator_t
@@ -136,15 +138,16 @@ class queue_t:
 		std::unique_ptr<ioremap::elliptics::node> m_node;
 		std::vector<int> m_groups;
 
-		ev::timer m_timer;
-		ev::async m_timer_async;
-		ev::async m_queue_async;
+		ev::timer m_idle_timer;
+		ev::async m_idle_timer_async;
+		ev::async m_local_queue_async;
 
 		std::atomic_uint m_current_exec_count;
 		std::map<ioremap::elliptics::data_pointer, scope_t, data_pointer_comparator_t> m_scopes;
 
 		std::queue<ioremap::elliptics::data_pointer> m_local_queue;
 		std::mutex m_local_queue_mutex;
+		std::mutex m_local_queue_processing_mutex;
 
 		const std::string m_worker_event;
 		const std::string m_queue_name;
