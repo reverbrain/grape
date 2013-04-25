@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <boost/filesystem.hpp>
 #include <jsoncpp/json.hpp>
 #include <cocaine/framework/logging.hpp>
@@ -36,6 +37,43 @@ void _debug_log(int line, const char *format, ...) {
 	fclose(f);
 }
 
+template <unsigned N>
+double approx_moving_average(double avg, double input) {
+	avg -= avg/N;
+	avg += input/N;
+	return avg;
+}
+
+double exponential_moving_average(double avg, double input, double alpha) {
+	return alpha * input + (1.0 - alpha) * avg;
+}
+
+struct rate_stat
+{
+	uint64_t last_update; // in microseconds
+	double avg;
+
+	rate_stat() : last_update(microseconds_now()), avg(0.0) {}
+
+	uint64_t microseconds_now() {
+		timespec t;
+		clock_gettime(CLOCK_MONOTONIC_RAW, &t);
+		return t.tv_sec * 1000000 + t.tv_nsec / 1000;
+	}
+
+	void update() {
+		uint64_t now = microseconds_now();
+		double elapsed = double(now - last_update) / 1000000; // in seconds
+		double alpha = (elapsed > 1.0) ? 1.0 : elapsed;
+		avg = exponential_moving_average(avg, (1.0 / elapsed), alpha);
+		last_update = now;
+	}
+
+	double get() {
+		return avg;
+	}
+};
+
 }
 
 class app_context : public cocaine::framework::application<app_context>
@@ -50,6 +88,15 @@ public:
 	// elliptics client generator
 	elliptics_client_state _elliptics_client_state;
 
+	int64_t _ack_count;
+	rate_stat _ack_rate;
+	int64_t _fail_count;
+	rate_stat _fail_rate;
+	int64_t _push_count;
+	rate_stat _push_rate;
+	int64_t _pop_count;
+	rate_stat _pop_rate;
+
 	app_context(std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
 	void initialize();
 
@@ -58,12 +105,14 @@ public:
 
 app_context::app_context(std::shared_ptr<cocaine::framework::service_manager_t> service_manager)
 	: application<app_context>(service_manager)
+	, _ack_count(0)
+	, _fail_count(0)
+	, _pop_count(0)
+	, _push_count(0)
 {
 	// first of all obtain logging facility
 	_log = service_manager->get_system_logger();
 	debug_log("_log: %p", _log.get());
-
-	COCAINE_LOG_INFO(_log, "ctor");
 
 	//FIXME: pass logger explicitly everywhere
 	extern void _queue_module_set_logger(std::shared_ptr<cocaine::framework::logger_t>);
@@ -169,6 +218,9 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		}
 		reply_ack();
 
+		++_push_count;
+		_push_rate.update();
+
 	} else if (event == "pop") {
 		std::lock_guard<std::mutex> lock(_queue_mutex);
 
@@ -185,6 +237,9 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		} else {
 			reply_ack();
 		}
+
+		++_pop_count;
+		_pop_rate.update();
 
 /*    } else if (event == "peek") {
 		std::lock_guard<std::mutex> lock(_queue_mutex);
@@ -204,28 +259,21 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		}
 */
 	} else if (event == "ack") {
-		std::lock_guard<std::mutex> lock(_queue_mutex);
+		//std::lock_guard<std::mutex> lock(_queue_mutex);
 
-		COCAINE_LOG_INFO(_log, "ack");
 		reply_ack();
-/*
-	} else if (event == "return") {
-		std::lock_guard<std::mutex> lock(_queue_mutex);
 
-		COCAINE_LOG_INFO(_log, "queue id: %d", _queue._id);
+		++_ack_count;
+		_ack_rate.update();
 
-		data_pointer d;
-		size_t size = 0;
-		_queue.pop(&client, &d, &size);
-		// zero length item mean that queue is empty and there is nothing to pop
-		// also pop is idempotent
-		if (size) {
-			COCAINE_LOG_INFO(_log, "returning item: %s", d.to_string().c_str());
-			reply(data_pointer::copy(d.data(), size));
-		} else {
-			reply_ack();
-		}
-*/
+	} else if (event == "fail") {
+		//std::lock_guard<std::mutex> lock(_queue_mutex);
+
+		reply_ack();
+
+		++_fail_count;
+		_fail_rate.update();
+
 	} else if (event == "new-id") {
 		std::lock_guard<std::mutex> lock(_queue_mutex);
 
@@ -253,6 +301,27 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 
 		std::string text;
 		_queue.dump_state(&text);
+		reply(text);
+
+	} else if (event == "stats") {
+		std::lock_guard<std::mutex> lock(_queue_mutex);
+
+		std::string text;
+		{
+			Json::StyledWriter writer;
+			Json::Value root;
+
+			root["ack.count"] = Json::Value::Int64(_ack_count);
+			root["ack.rate"] = Json::Value(_ack_rate.get());
+			root["fail.count"] = Json::Value::Int64(_fail_count);
+			root["fail.rate"] = Json::Value(_fail_rate.get());
+			root["pop.count"] = Json::Value::Int64(_pop_count);
+			root["pop.rate"] = Json::Value(_pop_rate.get());
+			root["push.count"] = Json::Value::Int64(_push_count);
+			root["push.rate"] = Json::Value(_push_rate.get());
+
+			text = writer.write(root);
+		}
 		reply(text);
 
 	} else {

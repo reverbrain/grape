@@ -42,6 +42,7 @@ target_link_libraries(queue-app
 	${Boost_PROGRAM_OPTIONS_LIBRARY}
 	boost_system-mt
 	boost_filesystem-mt
+	rt
 )
 
 
