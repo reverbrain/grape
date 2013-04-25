@@ -125,9 +125,7 @@ class queue_t:
 			bool operator() (const ioremap::elliptics::data_pointer &a,
 							 const ioremap::elliptics::data_pointer &b) const
 			{
-				return a.size() < b.size()
-						|| (a.size() == b.size()
-							&& memcmp(a.data(), b.data(), a.size()) < 0);
+				return a.data() < b.data();
 			}
 		};
 

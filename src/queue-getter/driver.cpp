@@ -381,8 +381,8 @@ void queue_t::on_process_total_fail(const data_pointer &data)
 */
 }
 
-queue_t::downstream_t::downstream_t(queue_t *queue, queue_t::scope_t *scope):
-	m_queue(queue), m_scope(scope), m_finished(false)
+queue_t::downstream_t::downstream_t(queue_t *queue, queue_t::scope_t *scope)
+	: m_queue(queue), m_scope(scope), m_finished(false)
 {
 }
 
