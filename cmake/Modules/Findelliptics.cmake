@@ -4,6 +4,7 @@ find_path(cocaine_INCLUDE_DIR cocaine/common.hpp PATHS ${COCAINE_PREFIX}/include
 #find_library(elliptics_LIBRARY NAMES elliptics PATHS ${ELLIPTICS_PREFIX}/lib ${ELLIPTICS_PREFIX}/lib64 /usr/lib /usr/lib64)
 find_library(elliptics_cpp_LIBRARY NAMES elliptics_cpp PATHS ${ELLIPTICS_PREFIX}/lib ${ELLIPTICS_PREFIX}/lib64 /usr/lib /usr/lib64)
 
+set(elliptics_cpp_LIBRARIES ${elliptics_cpp_LIBRARY})
 set(elliptics_LIBRARIES ${elliptics_LIBRARY} ${elliptics_cpp_LIBRARY})
 set(elliptics_INCLUDE_DIRS ${elliptics_INCLUDE_DIR} ${cocaine_INCLUDE_DIR})
 list(REMOVE_DUPLICATES elliptics_INCLUDE_DIRS)
@@ -16,4 +17,4 @@ include(FindPackageHandleStandardArgs)
 # if all listed variables are TRUE
 find_package_handle_standard_args(elliptics DEFAULT_MSG	elliptics_LIBRARIES elliptics_INCLUDE_DIRS)
 
-mark_as_advanced(elliptics_INCLUDE_DIRS elliptics_LIBRARIES)
+mark_as_advanced(elliptics_INCLUDE_DIRS elliptics_LIBRARIES elliptics_cpp_LIBRARIES)

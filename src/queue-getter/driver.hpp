@@ -63,7 +63,7 @@ class queue_t:
 
 			virtual
 			void
-			error(error_code, const std::string &message);
+			error(cocaine::error_code, const std::string &message);
 
 			virtual
 			void

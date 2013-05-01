@@ -11,17 +11,29 @@ STRING (REGEX MATCH "([0-9]+$)" grape_VERSION_MINOR "${DEBFULLVERSION}")
 set(${grape_VERSION} "${grape_VERSION_MAJOR}.${grape_VERSION_MINOR}")
 
 find_package(Boost REQUIRED system thread program_options)
-find_package(JsonCpp REQUIRED)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
+find_package(JsonCpp REQUIRED)
 find_package(elliptics REQUIRED)
 find_package(CocaineNative REQUIRED)
+
+include(cmake/Modules/locate_library.cmake)
+locate_library(LIBEV "ev++.h" "ev" "libev")
+
+set(GRAPE_COMMON_LIBRARIES
+	${elliptics_cpp_LIBRARY}
+	${CocaineNative_LIBRARIES}
+	${JsonCpp_LIBRARIES}
+	ev
+	${Boost_SYSTEM_LIBRARY}
+	${Boost_THREAD_LIBRARY}
+)
 
 FILE(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/include/grape/*.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/include/grape/*.h")
 install(FILES ${headers} DESTINATION include/grape)
 
-include_directories(${PROJECT_SOURCE_DIR}/include ${elliptics_INCLUDE_DIRS} ${CocaineNative_INCLUDE_DIRS})
+include_directories(${PROJECT_SOURCE_DIR}/include ${elliptics_INCLUDE_DIRS} ${CocaineNative_INCLUDE_DIRS} ${LIBEV_INCLUDE_DIRS})
 
 add_subdirectory(src/queue)
 add_subdirectory(src/queue-getter)

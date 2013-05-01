@@ -395,7 +395,7 @@ void queue_t::downstream_t::write(const char *data, size_t size)
 	}
 }
 
-void queue_t::downstream_t::error(error_code code, const std::string &msg)
+void queue_t::downstream_t::error(cocaine::error_code code, const std::string &msg)
 {
 	COCAINE_LOG_ERROR(m_queue->m_log, "getting error from worker: %d, %s", code, msg.c_str());
 	m_finished = true;

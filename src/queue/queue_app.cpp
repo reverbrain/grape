@@ -1,6 +1,6 @@
 #include <unistd.h>
 #include <boost/filesystem.hpp>
-#include <jsoncpp/json.hpp>
+#include <json/json.h>
 #include <cocaine/framework/logging.hpp>
 #include <cocaine/framework/application.hpp>
 #include <cocaine/framework/worker.hpp>
@@ -8,6 +8,8 @@
 
 #include <grape/elliptics_client_state.hpp>
 #include "queue.hpp"
+
+#include <fstream>
 
 using namespace ioremap::elliptics;
 

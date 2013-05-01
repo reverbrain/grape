@@ -6,10 +6,11 @@ set_target_properties(queue-getter PROPERTIES
 	SUFFIX ".cocaine-plugin"
 	COMPILE_FLAGS "-std=c++0x -Wall -Wextra"
 )
+
 target_link_libraries(queue-getter
-	elliptics_cpp
-	jsoncpp
-	cocaine-core
+	${elliptics_cpp_LIBRARIES}
+	${JsonCpp_LIBRARIES}
+	${Cocaine_LIBRARIES}
 )
 
 install(TARGETS queue-getter

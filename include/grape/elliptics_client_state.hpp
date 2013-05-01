@@ -1,7 +1,7 @@
 #ifndef ELLIPTICS_CLIENT_STATE_HPP__
 #define ELLIPTICS_CLIENT_STATE_HPP__
 
-#include <jsoncpp/json.hpp>
+#include <json/json.h>
 #include <cocaine/common.hpp> // for configuration_error_t
 #include <elliptics/cppdef.h>
 
