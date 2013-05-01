@@ -9,7 +9,6 @@ set_target_properties(queue-getter PROPERTIES
 
 target_link_libraries(queue-getter
 	${elliptics_cpp_LIBRARIES}
-	${JsonCpp_LIBRARIES}
 	${Cocaine_LIBRARIES}
 )
 

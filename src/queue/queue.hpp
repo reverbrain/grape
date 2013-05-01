@@ -3,7 +3,7 @@
 
 #include "block.hpp"
 
-using namespace ioremap::elliptics;
+#include <elliptics/cppdef.h>
 
 //
 // Queue receives commands by exec events with its own queue-id as a key.
@@ -12,17 +12,17 @@ struct queue_t
 {
 	queue_t();
 
-	bool _state_save(session *client);
-	bool _state_restore(session *client);
+	bool _state_save(ioremap::elliptics::session *client);
+	bool _state_restore(ioremap::elliptics::session *client);
 
 	// create new queue
-	void new_id(session *client, int id);
+	void new_id(ioremap::elliptics::session *client, int id);
 
 	// restoring state of the already existing queue
-	bool existing_id(session *client, int id);
+	bool existing_id(ioremap::elliptics::session *client, int id);
 
-	void push(session *client, const data_pointer &d);
-	void pop(session *client, data_pointer *elem_data, size_t *elem_size);
+	void push(ioremap::elliptics::session *client, const ioremap::elliptics::data_pointer &d);
+	void pop(ioremap::elliptics::session *client, ioremap::elliptics::data_pointer *elem_data, size_t *elem_size);
 	void dump_state(std::string *text);
 
 	std::string _make_block_key(uint64_t block);
@@ -41,7 +41,7 @@ struct queue_t
 
 	// internal details
 	// keeping a block from the output end of the queue
-	data_pointer _low_block_data;
+	ioremap::elliptics::data_pointer _low_block_data;
 	block_t _low_block_cached;
 };
 

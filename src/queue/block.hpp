@@ -1,6 +1,12 @@
 #ifndef BLOCK_HPP__
 #define BLOCK_HPP__
 
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <stdexcept>
+
 // block_t provides lenval format mapping onto raw memory
 struct block_t
 {

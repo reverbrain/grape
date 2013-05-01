@@ -14,7 +14,6 @@ find_package(Boost REQUIRED system thread program_options)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-find_package(JsonCpp REQUIRED)
 find_package(elliptics REQUIRED)
 find_package(CocaineNative REQUIRED)
 
@@ -24,7 +23,6 @@ locate_library(LIBEV "ev++.h" "ev" "libev")
 set(GRAPE_COMMON_LIBRARIES
 	${elliptics_cpp_LIBRARY}
 	${CocaineNative_LIBRARIES}
-	${JsonCpp_LIBRARIES}
 	ev
 	${Boost_SYSTEM_LIBRARY}
 	${Boost_THREAD_LIBRARY}

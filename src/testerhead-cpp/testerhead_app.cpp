@@ -1,11 +1,14 @@
-#include <boost/filesystem.hpp>
-#include <jsoncpp/json.hpp>
 #include <cocaine/framework/logging.hpp>
 #include <cocaine/framework/application.hpp>
 #include <cocaine/framework/worker.hpp>
+
 #include <elliptics/cppdef.h>
 
-#include <grape/elliptics_client_state.hpp>
+#include "grape/elliptics_client_state.hpp"
+
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/filestream.h"
 
 using namespace ioremap::elliptics;
 
@@ -38,35 +41,44 @@ app_context::app_context(std::shared_ptr<cocaine::framework::service_manager_t> 
 
 void app_context::initialize()
 {
+	FILE *cf = NULL;
+
 	try {
 		// configure
 		//FIXME: replace this with config storage service when it's done
 		{
 			const char CONFFILE[] = "testerhead-cpp.conf";
-			std::ifstream config;
-			config.open(CONFFILE);
-			if (!config.is_open()) {
+
+			cf = fopen(CONFFILE, "r");
+			if (!cf) {
 				COCAINE_LOG_INFO(_log, "failed to open config file %s", CONFFILE);
 				throw configuration_error_t("failed to open config file");
 			}
-
+ 
 			COCAINE_LOG_INFO(_log, "parsing config file");
 
-			Json::Value args;
-			Json::Reader reader;
-			if (!reader.parse(config, args, false)) {
-				COCAINE_LOG_INFO(_log, "can not parse config file %s", CONFFILE);
+			rapidjson::FileStream fs(cf);
+			rapidjson::Document doc;
+
+			doc.ParseStream<rapidjson::kParseDefaultFlags, rapidjson::UTF8<>, rapidjson::FileStream>(fs);
+			if (doc.HasParseError()) {
+				COCAINE_LOG_INFO(_log, "can not parse config file %s: %s", CONFFILE, doc.GetParseError());
 				throw configuration_error_t("can not parse config file");
 			}
 
 			COCAINE_LOG_INFO(_log, "creating elliptics client");
+			{
+				const rapidjson::Value& a = doc["remotes"];
+				for (rapidjson::Value::ConstValueIterator itr = a.Begin(); itr != a.End(); ++itr)
+					COCAINE_LOG_INFO(_log, "remote %s", itr->GetString());
+			}
 
-			_elliptics_client_state = elliptics_client_state::create(args);
+			_elliptics_client_state = elliptics_client_state::create(doc);
 
-            _delay = args.get("delay", "0").asUInt();
-            COCAINE_LOG_INFO(_log, "reply delay = %d", _delay);
-            // actual delay must be in microseconds
-            _delay *= 1000;
+			_delay = 0;
+			if (doc.HasMember("delay"))
+				_delay = doc["delay"].GetInt() * 1000;
+            		COCAINE_LOG_INFO(_log, "reply delay = %d", _delay);
 		}
 
 		COCAINE_LOG_INFO(_log, "registering event handlers");
@@ -75,9 +87,14 @@ void app_context::initialize()
 		on_unregistered(&app_context::process);
 	}
 	catch (const std::exception &e) {
+		if (cf)
+			fclose(cf);
 		COCAINE_LOG_ERROR(_log, "error in app_context::initialize: %s", e.what());
 		throw;
 	}
+
+	if (cf)
+		fclose(cf);
 }
 
 std::string app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks)
@@ -115,17 +132,7 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 	return "";
 }
 
-namespace fs = boost::filesystem;
-
 int main(int argc, char **argv)
 {
-	{
-		fs::path pathname(argv[0]);
-		std::string dirname = pathname.parent_path().string();
-		if (chdir(dirname.c_str())) {
-			fprintf(stderr, "Can't set working directory to app's spool dir: %m");
-		}
-	}
-
 	return cocaine::framework::worker_t::run<app_context>(argc, argv);
 }

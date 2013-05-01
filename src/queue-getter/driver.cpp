@@ -331,7 +331,7 @@ void queue_t::on_process_successed(const ioremap::elliptics::data_pointer &data)
 
 		sess.exec(&queue_id, m_queue_ack_event, data_pointer()).connect(
 			async_result<exec_result_entry>::result_function(),
-			[m_log, marker] (const error_info &error) {
+			[this, marker] (const ioremap::elliptics::error_info &error) {
 				if (error) {
 					COCAINE_LOG_ERROR(m_log, "data %p not acked", marker);
 				} else {

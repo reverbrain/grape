@@ -1,13 +1,17 @@
-#include <unistd.h>
-#include <json/json.h>
+#include "grape/elliptics_client_state.hpp"
+#include "queue.hpp"
+
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/filestream.h"
+
 #include <cocaine/framework/logging.hpp>
 #include <cocaine/framework/application.hpp>
 #include <cocaine/framework/worker.hpp>
+
 #include <elliptics/cppdef.h>
 
-#include <grape/elliptics_client_state.hpp>
-#include "queue.hpp"
-
+#include <unistd.h>
 #include <fstream>
 
 using namespace ioremap::elliptics;
@@ -122,14 +126,14 @@ app_context::app_context(std::shared_ptr<cocaine::framework::service_manager_t> 
 
 void app_context::initialize()
 {
+	FILE *cf = NULL;
 	try {
 		// configure
 		//FIXME: replace this with config storage service when it's done
 		{
 			const char CONFFILE[] = "queue.conf";
-			std::ifstream config;
-			config.open(CONFFILE);
-			if (!config.is_open()) {
+			cf = fopen(CONFFILE, "r");
+			if (!cf) {
 				COCAINE_LOG_INFO(_log, "failed to open config file %s", CONFFILE);
 				debug_log("failed to open config file");
 				throw configuration_error_t("failed to open config file");
@@ -138,10 +142,12 @@ void app_context::initialize()
 			COCAINE_LOG_INFO(_log, "parsing config file");
 			debug_log("parsing config file");
 
-			Json::Value args;
-			Json::Reader reader;
-			if (!reader.parse(config, args, false)) {
-				COCAINE_LOG_INFO(_log, "can not parse config file %s", CONFFILE);
+			rapidjson::FileStream fs(cf);
+			rapidjson::Document doc;
+
+			doc.ParseStream<rapidjson::kParseDefaultFlags, rapidjson::UTF8<>, rapidjson::FileStream>(fs);
+			if (doc.HasParseError()) {
+				COCAINE_LOG_INFO(_log, "can not parse config file %s: %s", CONFFILE, doc.GetParseError());
 				debug_log("can not parse config file");
 				throw configuration_error_t("can not parse config file");
 			}
@@ -149,13 +155,12 @@ void app_context::initialize()
 			COCAINE_LOG_INFO(_log, "creating elliptics client");
 			debug_log("creating elliptics client");
 			{
-				Json::Value remotesArray = args.get("remotes", Json::arrayValue);
-				for (Json::ArrayIndex i = 0; i < remotesArray.size(); ++i) {
-					COCAINE_LOG_INFO(_log, "remote %s", remotesArray[i].asCString());
-				}
+				const rapidjson::Value& a = doc["remotes"];
+				for (rapidjson::Value::ConstValueIterator itr = a.Begin(); itr != a.End(); ++itr)
+					COCAINE_LOG_INFO(_log, "remote %s", itr->GetString());
 			}
 
-			_elliptics_client_state = elliptics_client_state::create(args);
+			_elliptics_client_state = elliptics_client_state::create(doc);
 		}
 
 		COCAINE_LOG_INFO(_log, "registering event handlers");
@@ -166,11 +171,15 @@ void app_context::initialize()
 		on_unregistered(&app_context::process);
 
 		COCAINE_LOG_INFO(_log, "app_context initialized");
-	}
-	catch (const std::exception &e) {
+	} catch (const std::exception &e) {
+		if (cf)
+			fclose(cf);
+
 		COCAINE_LOG_ERROR(_log, "error in initialize: %s", e.what());
 		throw;
 	}
+	if (cf)
+		fclose(cf);
 }
 
 std::string app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks)
@@ -309,19 +318,21 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 
 		std::string text;
 		{
-			Json::StyledWriter writer;
-			Json::Value root;
+			rapidjson::StringBuffer stream;
+			rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(stream);
+			rapidjson::Value root;
 
-			root["ack.count"] = Json::Value::Int64(_ack_count);
-			root["ack.rate"] = Json::Value(_ack_rate.get());
-			root["fail.count"] = Json::Value::Int64(_fail_count);
-			root["fail.rate"] = Json::Value(_fail_rate.get());
-			root["pop.count"] = Json::Value::Int64(_pop_count);
-			root["pop.rate"] = Json::Value(_pop_rate.get());
-			root["push.count"] = Json::Value::Int64(_push_count);
-			root["push.rate"] = Json::Value(_push_rate.get());
+			root["ack.count"] = _ack_count;
+			root["ack.rate"] = _ack_rate.get();
+			root["fail.count"] = _fail_count;
+			root["fail.rate"] = _fail_rate.get();
+			root["pop.count"] = _pop_count;
+			root["pop.rate"] = _pop_rate.get();
+			root["push.count"] = _push_count;
+			root["push.rate"] = _push_rate.get();
 
-			text = writer.write(root);
+			root.Accept(writer);
+			text.assign(stream.GetString(), stream.GetSize());
 		}
 		reply(text);
 

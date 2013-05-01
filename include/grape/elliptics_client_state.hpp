@@ -1,7 +1,9 @@
 #ifndef ELLIPTICS_CLIENT_STATE_HPP__
 #define ELLIPTICS_CLIENT_STATE_HPP__
 
-#include <json/json.h>
+#include "rapidjson/document.h"
+#include "rapidjson/prettywriter.h"
+
 #include <cocaine/common.hpp> // for configuration_error_t
 #include <elliptics/cppdef.h>
 
@@ -38,25 +40,29 @@ struct elliptics_client_state {
 	//   logfile: "/dev/stderr",
 	//   loglevel: 0
 	// }
-	static elliptics_client_state create(const Json::Value &args)
+	static elliptics_client_state create(const rapidjson::Document &args)
 	{
-		std::string logfile;
-		uint loglevel = 0;
+		std::string logfile = "/dev/stderr";
+		uint loglevel = DNET_LOG_INFO;
 		std::vector<std::string> remotes;
 		std::vector<int> groups;
 
 		try {
-			logfile = args.get("logfile", "/dev/stderr").asString();
-			loglevel = args.get("loglevel", 0).asUInt();
-			Json::Value remotesArray = args.get("remotes", Json::arrayValue);
-			std::transform(remotesArray.begin(), remotesArray.end(),
+			if (args.HasMember("logfile"))
+				logfile = args["logfile"].GetString();
+
+			if (args.HasMember("loglevel"))
+				loglevel = args["loglevel"].GetInt();
+
+			const rapidjson::Value &remotesArray = args["remotes"];
+			std::transform(remotesArray.Begin(), remotesArray.End(),
 				std::back_inserter(remotes),
-				std::bind(&Json::Value::asString, std::placeholders::_1)
+				std::bind(&rapidjson::Value::GetString, std::placeholders::_1)
 				);
-			Json::Value groupsArray = args.get("groups", Json::arrayValue);
-			std::transform(groupsArray.begin(), groupsArray.end(),
+			const rapidjson::Value &groupsArray = args["groups"];
+			std::transform(groupsArray.Begin(), groupsArray.End(),
 				std::back_inserter(groups),
-				std::bind(&Json::Value::asInt, std::placeholders::_1)
+				std::bind(&rapidjson::Value::GetInt, std::placeholders::_1)
 				);
 		} catch (const std::exception &e) {
 			throw configuration_error_t(e.what());
@@ -65,7 +71,8 @@ struct elliptics_client_state {
 		return create(remotes, groups, logfile, loglevel);
 	}
 
-	static elliptics_client_state create(const std::vector<std::string> &remotes, const std::vector<int> &groups, const std::string &logfile, int loglevel)
+	static elliptics_client_state create(const std::vector<std::string> &remotes,
+			const std::vector<int> &groups, const std::string &logfile, int loglevel)
 	{
 		if (remotes.size() == 0) {
 			throw configuration_error_t("no remotes have been specified");

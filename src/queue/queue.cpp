@@ -1,13 +1,15 @@
-#include <cocaine/json.hpp>
-#include <cocaine/framework/logging.hpp>
-#include <elliptics/cppdef.h>
-
 #include "queue.hpp"
 
-using namespace ioremap::elliptics;
+#include "rapidjson/document.h"
+#include "rapidjson/prettywriter.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/filestream.h"
+
+#include <cocaine/json.hpp>
+#include <cocaine/framework/logging.hpp>
 
 namespace {
-	//DEBUG: only for debug sessions
+	//DEBUG: only for debug ioremap::elliptics::sessions
 	std::shared_ptr<cocaine::framework::logger_t> Log;
 	#define LOG_INFO(...) COCAINE_LOG_INFO(Log, __VA_ARGS__)
 	#define LOG_ERROR(...) COCAINE_LOG_ERROR(Log, __VA_ARGS__)
@@ -21,11 +23,13 @@ namespace {
 			sprintf(buf, "%02x ", (unsigned char)p[i]);
 			*dest += buf;
 		}
+
 		return dest->c_str();
 	}
 
-	// synchronous write to all groups set in client session
-	bool _lowlevel_write(session *client, const key &id, const data_pointer &d, bool append = false) {
+	// synchronous write to all groups set in client ioremap::elliptics::session
+	bool _lowlevel_write(ioremap::elliptics::session *client, const ioremap::elliptics::key &id,
+			const ioremap::elliptics::data_pointer &d, bool append = false) {
 		try {
 			//FIXME: this will drop all preset flags
 			if (append) {
@@ -33,12 +37,12 @@ namespace {
 			} else {
 				client->set_ioflags(0);
 			}
-			client->set_filter(filters::negative);
-			client->set_checker(checkers::quorum);
+			client->set_filter(ioremap::elliptics::filters::negative);
+			client->set_checker(ioremap::elliptics::checkers::quorum);
 			//NOTE: async call turns sync (magically) by using sync_*_result type,
 			// actually there is a wait incorporated in convertion from
 			// async_*_result to sync_*_result 
-			sync_write_result result = client->write_data(id, d, 0);
+			ioremap::elliptics::sync_write_result result = client->write_data(id, d, 0);
 			for (const auto &i : result) {
 				//FIXME: dnet_server_convert_dnet_addr uses static buffer and so is not thread safe
 				LOG_ERROR("singular write error on %s: %s",
@@ -47,8 +51,7 @@ namespace {
 					);
 			}
 			return true;
-		}
-		catch(const error &e) {
+		} catch(const ioremap::elliptics::error &e) {
 			// failed to even send commands
 			// or failed to reach a quorum on the write 
 			LOG_ERROR("write error: %s", e.what());
@@ -57,18 +60,18 @@ namespace {
 	}
 
 	// synchronous read latest data (choosing from all groups)
-	bool _lowlevel_read(session *client, const key &id, data_pointer *d) {
+	bool _lowlevel_read(ioremap::elliptics::session *client, const ioremap::elliptics::key &id, ioremap::elliptics::data_pointer *d) {
 		try {
-			client->set_filter(filters::all);
-			client->set_checker(checkers::quorum);
+			client->set_filter(ioremap::elliptics::filters::all);
+			client->set_checker(ioremap::elliptics::checkers::quorum);
 			//NOTE: async call turns sync (magically) by using sync_*_result type,
 			// actually there is a wait incorporated in convertion from
 			// async_*_result to sync_*_result 
 			//FIXME: read_latest apparently doesn't work if there is ony one group
 			// switching to read_data for now
 			//sync_read_result result = client->read_latest(id, 0, 0);
-			sync_read_result result = client->read_data(id, 0, 0);
-			const read_result_entry *positive_result = nullptr;
+			ioremap::elliptics::sync_read_result result = client->read_data(id, 0, 0);
+			const ioremap::elliptics::read_result_entry *positive_result = nullptr;
 			for (const auto &i : result) {
 				if (i.status() != 0) {
 					//FIXME: dnet_server_convert_dnet_addr uses static buffer and so is not thread safe
@@ -82,8 +85,7 @@ namespace {
 			}
 			*d = positive_result->file();
 			return true;
-		}
-		catch(const error &e) {
+		} catch(const ioremap::elliptics::error &e) {
 			// failed to even send commands
 			// or failed to reach a quorum on the read
 			LOG_ERROR("read error: %s", e.what());
@@ -129,22 +131,25 @@ queue_t::queue_t()
 	, _high_elem(0)
 {}
 
-bool queue_t::_state_save(session *client) {
+bool queue_t::_state_save(ioremap::elliptics::session *client) {
 	std::string text;
 	{
-		Json::StyledWriter writer;
-		Json::Value root;
+		rapidjson::StringBuffer stream;
+		rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(stream);
+		rapidjson::Value root;
 
-		root["low_block"] = Json::Value(Json::Int64(_low_block));
-		root["low_elem"] = Json::Value(Json::Int64(_low_elem));
-		root["high_block"] = Json::Value(Json::Int64(_high_block));
-		root["high_elem"] = Json::Value(Json::Int64(_high_elem));
+		root["low_block"] = _low_block;
+		root["low_elem"] = _low_elem;
+		root["high_block"] = _high_block;
+		root["high_elem"] = _high_elem;
 
-		text = writer.write(root);
+		root.Accept(writer);
+		std::string text;
+		text.assign(stream.GetString(), stream.GetSize());
 	}
 
-	key queue_id(_make_queue_key(_id));
-	if (!_lowlevel_write(client, queue_id, data_pointer(text))) {
+	ioremap::elliptics::key queue_id(_make_queue_key(_id));
+	if (!_lowlevel_write(client, queue_id, ioremap::elliptics::data_pointer(text))) {
 		//FIXME: log error and do something
 		LOG_ERROR("failed to save state");
 		return false;
@@ -153,37 +158,37 @@ bool queue_t::_state_save(session *client) {
 	return true;
 }
 
-bool queue_t::_state_restore(session *client) {
-	key queue_id(_make_queue_key(_id));
-	data_pointer p;
+bool queue_t::_state_restore(ioremap::elliptics::session *client) {
+	ioremap::elliptics::key queue_id(_make_queue_key(_id));
+	ioremap::elliptics::data_pointer p;
+
 	if (!_lowlevel_read(client, queue_id, &p)) {
 		//FIXME: log error and do something
 		return false;
 	}
 	{
-		Json::Reader reader;
-		Json::Value root;
+		rapidjson::Document root;
 
-		reader.parse(p.to_string(), root);
+		root.Parse<rapidjson::kParseDefaultFlags, rapidjson::UTF8<>>(p.to_string().c_str());
 
 		//TODO: error checking in queue state reading
-		_low_block = root["low_block"].asInt64();
-		_low_elem = root["low_elem"].asInt64();
-		_high_block = root["high_block"].asInt64();
-		_high_elem = root["high_elem"].asInt64();
+		_low_block = root["low_block"].GetInt64();
+		_low_elem = root["low_elem"].GetInt64();
+		_high_block = root["high_block"].GetInt64();
+		_high_elem = root["high_elem"].GetInt64();
 	}
 
 	return true;
 }
 
 // create new queue
-void queue_t::new_id(session *client, int id) {
+void queue_t::new_id(ioremap::elliptics::session *client, int id) {
 	(void)client;
 	_id = id;
 }
 
 // restoring state of the already existing queue
-bool queue_t::existing_id(session *client, int id) {
+bool queue_t::existing_id(ioremap::elliptics::session *client, int id) {
 	_id = id;
 
 	LOG_INFO("trying to pick state for id '%s'...", _id);
@@ -200,7 +205,7 @@ bool queue_t::existing_id(session *client, int id) {
 	return result;
 }
 
-void queue_t::push(session *client, const data_pointer &d) {
+void queue_t::push(ioremap::elliptics::session *client, const ioremap::elliptics::data_pointer &d) {
 	//NOTE: добавить сохранение локально
 
 	LOG_INFO("push: entering with d: %p", d.data());
@@ -215,14 +220,14 @@ void queue_t::push(session *client, const data_pointer &d) {
 
 	LOG_INFO("high block id: %s", _make_block_key(_high_block).c_str());
 
-	key block_id(_make_block_key(_high_block));
+	ioremap::elliptics::key block_id(_make_block_key(_high_block));
 
 	// write or append
 	block_t block;
 	block.append((const char *)d.data(), d.size());
 
 	LOG_INFO("block %d, %s", _high_block, (new_block_needed ? "write" : "append"));
-	data_pointer writep = data_pointer::from_raw(block._bytes, block._size);
+	ioremap::elliptics::data_pointer writep = ioremap::elliptics::data_pointer::from_raw(block._bytes, block._size);
 	bool append = !new_block_needed;
 	if (!_lowlevel_write(client, block_id, writep, append)) {
 		//FIXME: log error and do something
@@ -237,13 +242,13 @@ void queue_t::push(session *client, const data_pointer &d) {
 	LOG_INFO("push: leaving with d: %p", d.data());
 }
 
-void queue_t::pop(session *client, data_pointer *elem_data, size_t *elem_size) {
+void queue_t::pop(ioremap::elliptics::session *client, ioremap::elliptics::data_pointer *elem_data, size_t *elem_size) {
 	if (_low_block >= _high_block && _low_elem == _high_elem) {
 		LOG_INFO("queue empty, nothing to pop");
 		return;
 	}
 
-	key block_id(_make_block_key(_low_block));
+	ioremap::elliptics::key block_id(_make_block_key(_low_block));
 	int start_index = (_low_elem % _block_depth);
 
 	// read
@@ -293,7 +298,7 @@ void queue_t::pop(session *client, data_pointer *elem_data, size_t *elem_size) {
 	if (block_consumed) {
 		LOG_INFO("retire another low block: %d", _low_block);
 
-		_low_block_data = data_pointer();
+		_low_block_data = ioremap::elliptics::data_pointer();
 		_low_block_cached.set(NULL, 0);
 
 		//FIXME: catch failure exception on remove op
@@ -305,20 +310,25 @@ void queue_t::pop(session *client, data_pointer *elem_data, size_t *elem_size) {
 	_state_save(client);
 }
 
-void queue_t::dump_state(std::string *text) {
-	Json::StyledWriter writer;
-	Json::Value root;
+void queue_t::dump_state(std::string *textp) {
+	rapidjson::StringBuffer stream;
+	rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(stream);
+	rapidjson::Value root;
 
-	root["id"] = Json::Value(_id);
-	root["prefix"] = Json::Value(_prefix);
-	root["block_size"] = Json::Value(Json::Int64(_block_depth));
+	root["id"] = _id;
+	root["prefix"].SetString(_prefix.c_str(), _prefix.size());
+	root["block_size"] = _block_depth;
 
-	root["low_block"] = Json::Value(Json::Int64(_low_block));
-	root["low_elem"] = Json::Value(Json::Int64(_low_elem));
-	root["high_block"] = Json::Value(Json::Int64(_high_block));
-	root["high_elem"] = Json::Value(Json::Int64(_high_elem));
+	root["low_block"] = _low_block;
+	root["low_elem"] = _low_elem;
+	root["high_block"] = _high_block;
+	root["high_elem"] = _high_elem;
 
-	*text = writer.write(root);
+	root.Accept(writer);
+	std::string text;
+	text.assign(stream.GetString(), stream.GetSize());
+
+	*textp = text;
 }
 
 std::string queue_t::_make_block_key(uint64_t block) {

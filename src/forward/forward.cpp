@@ -1,11 +1,14 @@
-#include <boost/filesystem.hpp>
+#include "forward.hpp"
+
 #include <fstream>
-#include <jsoncpp/json.hpp>
+#include <sstream>
+
 #include <cocaine/framework/logging.hpp>
 #include <cocaine/framework/application.hpp>
 #include <cocaine/framework/worker.hpp>
 
-#include "forward.hpp"
+#include "rapidjson/document.h"
+#include "rapidjson/filestream.h"
 
 namespace cocaine {
 namespace worker {
@@ -21,57 +24,80 @@ executor::executor(std::shared_ptr<service_manager_t> service_manager)
 
 void executor::initialize()
 {
+	FILE *cf = NULL;
 	try {
 		const char CONFFILE[] = "forward.conf";
 
-		std::ifstream config;
-		config.open(CONFFILE);
-		if (!config)
+		cf = fopen(CONFFILE, "r");
+		if (!cf)
 			throw configuration_error_t("failed to open config file");
 
-		Json::Value args;
-		Json::Reader reader;
-		if (!reader.parse(config, args, false))
-			throw configuration_error_t("can not parse config file");
+		rapidjson::FileStream fs(cf);
+
+		rapidjson::Document doc;
+		doc.ParseStream<rapidjson::kParseDefaultFlags, rapidjson::UTF8<>, rapidjson::FileStream>(fs);
+		if (doc.HasParseError()) {
+			std::ostringstream out;
+			out << "can not parse config file: " << doc.GetParseError();
+			throw configuration_error_t(out.str().c_str());
+		}
+
+		std::string logfile = "/dev/stderr";
+		int loglevel = DNET_LOG_INFO;
+
+		if (doc.HasMember("logfile"))
+			logfile = doc["logfile"].GetString();
+		if (doc.HasMember("loglevel"))
+			logfile = doc["loglevel"].GetInt();
 
 		try {
-			m_logger.reset(new file_logger(args.get("logfile", "/dev/stderr").asCString(), args.get("loglevel", 0).asUInt()));
+			m_logger.reset(new file_logger(logfile.c_str(), loglevel));
 			m_node.reset(new node(*m_logger));
 		} catch (std::exception &e) {
 			throw configuration_error_t(e.what());
 		}
 
-		Json::Value remotes = args.get("remotes", Json::arrayValue);
-		if (remotes.size() == 0) {
-			throw configuration_error_t("no remotes have been specified");
-		}
+		if (!doc.HasMember("remotes"))
+			throw configuration_error_t("no 'remotes' section found in config");
+
+		const rapidjson::Value &remotesArray = doc["remotes"];
 		int remotes_added = 0;
-		for (Json::ArrayIndex index = 0; index < remotes.size(); ++index) {
+		for (rapidjson::Value::ConstValueIterator itr = remotesArray.Begin(); itr != remotesArray.End(); ++itr) {
 			try {
-				m_node->add_remote(remotes[index].asCString());
+				m_node->add_remote(itr->GetString());
 				++remotes_added;
 			} catch (...) {
 				// We don't care, really
 			}
 		}
-		if (remotes_added == 0) {
-			throw configuration_error_t("no remotes were added successfully");
-		}
+		if (remotes_added == 0)
+			throw configuration_error_t("no remote nodes have been added");
 
-		Json::Value groups = args.get("groups", Json::arrayValue);
-		if (groups.size() == 0) {
-			throw configuration_error_t("no groups have been specified");
-		}
-		std::transform(groups.begin(), groups.end(), std::back_inserter(m_groups),
-			std::bind(&Json::Value::asInt, std::placeholders::_1));
+
+		if (!doc.HasMember("groups"))
+			throw configuration_error_t("no 'groups' section found in config");
+
+		const rapidjson::Value &groupsArray = doc["groups"];
+		std::transform(groupsArray.Begin(), groupsArray.End(),
+			std::back_inserter(m_groups),
+			std::bind(&rapidjson::Value::GetInt, std::placeholders::_1)
+			);
+
+		if (!doc.HasMember("forward-event"))
+			throw configuration_error_t("no 'forward-event' section found in config");
 
 		//FIXME: is there a reasonable default? or make it strongly required?
-		m_forward_event.assign(args.get("forward-event", "start@start").asString());
+		m_forward_event.assign(doc["forward-event"].GetString());
 	}
 	catch (const std::exception &e) {
+		if (cf)
+			fclose(cf);
 		COCAINE_LOG_ERROR(m_log, "failed to configure: %s", e.what());
 		throw;
 	}
+
+	if (cf)
+		fclose(cf);
 
 	//FIXME: there we need to know names of the driver and the app in advance
 	on<queue_handler>("forward/queue");
@@ -172,17 +198,7 @@ void executor::session_handler::operator ()(const error_info &error)
 } // namespace worker
 } // namespace cocaine
 
-namespace fs = boost::filesystem;
-
 int main(int argc, char **argv)
 {
-	{
-		fs::path pathname(argv[0]);
-		std::string dirname = pathname.parent_path().string();
-		if (chdir(dirname.c_str())) {
-			fprintf(stderr, "Can't set working directory to app's spool dir: %m");
-		}
-	}
-
 	return cocaine::framework::worker_t::run<cocaine::worker::executor>(argc, argv);
 }

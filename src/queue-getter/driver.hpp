@@ -23,12 +23,13 @@
 #include <queue>
 #include <mutex>
 #include <atomic>
-#include <jsoncpp/json.hpp>
+
 #include <cocaine/common.hpp>
 #include <cocaine/api/driver.hpp>
 #include <cocaine/api/stream.hpp>
 #include <cocaine/asio/reactor.hpp>
 #include <cocaine/app.hpp>
+
 #include <elliptics/cppdef.h>
 
 namespace cocaine { namespace driver {

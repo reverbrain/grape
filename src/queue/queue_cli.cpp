@@ -169,7 +169,7 @@ int main(int argc, char** argv)
 
 	if (args.count("pop")) {
 		for (size_t i = 0; i < args.count("pop"); ++i) {
-			data_pointer d;
+			ioremap::elliptics::data_pointer d;
 			size_t size = 0;
 			queue.pop(&client, &d, &size);
 			// zero length item mean that queue is empty and there is nothing to pop
