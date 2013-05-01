@@ -112,8 +112,8 @@ app_context::app_context(std::shared_ptr<cocaine::framework::service_manager_t> 
 	: application<app_context>(service_manager)
 	, _ack_count(0)
 	, _fail_count(0)
-	, _pop_count(0)
 	, _push_count(0)
+	, _pop_count(0)
 {
 	// first of all obtain logging facility
 	_log = service_manager->get_system_logger();
