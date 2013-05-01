@@ -14,8 +14,6 @@
 #include <unistd.h>
 #include <fstream>
 
-using namespace ioremap::elliptics;
-
 namespace {
 
 void print_cwd(int line) {
@@ -184,18 +182,18 @@ void app_context::initialize()
 
 std::string app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks)
 {
-	session client = _elliptics_client_state.create_session();
+	ioremap::elliptics::session client = _elliptics_client_state.create_session();
 
-	exec_context context = exec_context::from_raw(chunks[0].c_str(), chunks[0].size());
+	ioremap::elliptics::exec_context context = ioremap::elliptics::exec_context::from_raw(chunks[0].c_str(), chunks[0].size());
 
 	auto reply_ack = [&client, &context] () {
-		client.reply(context, std::string(), exec_context::final);
+		client.reply(context, std::string(), ioremap::elliptics::exec_context::final);
 	};
 	auto reply_error = [&client, &context] (const char *msg) {
-		client.reply(context, std::string(msg), exec_context::final);
+		client.reply(context, std::string(msg), ioremap::elliptics::exec_context::final);
 	};
-	auto reply = [&client, &context] (data_pointer d) {
-		client.reply(context, d, exec_context::final);
+	auto reply = [&client, &context] (ioremap::elliptics::data_pointer d) {
+		client.reply(context, d, ioremap::elliptics::exec_context::final);
 	};
 
 	std::string app;
@@ -216,7 +214,7 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 
 		COCAINE_LOG_INFO(_log, "queue id: %d", _queue._id);
 
-		data_pointer d = context.data();
+		ioremap::elliptics::data_pointer d = context.data();
 		// skip adding zero length data, because there is no value in that
 		// queue has no method to request size and we can use zero reply in pop
 		// to indicate queue emptiness
@@ -236,14 +234,14 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 
 		COCAINE_LOG_INFO(_log, "queue id: %d", _queue._id);
 
-		data_pointer d;
+		ioremap::elliptics::data_pointer d;
 		size_t size = 0;
 		_queue.pop(&client, &d, &size);
 		// zero length item mean that queue is empty and there is nothing to pop
 		// also pop is idempotent
 		if (size) {
 			COCAINE_LOG_INFO(_log, "returning item: %s", d.to_string().c_str());
-			reply(data_pointer::copy(d.data(), size));
+			reply(ioremap::elliptics::data_pointer::copy(d.data(), size));
 		} else {
 			reply_ack();
 		}
