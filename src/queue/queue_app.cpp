@@ -1,5 +1,4 @@
 #include <unistd.h>
-#include <boost/filesystem.hpp>
 #include <json/json.h>
 #include <cocaine/framework/logging.hpp>
 #include <cocaine/framework/application.hpp>
@@ -335,17 +334,7 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 	return "";
 }
 
-namespace fs = boost::filesystem;
- 
 int main(int argc, char **argv)
 {
-	{
-		fs::path pathname(argv[0]);
-		std::string dirname = pathname.parent_path().string();
-		if (chdir(dirname.c_str())) {
-			fprintf(stderr, "Can't set working directory to app's spool dir: %m");
-		}
-	}
-
 	return cocaine::framework::worker_t::run<app_context>(argc, argv);
 }
