@@ -48,7 +48,7 @@ void executor::initialize()
 		if (doc.HasMember("logfile"))
 			logfile = doc["logfile"].GetString();
 		if (doc.HasMember("loglevel"))
-			logfile = doc["loglevel"].GetInt();
+			loglevel = doc["loglevel"].GetInt();
 
 		try {
 			m_logger.reset(new file_logger(logfile.c_str(), loglevel));
