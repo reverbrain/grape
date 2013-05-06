@@ -2,13 +2,7 @@
 #include <cocaine/framework/application.hpp>
 #include <cocaine/framework/worker.hpp>
 
-#include <elliptics/cppdef.h>
-
 #include "grape/elliptics_client_state.hpp"
-
-#include "rapidjson/document.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/filestream.h"
 
 using namespace ioremap::elliptics;
 
@@ -41,60 +35,19 @@ app_context::app_context(std::shared_ptr<cocaine::framework::service_manager_t> 
 
 void app_context::initialize()
 {
-	FILE *cf = NULL;
+	// configure
+	//FIXME: replace this with config storage service when it's done
+	{
+		rapidjson::Document doc;
+		_elliptics_client_state = elliptics_client_state::create(doc);
 
-	try {
-		// configure
-		//FIXME: replace this with config storage service when it's done
-		{
-			const char CONFFILE[] = "testerhead-cpp.conf";
-
-			cf = fopen(CONFFILE, "r");
-			if (!cf) {
-				COCAINE_LOG_INFO(_log, "failed to open config file %s", CONFFILE);
-				throw configuration_error_t("failed to open config file");
-			}
- 
-			COCAINE_LOG_INFO(_log, "parsing config file");
-
-			rapidjson::FileStream fs(cf);
-			rapidjson::Document doc;
-
-			doc.ParseStream<rapidjson::kParseDefaultFlags, rapidjson::UTF8<>, rapidjson::FileStream>(fs);
-			if (doc.HasParseError()) {
-				COCAINE_LOG_INFO(_log, "can not parse config file %s: %s", CONFFILE, doc.GetParseError());
-				throw configuration_error_t("can not parse config file");
-			}
-
-			COCAINE_LOG_INFO(_log, "creating elliptics client");
-			{
-				const rapidjson::Value& a = doc["remotes"];
-				for (rapidjson::Value::ConstValueIterator itr = a.Begin(); itr != a.End(); ++itr)
-					COCAINE_LOG_INFO(_log, "remote %s", itr->GetString());
-			}
-
-			_elliptics_client_state = elliptics_client_state::create(doc);
-
-			_delay = 0;
-			if (doc.HasMember("delay"))
-				_delay = doc["delay"].GetInt() * 1000;
-            		COCAINE_LOG_INFO(_log, "reply delay = %d", _delay);
-		}
-
-		COCAINE_LOG_INFO(_log, "registering event handlers");
-
-		// register event handlers
-		on_unregistered(&app_context::process);
-	}
-	catch (const std::exception &e) {
-		if (cf)
-			fclose(cf);
-		COCAINE_LOG_ERROR(_log, "error in app_context::initialize: %s", e.what());
-		throw;
+		_delay = 0;
+		if (doc.HasMember("delay"))
+			_delay = doc["delay"].GetInt() * 1000;
 	}
 
-	if (cf)
-		fclose(cf);
+	// register event handlers
+	on_unregistered(&app_context::process);
 }
 
 std::string app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks)

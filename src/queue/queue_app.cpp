@@ -1,46 +1,14 @@
 #include "grape/elliptics_client_state.hpp"
 #include "queue.hpp"
 
-#include "rapidjson/document.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/filestream.h"
-
 #include <cocaine/framework/logging.hpp>
 #include <cocaine/framework/application.hpp>
 #include <cocaine/framework/worker.hpp>
-
-#include <elliptics/cppdef.h>
 
 #include <unistd.h>
 #include <fstream>
 
 namespace {
-
-void print_cwd(int line) {
-	std::ofstream f;
-	f.open("/tmp/cwd.log", std::ios_base::app);
-	char CWD[1024];
-	getcwd(CWD, 1023);
-	f << line << " " << std::string(CWD) << std::endl;
-	f.flush();
-	f.close();
-}
-
-#include <stdarg.h>
-#define debug_log(...) _debug_log(__LINE__, __VA_ARGS__)
-void _debug_log(int line, const char *format, ...) {
-	FILE *f = fopen("/tmp/debug.log", "a");
-	if (f) {
-		fprintf(f, "%d ", line);
-		va_list a;
-		va_start(a, format);
-		vfprintf(f, format, a);
-		va_end(a);
-		fprintf(f, "\n");
-		fflush(f);
-		fclose(f);
-	}
-}
 
 template <unsigned N>
 double approx_moving_average(double avg, double input) {
@@ -117,7 +85,6 @@ app_context::app_context(std::shared_ptr<cocaine::framework::service_manager_t> 
 {
 	// first of all obtain logging facility
 	_log = service_manager->get_system_logger();
-	debug_log("_log: %p", _log.get());
 
 	//FIXME: pass logger explicitly everywhere
 	extern void _queue_module_set_logger(std::shared_ptr<cocaine::framework::logger_t>);
@@ -126,60 +93,16 @@ app_context::app_context(std::shared_ptr<cocaine::framework::service_manager_t> 
 
 void app_context::initialize()
 {
-	FILE *cf = NULL;
-	try {
-		// configure
-		//FIXME: replace this with config storage service when it's done
-		{
-			const char CONFFILE[] = "queue.conf";
-			cf = fopen(CONFFILE, "r");
-			if (!cf) {
-				COCAINE_LOG_INFO(_log, "failed to open config file %s", CONFFILE);
-				debug_log("failed to open config file");
-				throw configuration_error_t("failed to open config file");
-			}
- 
-			COCAINE_LOG_INFO(_log, "parsing config file");
-			debug_log("parsing config file");
-
-			rapidjson::FileStream fs(cf);
-			rapidjson::Document doc;
-
-			doc.ParseStream<rapidjson::kParseDefaultFlags, rapidjson::UTF8<>, rapidjson::FileStream>(fs);
-			if (doc.HasParseError()) {
-				COCAINE_LOG_INFO(_log, "can not parse config file %s: %s", CONFFILE, doc.GetParseError());
-				debug_log("can not parse config file");
-				throw configuration_error_t("can not parse config file");
-			}
-
-			COCAINE_LOG_INFO(_log, "creating elliptics client");
-			debug_log("creating elliptics client");
-			{
-				const rapidjson::Value& a = doc["remotes"];
-				for (rapidjson::Value::ConstValueIterator itr = a.Begin(); itr != a.End(); ++itr)
-					COCAINE_LOG_INFO(_log, "remote %s", itr->GetString());
-			}
-
-			_elliptics_client_state = elliptics_client_state::create(doc);
-		}
-
-		COCAINE_LOG_INFO(_log, "registering event handlers");
-		debug_log("registering event handlers");
-
-		// register event handlers
-		//FIXME: all at once for now
-		on_unregistered(&app_context::process);
-
-		COCAINE_LOG_INFO(_log, "app_context initialized");
-	} catch (const std::exception &e) {
-		if (cf)
-			fclose(cf);
-
-		COCAINE_LOG_ERROR(_log, "error in initialize: %s", e.what());
-		throw;
+	// configure
+	//FIXME: replace this with config storage service when it's done
+	{
+		rapidjson::Document doc;
+		_elliptics_client_state = elliptics_client_state::create("queue.conf", doc);
 	}
-	if (cf)
-		fclose(cf);
+
+	// register event handlers
+	//FIXME: all at once for now
+	on_unregistered(&app_context::process);
 }
 
 std::string app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks)
