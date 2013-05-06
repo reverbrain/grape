@@ -1,3 +1,4 @@
+#include "grape/elliptics_client_state.hpp"
 #include "forward.hpp"
 
 #include <fstream>
@@ -6,9 +7,6 @@
 #include <cocaine/framework/logging.hpp>
 #include <cocaine/framework/application.hpp>
 #include <cocaine/framework/worker.hpp>
-
-#include "rapidjson/document.h"
-#include "rapidjson/filestream.h"
 
 namespace cocaine {
 namespace worker {
@@ -24,80 +22,13 @@ executor::executor(std::shared_ptr<service_manager_t> service_manager)
 
 void executor::initialize()
 {
-	FILE *cf = NULL;
-	try {
-		const char CONFFILE[] = "forward.conf";
+	rapidjson::Document doc;
+	_elliptics_client_state = elliptics_client_state::create("forward.conf", doc);
 
-		cf = fopen(CONFFILE, "r");
-		if (!cf)
-			throw configuration_error_t("failed to open config file");
+	if (!doc.HasMember("forward-event"))
+		throw configuration_error_t("no 'forward-event' section found in config");
 
-		rapidjson::FileStream fs(cf);
-
-		rapidjson::Document doc;
-		doc.ParseStream<rapidjson::kParseDefaultFlags, rapidjson::UTF8<>, rapidjson::FileStream>(fs);
-		if (doc.HasParseError()) {
-			std::ostringstream out;
-			out << "can not parse config file: " << doc.GetParseError();
-			throw configuration_error_t(out.str().c_str());
-		}
-
-		std::string logfile = "/dev/stderr";
-		int loglevel = DNET_LOG_INFO;
-
-		if (doc.HasMember("logfile"))
-			logfile = doc["logfile"].GetString();
-		if (doc.HasMember("loglevel"))
-			loglevel = doc["loglevel"].GetInt();
-
-		try {
-			m_logger.reset(new file_logger(logfile.c_str(), loglevel));
-			m_node.reset(new node(*m_logger));
-		} catch (std::exception &e) {
-			throw configuration_error_t(e.what());
-		}
-
-		if (!doc.HasMember("remotes"))
-			throw configuration_error_t("no 'remotes' section found in config");
-
-		const rapidjson::Value &remotesArray = doc["remotes"];
-		int remotes_added = 0;
-		for (rapidjson::Value::ConstValueIterator itr = remotesArray.Begin(); itr != remotesArray.End(); ++itr) {
-			try {
-				m_node->add_remote(itr->GetString());
-				++remotes_added;
-			} catch (...) {
-				// We don't care, really
-			}
-		}
-		if (remotes_added == 0)
-			throw configuration_error_t("no remote nodes have been added");
-
-
-		if (!doc.HasMember("groups"))
-			throw configuration_error_t("no 'groups' section found in config");
-
-		const rapidjson::Value &groupsArray = doc["groups"];
-		std::transform(groupsArray.Begin(), groupsArray.End(),
-			std::back_inserter(m_groups),
-			std::bind(&rapidjson::Value::GetInt, std::placeholders::_1)
-			);
-
-		if (!doc.HasMember("forward-event"))
-			throw configuration_error_t("no 'forward-event' section found in config");
-
-		//FIXME: is there a reasonable default? or make it strongly required?
-		m_forward_event.assign(doc["forward-event"].GetString());
-	}
-	catch (const std::exception &e) {
-		if (cf)
-			fclose(cf);
-		COCAINE_LOG_ERROR(m_log, "failed to configure: %s", e.what());
-		throw;
-	}
-
-	if (cf)
-		fclose(cf);
+	m_forward_event.assign(doc["forward-event"].GetString());
 
 	//FIXME: there we need to know names of the driver and the app in advance
 	on<queue_handler>("forward/queue");
@@ -106,9 +37,7 @@ void executor::initialize()
 
 session executor::create_session()
 {
-	session sess(*m_node);
-	sess.set_groups(m_groups);
-	return sess;
+	return _elliptics_client_state.create_session();
 }
 
 std::string executor::on_unexpected_event(const std::string &event, const std::vector<std::string> &/*args*/)
