@@ -1,9 +1,0 @@
-{
-    "type": "binary",
-    "slave": "queue",
-
-     "remotes": [
-        "localhost:1025:2"
-     ],
-    "groups": [2]
-}
