@@ -10,13 +10,13 @@ class app_context : public cocaine::framework::application<app_context>
 {
 public:
 	// proxy to the logging service
-	std::shared_ptr<cocaine::framework::logger_t> _log;
+	std::shared_ptr<cocaine::framework::logger_t> m_log;
 
 	// elliptics client generator
 	elliptics_client_state _elliptics_client_state;
     
-    // reply delay, in milliseconds
-    int _delay;
+	// reply delay, in milliseconds
+	int _delay;
 
 	app_context(std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
 	void initialize();
@@ -28,9 +28,9 @@ app_context::app_context(std::shared_ptr<cocaine::framework::service_manager_t> 
 	: application<app_context>(service_manager)
 {
 	// obtain logging facility
-	_log = service_manager->get_system_logger();
+	m_log = service_manager->get_system_logger();
 
-    _delay = 0;
+	_delay = 0;
 }
 
 void app_context::initialize()
@@ -66,7 +66,7 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		client.reply(context, d, exec_context::final);
 	};
 
-	COCAINE_LOG_INFO(_log, "cocaine event: %s", cocaine_event.c_str());
+	COCAINE_LOG_INFO(m_log, "cocaine event: %s", cocaine_event.c_str());
 
 	// std::string app;
 	// std::string event;
@@ -76,9 +76,9 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 	//     event.assign(p + 1);
 	// }
 
-    if (_delay) {
-        usleep(_delay);
-    }
+	if (_delay) {
+		usleep(_delay);
+	}
 
 	reply(cocaine_event);
 
