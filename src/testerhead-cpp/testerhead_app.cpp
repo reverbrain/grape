@@ -39,7 +39,7 @@ void app_context::initialize()
 	//FIXME: replace this with config storage service when it's done
 	{
 		rapidjson::Document doc;
-		_elliptics_client_state = elliptics_client_state::create(doc);
+		_elliptics_client_state = elliptics_client_state::create("testerhead-cpp.conf", doc);
 
 		_delay = 0;
 		if (doc.HasMember("delay"))
