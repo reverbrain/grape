@@ -18,7 +18,7 @@ namespace {
 
 void print_cwd(int line) {
 	std::ofstream f;
-	f.open("/home/ijon/proj/launchpad/cwd.log", std::ios_base::app);
+	f.open("/tmp/cwd.log", std::ios_base::app);
 	char CWD[1024];
 	getcwd(CWD, 1023);
 	f << line << " " << std::string(CWD) << std::endl;
@@ -29,15 +29,17 @@ void print_cwd(int line) {
 #include <stdarg.h>
 #define debug_log(...) _debug_log(__LINE__, __VA_ARGS__)
 void _debug_log(int line, const char *format, ...) {
-	FILE *f = fopen("/home/ijon/proj/launchpad/debug.log", "a");
-	fprintf(f, "%d ", line);
-	va_list a;
-	va_start(a, format);
-	vfprintf(f, format, a);
-	va_end(a);
-	fprintf(f, "\n");
-	fflush(f);
-	fclose(f);
+	FILE *f = fopen("/tmp/debug.log", "a");
+	if (f) {
+		fprintf(f, "%d ", line);
+		va_list a;
+		va_start(a, format);
+		vfprintf(f, format, a);
+		va_end(a);
+		fprintf(f, "\n");
+		fflush(f);
+		fclose(f);
+	}
 }
 
 template <unsigned N>
@@ -318,16 +320,17 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		{
 			rapidjson::StringBuffer stream;
 			rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(stream);
-			rapidjson::Value root;
+			rapidjson::Document root;
 
-			root["ack.count"] = _ack_count;
-			root["ack.rate"] = _ack_rate.get();
-			root["fail.count"] = _fail_count;
-			root["fail.rate"] = _fail_rate.get();
-			root["pop.count"] = _pop_count;
-			root["pop.rate"] = _pop_rate.get();
-			root["push.count"] = _push_count;
-			root["push.rate"] = _push_rate.get();
+			root.SetObject();
+			root.AddMember("ack.count", _ack_count, root.GetAllocator());
+			root.AddMember("ack.rate", _ack_rate.get(), root.GetAllocator());
+			root.AddMember("fail.count", _fail_count, root.GetAllocator());
+			root.AddMember("fail.rate", _fail_rate.get(), root.GetAllocator());
+			root.AddMember("pop.count", _pop_count, root.GetAllocator());
+			root.AddMember("pop.rate", _pop_rate.get(), root.GetAllocator());
+			root.AddMember("push.count", _push_count, root.GetAllocator());
+			root.AddMember("push.rate", _push_rate.get(), root.GetAllocator());
 
 			root.Accept(writer);
 			text.assign(stream.GetString(), stream.GetSize());

@@ -136,12 +136,13 @@ bool queue_t::_state_save(ioremap::elliptics::session *client) {
 	{
 		rapidjson::StringBuffer stream;
 		rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(stream);
-		rapidjson::Value root;
+		rapidjson::Document root;
 
-		root["low_block"] = _low_block;
-		root["low_elem"] = _low_elem;
-		root["high_block"] = _high_block;
-		root["high_elem"] = _high_elem;
+		root.SetObject();
+		root.AddMember("low_block", _low_block, root.GetAllocator());
+		root.AddMember("low_elem", _low_elem, root.GetAllocator());
+		root.AddMember("high_block", _high_block, root.GetAllocator());
+		root.AddMember("high_elem", _high_elem, root.GetAllocator());
 
 		root.Accept(writer);
 		std::string text;
@@ -313,16 +314,16 @@ void queue_t::pop(ioremap::elliptics::session *client, ioremap::elliptics::data_
 void queue_t::dump_state(std::string *textp) {
 	rapidjson::StringBuffer stream;
 	rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(stream);
-	rapidjson::Value root;
+	rapidjson::Document root;
 
-	root["id"] = _id;
-	root["prefix"].SetString(_prefix.c_str(), _prefix.size());
-	root["block_size"] = _block_depth;
+	root.AddMember("id", _id, root.GetAllocator());
+	root.AddMember("prefix", _prefix.c_str(), root.GetAllocator());
+	root.AddMember("block_size", _block_depth, root.GetAllocator());
 
-	root["low_block"] = _low_block;
-	root["low_elem"] = _low_elem;
-	root["high_block"] = _high_block;
-	root["high_elem"] = _high_elem;
+	root.AddMember("low_block", _low_block, root.GetAllocator());
+	root.AddMember("low_elem", _low_elem, root.GetAllocator());
+	root.AddMember("high_block", _high_block, root.GetAllocator());
+	root.AddMember("high_elem", _high_elem, root.GetAllocator());
 
 	root.Accept(writer);
 	std::string text;
