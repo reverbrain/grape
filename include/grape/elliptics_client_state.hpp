@@ -3,9 +3,14 @@
 
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/filestream.h"
 
 #include <cocaine/common.hpp> // for configuration_error_t
+
 #include <elliptics/cppdef.h>
+
+#include <sstream>
 
 using namespace ioremap;
 using namespace cocaine;
@@ -21,17 +26,6 @@ struct elliptics_client_state {
 		return session;
 	}
 
-	// bare default: single target server, single group, no logging (but could be enabled)
-	static elliptics_client_state create(const std::string &server_addr, int server_port, int group, int loglevel = 0)
-	{
-		elliptics_client_state result;   
-		result.logger.reset(new elliptics::file_logger("/dev/stderr", loglevel));
-		result.node.reset(new elliptics::node(*result.logger));
-		result.node->add_remote(server_addr.c_str(), server_port);
-		result.groups.push_back(group);
-		return result;
-	}
-
 	// Configure from preparsed json config.
 	// Config template:
 	// {
@@ -40,8 +34,7 @@ struct elliptics_client_state {
 	//   logfile: "/dev/stderr",
 	//   loglevel: 0
 	// }
-	static elliptics_client_state create(const rapidjson::Document &args)
-	{
+	static elliptics_client_state create(const rapidjson::Document &args) {
 		std::string logfile = "/dev/stderr";
 		uint loglevel = DNET_LOG_INFO;
 		std::vector<std::string> remotes;
@@ -71,9 +64,40 @@ struct elliptics_client_state {
 		return create(remotes, groups, logfile, loglevel);
 	}
 
+	static elliptics_client_state create(const std::string &conf, rapidjson::Document &doc) {
+		FILE *cf;
+
+		cf = fopen(conf.c_str(), "r");
+		if (!cf) {
+			std::ostringstream str;
+			str << "failed to open config file '" << conf << "'";
+			throw configuration_error_t(str.str().c_str());
+		}
+
+		try {
+			rapidjson::FileStream fs(cf);
+
+			doc.ParseStream<rapidjson::kParseDefaultFlags, rapidjson::UTF8<>, rapidjson::FileStream>(fs);
+			if (doc.HasParseError()) {
+				std::ostringstream str;
+				str << "can not parse config file '" << conf << "': " << doc.GetParseError();
+				throw configuration_error_t(str.str().c_str());
+			}
+
+			fclose(cf);
+			cf = NULL;
+
+			return create(doc);
+		} catch (...) {
+			if (cf)
+				fclose(cf);
+
+			throw;
+		}
+	}
+
 	static elliptics_client_state create(const std::vector<std::string> &remotes,
-			const std::vector<int> &groups, const std::string &logfile, int loglevel)
-	{
+			const std::vector<int> &groups, const std::string &logfile, int loglevel) {
 		if (remotes.size() == 0) {
 			throw configuration_error_t("no remotes have been specified");
 		}
