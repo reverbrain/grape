@@ -1,3 +1,24 @@
+grape (0.6.2) unstable; urgency=low
+
+  * Code style cleanup
+  * Revorked forward app to use elliptics_client_state::create() and friends.
+  * Use new elliptics_client_state::create() which accepts filename and returns elliptics client and json object
+  * Moved json parsing into new static elliptics_client_state::create()
+  * Removed manifests, use config files instead
+  * Depend on cocaine-framework-native-dev 0.10.2+
+  * Compile grape on Fedora. Added rapidjson support instead of jsoncpp, which differs too much on Ubuntu and Fedora.
+  * Get rid of boost::filesystem in the queue code
+  * Cmake and include cleanup
+  * Get rid of LIB_SUFFIX
+  * Fixed data_pointer comparator used in queue-getter driver for storing scopes.
+  * Clean a bit queue-getter driver's logic for data requesting and processing.
+  * Queue components (queue, driver, testerhead) fused together under the
+  * Added statistics collection for the commands of queue app.
+  * Queue components (queue, driver, testerhead) fused together under the umbrella name "grape".
+  * Old stuff removed (may be to reincarnate later).
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Tue, 07 May 2013 22:13:23 +0400
+
 grape (0.6~2.gbpa6e877) UNRELEASED; urgency=low
 
   ** SNAPSHOT build @a6e877526c11d96bc70c929f4b2831f5cda93f80 **
