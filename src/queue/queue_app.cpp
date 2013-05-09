@@ -49,11 +49,10 @@ struct rate_stat
 
 }
 
-class app_context : public cocaine::framework::application<app_context>
+class queue_app_context : public cocaine::framework::application<app_context>
 {
 public:
 	queue_t _queue;
-	std::mutex _queue_mutex;
 
 	// proxy to the logging service
 	std::shared_ptr<cocaine::framework::logger_t> _log;
@@ -61,14 +60,10 @@ public:
 	// elliptics client generator
 	elliptics_client_state _elliptics_client_state;
 
-	int64_t _ack_count;
-	rate_stat _ack_rate;
-	int64_t _fail_count;
-	rate_stat _fail_rate;
-	int64_t _push_count;
-	rate_stat _push_rate;
-	int64_t _pop_count;
-	rate_stat _pop_rate;
+	long _ack_count;
+	long _fail_count;
+	long _push_count;
+	long _pop_count;
 
 	app_context(std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
 	void initialize();
@@ -112,7 +107,7 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 	ioremap::elliptics::exec_context context = ioremap::elliptics::exec_context::from_raw(chunks[0].c_str(), chunks[0].size());
 
 	auto reply_ack = [&client, &context] () {
-		client.reply(context, std::string(), ioremap::elliptics::exec_context::final);
+		client.reply(context, std::string("queue@ack: final"), ioremap::elliptics::exec_context::final);
 	};
 	auto reply_error = [&client, &context] (const char *msg) {
 		client.reply(context, std::string(msg), ioremap::elliptics::exec_context::final);
@@ -135,8 +130,6 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		reply(std::string("ok"));
 
 	} else if (event == "push") {
-		std::lock_guard<std::mutex> lock(_queue_mutex);
-
 		COCAINE_LOG_INFO(_log, "queue id: %d", _queue._id);
 
 		ioremap::elliptics::data_pointer d = context.data();
@@ -152,11 +145,8 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		reply_ack();
 
 		++_push_count;
-		_push_rate.update();
 
 	} else if (event == "pop") {
-		std::lock_guard<std::mutex> lock(_queue_mutex);
-
 		COCAINE_LOG_INFO(_log, "queue id: %d", _queue._id);
 
 		ioremap::elliptics::data_pointer d;
@@ -172,11 +162,8 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		}
 
 		++_pop_count;
-		_pop_rate.update();
 
 /*    } else if (event == "peek") {
-		std::lock_guard<std::mutex> lock(_queue_mutex);
-
 		COCAINE_LOG_INFO(_log, "queue id: %d", _queue._id);
 
 		data_pointer d;
@@ -192,24 +179,16 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		}
 */
 	} else if (event == "ack") {
-		//std::lock_guard<std::mutex> lock(_queue_mutex);
-
 		reply_ack();
 
 		++_ack_count;
-		_ack_rate.update();
 
 	} else if (event == "fail") {
-		//std::lock_guard<std::mutex> lock(_queue_mutex);
-
 		reply_ack();
 
 		++_fail_count;
-		_fail_rate.update();
 
 	} else if (event == "new-id") {
-		std::lock_guard<std::mutex> lock(_queue_mutex);
-
 		int id = std::stoi(context.data().to_string());
 		if (id < 0) {
 			reply_error("new-id: queue id must be positive integer");
@@ -219,8 +198,6 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		reply(std::to_string(id));
 
 	} else if (event == "existing-id") {
-		std::lock_guard<std::mutex> lock(_queue_mutex);
-
 		int id = std::stoi(context.data().to_string());
 		if (id < 0) {
 			reply_error("existing-id: queue id must be positive interger");
@@ -230,15 +207,11 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		reply(std::to_string(id));
 
 	} else if (event == "state") {
-		std::lock_guard<std::mutex> lock(_queue_mutex);
-
 		std::string text;
 		_queue.dump_state(&text);
 		reply(text);
 
 	} else if (event == "stats") {
-		std::lock_guard<std::mutex> lock(_queue_mutex);
-
 		std::string text;
 		{
 			rapidjson::StringBuffer stream;
@@ -247,13 +220,9 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 
 			root.SetObject();
 			root.AddMember("ack.count", _ack_count, root.GetAllocator());
-			root.AddMember("ack.rate", _ack_rate.get(), root.GetAllocator());
 			root.AddMember("fail.count", _fail_count, root.GetAllocator());
-			root.AddMember("fail.rate", _fail_rate.get(), root.GetAllocator());
 			root.AddMember("pop.count", _pop_count, root.GetAllocator());
-			root.AddMember("pop.rate", _pop_rate.get(), root.GetAllocator());
 			root.AddMember("push.count", _push_count, root.GetAllocator());
-			root.AddMember("push.rate", _push_rate.get(), root.GetAllocator());
 
 			root.Accept(writer);
 			text.assign(stream.GetString(), stream.GetSize());

@@ -36,7 +36,7 @@ struct elliptics_client_state {
 	// }
 	static elliptics_client_state create(const rapidjson::Document &args) {
 		std::string logfile = "/dev/stderr";
-		uint loglevel = DNET_LOG_INFO;
+		uint loglevel = DNET_LOG_ERROR;
 		std::vector<std::string> remotes;
 		std::vector<int> groups;
 

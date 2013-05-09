@@ -1,51 +1,107 @@
-#ifndef QUEUE_HPP__
-#define QUEUE_HPP__
+#ifndef __QUEUE_HPP
+#define __QUEUE_HPP
 
-#include "block.hpp"
+#include "grape/elliptics_client_state.hpp"
 
 #include <elliptics/cppdef.h>
+#include <map>
 
-//
-// Queue receives commands by exec events with its own queue-id as a key.
-//
-struct queue_t
-{
-	queue_t();
+namespace ioremap { namespace grape {
 
-	bool _state_save(ioremap::elliptics::session *client);
-	bool _state_restore(ioremap::elliptics::session *client);
+static std::string lexical_cast(size_t value) {
+	if (value == 0) {
+		return std::string("0");
+	}
+	std::string result;
+	size_t length = 0;
+	size_t calculated = value;
+	while (calculated) {
+		calculated /= 10;
+		++length;
+	}
+	result.resize(length);
+	while (value) {
+		--length;
+		result[length] = '0' + (value % 10);
+		value /= 10;
+	}
+	return result;
+}
 
-	// create new queue
-	void new_id(ioremap::elliptics::session *client, int id);
-
-	// restoring state of the already existing queue
-	bool existing_id(ioremap::elliptics::session *client, int id);
-
-	void push(ioremap::elliptics::session *client, const ioremap::elliptics::data_pointer &d);
-	void pop(ioremap::elliptics::session *client, ioremap::elliptics::data_pointer *elem_data, size_t *elem_size);
-	void dump_state(std::string *text);
-
-	std::string _make_block_key(uint64_t block);
-	std::string _make_queue_key(int id);
-
-	// config
-	int _id;
-	std::string _prefix;
-	uint64_t _block_depth;
-
-	// running state
-	uint64_t _low_block;
-	uint64_t _low_elem;
-	uint64_t _high_block;
-	uint64_t _high_elem;
-
-	// internal details
-	// keeping a block from the output end of the queue
-	ioremap::elliptics::data_pointer _low_block_data;
-	block_t _low_block_cached;
+struct chunk_entry {
+	int		size;
+	int		state;
 };
 
-std::string make_block_key(const char *prefix, int id, uint64_t block);
-std::string make_queue_key(const char *prefix, int id);
+struct chunk_disk {
+	int			acked, used, max;
+	struct chunk_entry	states[];
+};
 
-#endif //QUEUE_HPP__
+class chunk_ctl {
+	public:
+		chunk_ctl(int max);
+
+		bool push(int size); // returns true when given chunk is full
+
+		std::string &data(void);
+		void assign(char *data, int size);
+
+		int used(void);
+
+		struct chunk_entry operator[] (int pos);
+
+	private:
+		std::string m_chunk;
+		struct chunk_disk *m_ptr;
+};
+
+class chunk {
+	public:
+		ELLIPTICS_DISABLE_COPY(chunk);
+
+		chunk(elliptics::session &session, const std::string &queue_id, int chunk_id, int max);
+		~chunk();
+
+		bool push(const elliptics::data_pointer &d); // returns true if chunk is full
+		elliptics::data_pointer pop(void);
+
+	private:
+		int m_chunk_id;
+		std::string m_queue_id;
+		elliptics::key m_data_key;
+		elliptics::key m_ctl_key;
+		elliptics::session m_session_data;
+		elliptics::session m_session_ctl;
+
+		int m_pop_position;
+		int m_pop_index;
+
+		// whole chunk data is cached here
+		// cache is being filled when ::pop is invoked and @m_pop_position is >= than cache size
+		elliptics::data_pointer m_chunk_data;
+
+		chunk_ctl m_chunk;
+};
+
+typedef std::shared_ptr<chunk> shared_chunk;
+
+class queue {
+	public:
+		queue(const std::string &config, const std::string &queue_id);
+
+		void push(const elliptics::data_pointer &d);
+		elliptics::data_pointer pop(void);
+
+	private:
+		std::map<int, shared_chunk> m_chunks;
+		std::string m_queue_id;
+		int m_chunk_id_push;
+		int m_chunk_id_pop;
+
+		elliptics_client_state m_client;
+};
+
+}} /* namespace ioremap::grape */
+
+#endif /* __QUEUE_HPP */
