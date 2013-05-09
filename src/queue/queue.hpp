@@ -40,6 +40,8 @@ struct chunk_disk {
 
 class chunk_ctl {
 	public:
+		ELLIPTICS_DISABLE_COPY(chunk_ctl);
+
 		chunk_ctl(int max);
 
 		bool push(int size); // returns true when given chunk is full
@@ -88,6 +90,8 @@ typedef std::shared_ptr<chunk> shared_chunk;
 
 class queue {
 	public:
+		ELLIPTICS_DISABLE_COPY(queue);
+
 		queue(const std::string &config, const std::string &queue_id, int max);
 
 		void push(const elliptics::data_pointer &d);
