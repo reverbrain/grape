@@ -21,7 +21,8 @@ void grape_queue_module_set_logger(std::shared_ptr<cocaine::framework::logger_t>
 	__grape_queue_private_log = logger;
 }
 
-ioremap::grape::queue::queue(const std::string &config, const std::string &queue_id):
+ioremap::grape::queue::queue(const std::string &config, const std::string &queue_id, int max):
+m_chunk_max(max),
 m_queue_id(queue_id),
 m_chunk_id_push(0),
 m_chunk_id_pop(0)
@@ -36,7 +37,7 @@ void ioremap::grape::queue::push(const ioremap::elliptics::data_pointer &d)
 	if (ch == m_chunks.end()) {
 		ioremap::elliptics::session tmp = m_client.create_session();
 		auto epair = m_chunks.insert(std::make_pair(m_chunk_id_push,
-					std::make_shared<chunk>(tmp, m_queue_id, m_chunk_id_push, 3)));
+					std::make_shared<chunk>(tmp, m_queue_id, m_chunk_id_push, m_chunk_max)));
 
 		ch = epair.first;
 	}

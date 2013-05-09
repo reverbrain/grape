@@ -88,14 +88,18 @@ typedef std::shared_ptr<chunk> shared_chunk;
 
 class queue {
 	public:
-		queue(const std::string &config, const std::string &queue_id);
+		queue(const std::string &config, const std::string &queue_id, int max);
 
 		void push(const elliptics::data_pointer &d);
 		elliptics::data_pointer pop(void);
 
 	private:
+		int m_chunk_max;
+
 		std::map<int, shared_chunk> m_chunks;
+
 		std::string m_queue_id;
+
 		int m_chunk_id_push;
 		int m_chunk_id_pop;
 
