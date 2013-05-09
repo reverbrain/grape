@@ -44,7 +44,8 @@ class chunk_ctl {
 
 		chunk_ctl(int max);
 
-		bool push(int size); // returns true when given chunk is full
+		bool push(int size); // Returns true when given chunk is full
+		int ack(int pos, int state); // Marks entry at @pos position with @state state. Increases @ack and returns it
 
 		std::string &data(void);
 		void assign(char *data, int size);
@@ -84,6 +85,8 @@ class chunk {
 		elliptics::data_pointer m_chunk_data;
 
 		chunk_ctl m_chunk;
+
+		void write_chunk(void);
 };
 
 typedef std::shared_ptr<chunk> shared_chunk;

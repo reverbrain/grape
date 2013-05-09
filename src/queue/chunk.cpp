@@ -9,6 +9,8 @@ m_ptr(NULL)
 	m_ptr = (struct chunk_disk *)m_chunk.data();
 	
 	m_ptr->max = max;
+
+	std::cout << "new chunk: max: " << max << std::endl;
 }
 
 bool ioremap::grape::chunk_ctl::push(int size)
@@ -18,7 +20,32 @@ bool ioremap::grape::chunk_ctl::push(int size)
 
 	m_ptr->states[m_ptr->used].size = size;
 	m_ptr->used++;
-	return m_ptr->used;
+	return m_ptr->used == m_ptr->max;
+}
+
+int ioremap::grape::chunk_ctl::ack(int pos, int state)
+{
+	if (pos >= m_ptr->used) {
+		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: position can not be more than used: "
+				"pos: %d, acked: %d, used: %d, max: %d",
+				pos, m_ptr->acked, m_ptr->used, m_ptr->max);
+	}
+
+	if (pos >= m_ptr->max) {
+		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: position can not be more than maximum chunk size: "
+				"pos: %d, acked: %d, used: %d, max: %d",
+				pos, m_ptr->acked, m_ptr->used, m_ptr->max);
+	}
+
+	if (m_ptr->acked >= m_ptr->used) {
+		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: acked can not be more than used: "
+				"pos: %d, acked: %d, used: %d, max: %d",
+				pos, m_ptr->acked, m_ptr->used, m_ptr->max);
+	}
+
+	m_ptr->states[pos].state = state;
+	m_ptr->acked++;
+	return m_ptr->acked;
 }
 
 std::string &ioremap::grape::chunk_ctl::data(void)
@@ -55,18 +82,30 @@ m_chunk_id(chunk_id),
 m_queue_id(queue_id),
 m_data_key(queue_id + ".chunk." + lexical_cast(chunk_id)),
 m_ctl_key(queue_id + ".chunk." + lexical_cast(chunk_id) + ".meta"),
-m_session_data(session),
-m_session_ctl(session),
+m_session_data(session.clone()),
+m_session_ctl(session.clone()),
 m_pop_index(0),
 m_pop_position(0),
 m_chunk(max)
 {
-	m_session_data.set_ioflags(DNET_IO_FLAGS_APPEND | DNET_IO_FLAGS_NOCSUM | DNET_IO_FLAGS_OVERWRITE);
+	m_session_data.set_ioflags(DNET_IO_FLAGS_APPEND | DNET_IO_FLAGS_NOCSUM);
 	m_session_ctl.set_ioflags(DNET_IO_FLAGS_NOCSUM | DNET_IO_FLAGS_OVERWRITE);
+
+	try {
+		ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
+		m_chunk.assign((char *)d.data(), d.size());
+	} catch (const ioremap::elliptics::not_found_error &) {
+		// ignore not-found exception - create empty chunk
+	}
 }
 
 ioremap::grape::chunk::~chunk()
 {
+}
+
+void ioremap::grape::chunk::write_chunk(void)
+{
+	m_session_ctl.write_data(m_ctl_key, ioremap::elliptics::data_pointer::from_raw(m_chunk.data()), 0).wait();
 }
 
 bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
@@ -74,7 +113,7 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 	auto async_data = m_session_data.write_data(m_data_key, d, 0);
 
 	bool full = m_chunk.push(d.size());
-	m_session_ctl.write_data(m_ctl_key, ioremap::elliptics::data_pointer::from_raw(m_chunk.data()), 0).wait();
+	write_chunk();
 
 	async_data.wait();
 
@@ -88,7 +127,7 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(void)
 	if (m_pop_position >= m_chunk_data.size()) {
 		m_chunk_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
 		if (m_chunk.used() == 0) {
-			ioremap::elliptics::data_pointer d = m_session_data.read_data(m_ctl_key, 0, 0).get_one().file();
+			ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
 			m_chunk.assign((char *)d.data(), d.size());
 		}
 
@@ -100,6 +139,10 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(void)
 	if (m_pop_position < m_chunk_data.size()) {
 		int size = m_chunk[m_pop_index].size;
 		d = ioremap::elliptics::data_pointer::copy((char *)m_chunk_data.data() + m_pop_position, size);
+
+		m_chunk.ack(m_pop_index, 1);
+		write_chunk();
+
 		m_pop_position += size;
 		m_pop_index++;
 	}
