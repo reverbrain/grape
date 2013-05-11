@@ -158,7 +158,9 @@ void queue_t::on_queue_request_data(const ioremap::elliptics::exec_result_entry 
 {
 	try {
 		if (result.error()) {
-			COCAINE_LOG_INFO(m_log, "got error from %s-%s: %d, %s", m_queue_name.c_str(), m_queue_id.c_str(), result.error().code(), result.error().message());
+			COCAINE_LOG_INFO(m_log, "got error from %s-%s: %d, %s",
+					m_queue_name.c_str(), m_queue_id.c_str(),
+					result.error().code(), result.error().message());
 			return;
 		}
 
@@ -261,7 +263,7 @@ bool queue_t::process_data(const data_pointer &data)
 			scope.upstream = upstream;
 			scope.downstream = downstream;
 
-			//NOTE: successful enqueueing cause boost for inbound data rate
+			//NOTE: successful enqueueing causes boost for inbound data rate
 			// by calling to get more data
 			get_more_data();
 
