@@ -10,7 +10,7 @@ m_ptr(NULL)
 	
 	m_ptr->max = max;
 
-	std::cout << "new chunk: max: " << max << std::endl;
+	//std::cout << "new chunk: max: " << max << std::endl;
 }
 
 bool ioremap::grape::chunk_ctl::push(int size)
@@ -98,13 +98,13 @@ m_chunk(max)
 	try {
 		ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
 		m_chunk.assign((char *)d.data(), d.size());
-
+#if 0
 		std::cout << "constructor: chunk read: data-key: " << m_data_key.to_string() <<
 			", ctl-key: " << m_ctl_key.to_string() <<
 			", chunk-size: " << m_chunk_data.size() <<
 			", used: " << m_chunk.used() <<
 			", acked: " << m_chunk.acked() <<
-			std::endl;
+#endif			std::endl;
 
 		for (int i = 0; i < m_chunk.acked(); ++i)
 			m_pop_position += m_chunk[i].size;
@@ -150,6 +150,10 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(void)
 			m_chunk.assign((char *)d.data(), d.size());
 		}
 
+		m_pop_position = 0;
+		for (int i = 0; i < m_chunk.acked(); ++i)
+			m_pop_position += m_chunk[i].size;
+#if 0
 		std::cout << "chunk read: data-key: " << m_data_key.to_string() <<
 			", ctl-key: " << m_ctl_key.to_string() <<
 			", chunk-size: " << m_chunk_data.size() <<
@@ -157,10 +161,7 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(void)
 			", acked: " << m_chunk.acked() <<
 			", m_pop_position: " << m_pop_position <<
 			std::endl;
-
-
-		for (int i = 0; i < m_chunk.acked(); ++i)
-			m_pop_position += m_chunk[i].size;
+#endif
 	}
 
 	if (m_chunk.acked() < m_chunk.used() && m_pop_position < m_chunk_data.size()) {

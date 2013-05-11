@@ -1,7 +1,0 @@
-{
-    "remotes": [
-        "localhost:1025:2"
-    ],
-    "groups" : [2],
-    "forward-event": "launcher@filter"
-}

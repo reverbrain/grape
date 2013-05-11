@@ -16,6 +16,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 find_package(elliptics REQUIRED)
 find_package(CocaineNative REQUIRED)
+find_package(Cocaine REQUIRED)
 
 include(cmake/Modules/locate_library.cmake)
 locate_library(LIBEV "ev++.h" "ev" "libev")
@@ -34,8 +35,7 @@ install(FILES ${headers} DESTINATION include/grape)
 include_directories(${PROJECT_SOURCE_DIR}/include ${elliptics_INCLUDE_DIRS} ${CocaineNative_INCLUDE_DIRS} ${LIBEV_INCLUDE_DIRS})
 
 add_subdirectory(src/queue)
-add_subdirectory(src/queue-getter)
-add_subdirectory(src/forward)
+add_subdirectory(src/driver)
 add_subdirectory(src/testerhead-cpp)
 
 #add_subdirectory(example)

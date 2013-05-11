@@ -29,6 +29,7 @@ app_context::app_context(std::shared_ptr<cocaine::framework::service_manager_t> 
 {
 	// obtain logging facility
 	m_log = service_manager->get_system_logger();
+	COCAINE_LOG_INFO(m_log, "application start\n");
 
 	_delay = 0;
 }
@@ -40,6 +41,7 @@ void app_context::initialize()
 	{
 		rapidjson::Document doc;
 		_elliptics_client_state = elliptics_client_state::create("testerhead-cpp.conf", doc);
+
 
 		_delay = 0;
 		if (doc.HasMember("delay"))
@@ -66,7 +68,7 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		client.reply(context, d, exec_context::final);
 	};
 
-	COCAINE_LOG_INFO(m_log, "cocaine event: %s", cocaine_event.c_str());
+	COCAINE_LOG_INFO(m_log, "testerhead: event: '%s', data: '%s'", cocaine_event.c_str(), context.data().to_string().c_str());
 
 	// std::string app;
 	// std::string event;
@@ -80,9 +82,9 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		usleep(_delay);
 	}
 
-	reply(cocaine_event);
+	//reply(cocaine_event + ": completed");
 
-	return "";
+	return "testerhead-cpp: return: " + context.data().to_string();
 }
 
 int main(int argc, char **argv)

@@ -19,12 +19,9 @@
 
 #include "driver.hpp"
 
-using namespace cocaine;
-using namespace cocaine::driver;
-
 extern "C" {
 	void
-	initialize(api::repository_t& repository) {
-		repository.insert<queue_t>("persistent-queue");
+	initialize(cocaine::api::repository_t& repository) {
+		repository.insert<cocaine::driver::queue_driver>("persistent-queue");
 	}
 }
