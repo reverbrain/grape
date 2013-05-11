@@ -104,8 +104,8 @@ m_chunk(max)
 			", chunk-size: " << m_chunk_data.size() <<
 			", used: " << m_chunk.used() <<
 			", acked: " << m_chunk.acked() <<
-#endif			std::endl;
-
+			std::endl;
+#endif
 		for (int i = 0; i < m_chunk.acked(); ++i)
 			m_pop_position += m_chunk[i].size;
 	} catch (const ioremap::elliptics::not_found_error &) {

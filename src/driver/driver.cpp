@@ -33,10 +33,10 @@ using namespace cocaine::driver;
 queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &reactor, cocaine::app_t &app,
 		const std::string& name, const Json::Value& args):
 category_type(context, reactor, app, name, args),
+m_src_key(0),
 m_context(context),
 m_app(app),
 m_log(new cocaine::logging::log_t(context, cocaine::format("driver/%s", name))),
-m_src_key(0),
 m_idle_timer(reactor.native()),
 m_worker_event(args.get("emit", name).asString()),
 m_queue_name(args.get("source-queue-app", "queue").asString()),
@@ -87,7 +87,9 @@ Json::Value queue_driver::info() const
 void queue_driver::on_idle_timer_event(ev::timer &, int)
 {
 	COCAINE_LOG_INFO(m_log, "timer: checking queue");
-	get_more_data();
+
+	for (int i = 0; i < 1000; ++i)
+		get_more_data();
 }
 
 void queue_driver::get_more_data()
