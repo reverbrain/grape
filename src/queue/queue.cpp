@@ -77,8 +77,10 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::pop(void)
 			break;
 
 		d = ch->second->pop();
-		if (!d.empty())
+		if (!d.empty()) {
+			m_stat.pop_count++;
 			break;
+		}
 
 		if (m_stat.chunk_id_pop == m_stat.chunk_id_push)
 			break;
@@ -91,7 +93,6 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::pop(void)
 		update_indexes();
 	}
 
-	m_stat.pop_count++;
 	return d;
 }
 
