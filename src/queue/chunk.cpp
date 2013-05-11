@@ -53,9 +53,14 @@ std::string &ioremap::grape::chunk_ctl::data(void)
 	return m_chunk;
 }
 
-int ioremap::grape::chunk_ctl::used(void)
+int ioremap::grape::chunk_ctl::used(void) const
 {
 	return m_ptr->used;
+}
+
+int ioremap::grape::chunk_ctl::acked(void) const
+{
+	return m_ptr->acked;
 }
 
 void ioremap::grape::chunk_ctl::assign(char *data, int size)
@@ -84,7 +89,6 @@ m_data_key(queue_id + ".chunk." + lexical_cast(chunk_id)),
 m_ctl_key(queue_id + ".chunk." + lexical_cast(chunk_id) + ".meta"),
 m_session_data(session.clone()),
 m_session_ctl(session.clone()),
-m_pop_index(0),
 m_pop_position(0),
 m_chunk(max)
 {
@@ -94,6 +98,16 @@ m_chunk(max)
 	try {
 		ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
 		m_chunk.assign((char *)d.data(), d.size());
+
+		std::cout << "constructor: chunk read: data-key: " << m_data_key.to_string() <<
+			", ctl-key: " << m_ctl_key.to_string() <<
+			", chunk-size: " << m_chunk_data.size() <<
+			", used: " << m_chunk.used() <<
+			", acked: " << m_chunk.acked() <<
+			std::endl;
+
+		for (int i = 0; i < m_chunk.acked(); ++i)
+			m_pop_position += m_chunk[i].size;
 	} catch (const ioremap::elliptics::not_found_error &) {
 		// ignore not-found exception - create empty chunk
 	}
@@ -105,7 +119,12 @@ ioremap::grape::chunk::~chunk()
 
 void ioremap::grape::chunk::write_chunk(void)
 {
-	m_session_ctl.write_data(m_ctl_key, ioremap::elliptics::data_pointer::from_raw(m_chunk.data()), 0).wait();
+	m_session_ctl.write_data(m_ctl_key, ioremap::elliptics::data_pointer::from_raw(m_chunk.data()), 0);
+}
+
+void ioremap::grape::chunk::remove(void)
+{
+	m_session_ctl.remove(m_ctl_key);
 }
 
 bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
@@ -115,7 +134,7 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 	bool full = m_chunk.push(d.size());
 	write_chunk();
 
-	async_data.wait();
+	//async_data.wait();
 
 	return full;
 }
@@ -133,18 +152,25 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(void)
 
 		std::cout << "chunk read: data-key: " << m_data_key.to_string() <<
 			", ctl-key: " << m_ctl_key.to_string() <<
-			", chunk-size: " << m_chunk_data.size() << std::endl;
+			", chunk-size: " << m_chunk_data.size() <<
+			", used: " << m_chunk.used() <<
+			", acked: " << m_chunk.acked() <<
+			", m_pop_position: " << m_pop_position <<
+			std::endl;
+
+
+		for (int i = 0; i < m_chunk.acked(); ++i)
+			m_pop_position += m_chunk[i].size;
 	}
 
-	if (m_pop_position < m_chunk_data.size()) {
-		int size = m_chunk[m_pop_index].size;
+	if (m_chunk.acked() < m_chunk.used() && m_pop_position < m_chunk_data.size()) {
+		int size = m_chunk[m_chunk.acked()].size;
 		d = ioremap::elliptics::data_pointer::copy((char *)m_chunk_data.data() + m_pop_position, size);
 
-		m_chunk.ack(m_pop_index, 1);
+		m_chunk.ack(m_chunk.acked(), 1);
 		write_chunk();
 
 		m_pop_position += size;
-		m_pop_index++;
 	}
 
 	return d;

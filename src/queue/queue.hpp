@@ -50,7 +50,8 @@ class chunk_ctl {
 		std::string &data(void);
 		void assign(char *data, int size);
 
-		int used(void);
+		int used(void) const;
+		int acked(void) const;
 
 		struct chunk_entry operator[] (int pos);
 
@@ -68,6 +69,8 @@ class chunk {
 
 		bool push(const elliptics::data_pointer &d); // returns true if chunk is full
 		elliptics::data_pointer pop(void);
+
+		void remove(void);
 
 	private:
 		int m_chunk_id;
@@ -91,6 +94,15 @@ class chunk {
 
 typedef std::shared_ptr<chunk> shared_chunk;
 
+struct queue_stat {
+	uint64_t	push_count;
+	uint64_t	pop_count;
+	uint64_t	fail_count;
+	uint64_t	ack_count;
+	int		chunk_id_push;
+	int		chunk_id_pop;
+};
+
 class queue {
 	public:
 		ELLIPTICS_DISABLE_COPY(queue);
@@ -100,17 +112,23 @@ class queue {
 		void push(const elliptics::data_pointer &d);
 		elliptics::data_pointer pop(void);
 
+		void reply(const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d);
+
+		struct queue_stat &stat(void);
+
 	private:
 		int m_chunk_max;
 
 		std::map<int, shared_chunk> m_chunks;
 
 		std::string m_queue_id;
-
-		int m_chunk_id_push;
-		int m_chunk_id_pop;
+		std::string m_queue_stat_id;
 
 		elliptics_client_state m_client;
+
+		struct queue_stat m_stat;
+
+		void update_indexes(void);
 };
 
 }} /* namespace ioremap::grape */
