@@ -1,3 +1,15 @@
+grape (0.6.3) unstable; urgency=low
+
+  * Update pop counter only on successfull pop
+  * Cleanups. Run queue get 1000 times when fired on timer.
+  * Removed old driver and forwarder. Added new driver. Attach driver to test application.
+  * Misc cleanups, debug. Increased forward queue size.
+  * Added acked() member and use it as pointer within chunk.
+  * Fixed session creation. Added chunk ack. Update acked counter and write chunk metadata for every pop
+  * New queue implementation
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Tue, 14 May 2013 23:15:55 +0400
+
 grape (0.6.2) unstable; urgency=low
 
   * Code style cleanup
