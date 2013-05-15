@@ -31,6 +31,8 @@
 #include <cocaine/api/stream.hpp>
 #include <cocaine/asio/reactor.hpp>
 #include <cocaine/app.hpp>
+#include <cocaine/api/storage.hpp>
+#include <cocaine/detail/traits/json.hpp>
 
 namespace cocaine { namespace driver {
 
@@ -41,6 +43,7 @@ class queue_driver: public api::driver_t {
 	public:
 		struct downstream_t: public cocaine::api::stream_t {
 			downstream_t(queue_driver *queue, const ioremap::elliptics::data_pointer &d);
+			~downstream_t();
 
 			virtual void write(const char *data, size_t size);
 			virtual void error(cocaine::error_code, const std::string &message);
@@ -57,6 +60,9 @@ class queue_driver: public api::driver_t {
 		virtual ~queue_driver();
 
 		virtual Json::Value info() const;
+
+		void queue_dec(int num);
+		void queue_inc(int num);
 
 	private:
 		elliptics_client_state m_client;
@@ -100,6 +106,8 @@ class queue_driver: public api::driver_t {
 
 		const double m_timeout;
 		const double m_deadline;
+
+		std::atomic_int m_queue_length, m_queue_length_max;
 
 		friend class downstream_t;
 };

@@ -23,6 +23,12 @@
 #include <cocaine/logging.hpp>
 #include <cocaine/api/event.hpp>
 
+#include <cocaine/app.hpp>
+#include <cocaine/exceptions.hpp>
+#include <cocaine/api/event.hpp>
+#include <cocaine/api/stream.hpp>
+#include <cocaine/api/service.hpp>
+
 #include "rapidjson/document.h"
 
 // number of retries for data processing
@@ -45,7 +51,9 @@ m_queue_id(args.get("source-queue-id", "5").asString()),
 m_queue_pop_event(m_queue_name + "@pop"),
 m_queue_ack_event(m_queue_name + "@ack"),
 m_timeout(args.get("timeout", 0.0f).asDouble()),
-m_deadline(args.get("deadline", 0.0f).asDouble())
+m_deadline(args.get("deadline", 0.0f).asDouble()),
+m_queue_length(0),
+m_queue_length_max(0)
 {
 	COCAINE_LOG_INFO(m_log, "driver starts\n");
 
@@ -64,6 +72,20 @@ m_deadline(args.get("deadline", 0.0f).asDouble())
 	if (m_queue_name.empty())
 		throw configuration_error_t("no queue name has been specified");
 
+	char *ptr = strchr((char *)m_worker_event.c_str(), '@');
+	if (!ptr)
+		throw configuration_error_t("invalid worker event ('emit' config entry), it must contain @ sign");
+
+	std::string app_name(m_worker_event.c_str(), ptr - m_worker_event.c_str());
+	std::string event_name(ptr+1);
+
+	auto storage = cocaine::api::storage(context, "core");
+	Json::Value profile = storage->get<Json::Value>("profiles", app_name);
+	int concurrency = profile["concurrency"].asInt();
+	int pool_limit = profile["pool-limit"].asInt();
+
+	m_queue_length_max = concurrency * pool_limit / 2;
+
 	m_idle_timer.set<queue_driver, &queue_driver::on_idle_timer_event>(this);
 	m_idle_timer.set(1.0f, 5.0f);
 	m_idle_timer.again();
@@ -80,15 +102,17 @@ Json::Value queue_driver::info() const
 
 	result["type"] = "persistent-queue";
 	result["name"] = m_queue_name;
+	result["queue-stats"]["inserted"] = (int)m_queue_length;
+	result["queue-stats"]["max-length"] = (int)m_queue_length_max;
 
 	return result;
 }
 
 void queue_driver::on_idle_timer_event(ev::timer &, int)
 {
-	COCAINE_LOG_INFO(m_log, "timer: checking queue");
+	COCAINE_LOG_INFO(m_log, "timer: checking queue: length: %d, max: %d", m_queue_length, m_queue_length_max);
 
-	for (int i = 0; i < 1000; ++i)
+	for (int i = m_queue_length; i < m_queue_length_max; ++i)
 		get_more_data();
 }
 
@@ -177,6 +201,7 @@ bool queue_driver::process_data(const ioremap::elliptics::data_pointer &data)
 		auto upstream = m_app.enqueue(api::event_t(m_worker_event, policy), downstream);
 		upstream->write(raw_data.data(), raw_data.size());
 
+		queue_inc(1);
 		// get more data
 		get_more_data();
 
@@ -198,6 +223,7 @@ void queue_driver::on_process_successed(const ioremap::elliptics::data_pointer &
 	queue_id.group_id = 0;
 	sess.transform(m_queue_id, queue_id);
 
+
 	sess.exec(&queue_id, m_queue_ack_event, ioremap::elliptics::data_pointer()).connect(
 		ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
 		[this] (const ioremap::elliptics::error_info &error) {
@@ -214,9 +240,24 @@ void queue_driver::on_process_successed(const ioremap::elliptics::data_pointer &
 	get_more_data();
 }
 
+void queue_driver::queue_dec(int num)
+{
+	m_queue_length -= num;
+}
+
+void queue_driver::queue_inc(int num)
+{
+	m_queue_length += num;
+}
+
 queue_driver::downstream_t::downstream_t(queue_driver *queue, const ioremap::elliptics::data_pointer &d)
 	: m_queue(queue), m_data(d), m_attempts(0)
 {
+}
+
+queue_driver::downstream_t::~downstream_t()
+{
+	m_queue->queue_dec(1);
 }
 
 void queue_driver::downstream_t::write(const char *data, size_t size)
