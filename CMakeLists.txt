@@ -24,7 +24,7 @@ locate_library(LIBEV "ev++.h" "ev" "libev")
 set(GRAPE_COMMON_LIBRARIES
 	${elliptics_cpp_LIBRARY}
 	${CocaineNative_LIBRARIES}
-	ev
+	${LIBEV_LIBRARIES}
 	${Boost_SYSTEM_LIBRARY}
 	${Boost_THREAD_LIBRARY}
 )
