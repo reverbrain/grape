@@ -1,3 +1,11 @@
+grape (0.6.4) unstable; urgency=low
+
+  * Try to not overflow queue by checking number of elements in flight
+  * Use cmake-detected libev name
+  * We do not have /usr/bin binaries in grape, do not put them into package
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Thu, 16 May 2013 01:08:36 +0400
+
 grape (0.6.3) unstable; urgency=low
 
   * Update pop counter only on successfull pop
