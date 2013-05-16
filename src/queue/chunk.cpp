@@ -63,7 +63,7 @@ int ioremap::grape::chunk_ctl::acked(void) const
 	return m_ptr->acked;
 }
 
-void ioremap::grape::chunk_ctl::assign(char *data, int size)
+void ioremap::grape::chunk_ctl::assign(char *data, size_t size)
 {
 	if (size != m_chunk.size())
 		ioremap::elliptics::throw_error(-ERANGE, "chunk assignment with invalid size: current: %zd, want-to-assign: %d",

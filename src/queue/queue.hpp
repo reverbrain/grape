@@ -48,7 +48,7 @@ class chunk_ctl {
 		int ack(int pos, int state); // Marks entry at @pos position with @state state. Increases @ack and returns it
 
 		std::string &data(void);
-		void assign(char *data, int size);
+		void assign(char *data, size_t size);
 
 		int used(void) const;
 		int acked(void) const;
@@ -80,8 +80,8 @@ class chunk {
 		elliptics::session m_session_data;
 		elliptics::session m_session_ctl;
 
-		int m_pop_position;
-		int m_pop_index;
+		size_t m_pop_position;
+		size_t m_pop_index;
 
 		// whole chunk data is cached here
 		// cache is being filled when ::pop is invoked and @m_pop_position is >= than cache size
