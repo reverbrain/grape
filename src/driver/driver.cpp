@@ -29,6 +29,8 @@
 #include <cocaine/api/stream.hpp>
 #include <cocaine/api/service.hpp>
 
+#include "cocaine-json-trait.hpp"
+
 #include "rapidjson/document.h"
 
 // number of retries for data processing

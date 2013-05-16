@@ -19,6 +19,7 @@ tags
 *.tar
 *.tar.*
 *.cocaine-plugin
+.*.sw*
 src/queue/block
 src/queue/queue
 src/queue/queue-tool

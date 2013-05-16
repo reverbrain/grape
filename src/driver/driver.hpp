@@ -32,7 +32,6 @@
 #include <cocaine/asio/reactor.hpp>
 #include <cocaine/app.hpp>
 #include <cocaine/api/storage.hpp>
-#include <cocaine/detail/traits/json.hpp>
 
 namespace cocaine { namespace driver {
 
