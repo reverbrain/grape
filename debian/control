@@ -5,10 +5,10 @@ Maintainer: Ivan Chelyubeev <ijon@yandex-team.ru>
 Build-Depends: debhelper (>= 7),
 		cmake,
 		cdbs,
-		elliptics-dev (>= 2.24),
-		elliptics-client (>= 2.24),
-		cocaine-framework-native-dev (>= 0.10.3),
-		libcocaine-dev (>= 0.10.4),
+		elliptics-dev (>= 2.24.3),
+		elliptics-client (>= 2.24.3),
+		cocaine-framework-native-dev (>= 0.10.2),
+		libcocaine-dev (>= 0.10.4~pre0),
 		libboost-dev,
 		libboost-system-dev,
 		libboost-program-options-dev,
@@ -36,12 +36,12 @@ Description: Realtime pipeline processing engine (includes)
 
 Package: libcocaine-plugin-queue-getter
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, elliptics-client (>= 2.24)
+Depends: ${shlibs:Depends}, ${misc:Depends}, elliptics-client (>= 2.24.3)
 Description: Grape queue getter driver (cocaine plugin)
  Grape queue getter run as a cocaine plugin
 
 Package: grape-components
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, grape (= ${binary:Version}), cocaine-framework-native (>> 0.10.2)
+Depends: ${shlibs:Depends}, ${misc:Depends}, grape (= ${binary:Version}), cocaine-framework-native (>= 0.10.2)
 Description: Grape queue and other components (cocaine apps)
  Grape queue and other component apps
