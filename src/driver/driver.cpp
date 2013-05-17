@@ -83,10 +83,9 @@ m_queue_length_max(0)
 
 	auto storage = cocaine::api::storage(context, "core");
 	Json::Value profile = storage->get<Json::Value>("profiles", app_name);
-	int concurrency = profile["concurrency"].asInt();
-	int pool_limit = profile["pool-limit"].asInt();
+	int queue_limit = profile["queue-limit"].asInt();
 
-	m_queue_length_max = concurrency * pool_limit / 2;
+	m_queue_length_max = queue_limit * 9 / 10;
 
 	m_idle_timer.set<queue_driver, &queue_driver::on_idle_timer_event>(this);
 	m_idle_timer.set(1.0f, 5.0f);
@@ -112,7 +111,7 @@ Json::Value queue_driver::info() const
 
 void queue_driver::on_idle_timer_event(ev::timer &, int)
 {
-	COCAINE_LOG_INFO(m_log, "timer: checking queue: length: %d, max: %d", m_queue_length, m_queue_length_max);
+	COCAINE_LOG_ERROR(m_log, "timer: checking queue: length: %d, max: %d", m_queue_length, m_queue_length_max);
 
 	for (int i = m_queue_length; i < m_queue_length_max; ++i)
 		get_more_data();
@@ -120,21 +119,25 @@ void queue_driver::on_idle_timer_event(ev::timer &, int)
 
 void queue_driver::get_more_data()
 {
-	ioremap::elliptics::session sess = m_client.create_session();
+	if (m_queue_length < m_queue_length_max) {
+		ioremap::elliptics::session sess = m_client.create_session();
 
-	dnet_id queue_id;
-	queue_id.type = 0;
-	queue_id.group_id = 0;
-	sess.transform(m_queue_id, queue_id);
+		dnet_id queue_id;
+		queue_id.type = 0;
+		queue_id.group_id = 0;
+		sess.transform(m_queue_id, queue_id);
 
-	sess.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
-	sess.exec(&queue_id, m_queue_pop_event, ioremap::elliptics::data_pointer()).connect(
-		std::bind(&queue_driver::on_queue_request_data, this, std::placeholders::_1),
-		std::bind(&queue_driver::on_queue_request_complete, this, std::placeholders::_1)
-	);
+		queue_inc(1);
 
-	COCAINE_LOG_INFO(m_log, "%s: request has been sent to queue %s-%s",
-			m_queue_pop_event.c_str(), m_queue_name.c_str(), m_queue_id.c_str());
+		sess.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
+		sess.exec(&queue_id, m_queue_pop_event, ioremap::elliptics::data_pointer()).connect(
+			std::bind(&queue_driver::on_queue_request_data, this, std::placeholders::_1),
+			std::bind(&queue_driver::on_queue_request_complete, this, std::placeholders::_1)
+		);
+
+		COCAINE_LOG_INFO(m_log, "%s: request has been sent to queue %s-%s",
+				m_queue_pop_event.c_str(), m_queue_name.c_str(), m_queue_id.c_str());
+	}
 }
 
 void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_entry &result)
@@ -175,6 +178,8 @@ void queue_driver::on_queue_request_complete(const ioremap::elliptics::error_inf
 	} else {
 		COCAINE_LOG_ERROR(m_log, "%s-%s: completed error: %s", m_queue_name.c_str(), m_queue_id.c_str(), error.message().c_str());
 	}
+
+	queue_dec(1);
 }
 
 bool queue_driver::process_data(const ioremap::elliptics::data_pointer &data)
@@ -203,13 +208,14 @@ bool queue_driver::process_data(const ioremap::elliptics::data_pointer &data)
 		auto upstream = m_app.enqueue(api::event_t(m_worker_event, policy), downstream);
 		upstream->write(raw_data.data(), raw_data.size());
 
-		queue_inc(1);
 		// get more data
 		get_more_data();
 
 		return true;
 	} catch (const cocaine::error_t &e) {
-		COCAINE_LOG_ERROR(m_log, "%s-%s: enqueue failed: %s", m_queue_name.c_str(), m_queue_id.c_str(), e.what());
+		COCAINE_LOG_ERROR(m_log, "%s-%s: enqueue failed: %s: queue-len: %d/%d",
+				m_queue_name.c_str(), m_queue_id.c_str(), e.what(),
+				m_queue_length, m_queue_length_max);
 	}
 
 	return false;
@@ -255,6 +261,7 @@ void queue_driver::queue_inc(int num)
 queue_driver::downstream_t::downstream_t(queue_driver *queue, const ioremap::elliptics::data_pointer &d)
 	: m_queue(queue), m_data(d), m_attempts(0)
 {
+	m_queue->queue_inc(1);
 }
 
 queue_driver::downstream_t::~downstream_t()
