@@ -84,7 +84,6 @@ struct ioremap::grape::chunk_entry ioremap::grape::chunk_ctl::operator[] (int po
 
 ioremap::grape::chunk::chunk(ioremap::elliptics::session &session, const std::string &queue_id, int chunk_id, int max):
 m_chunk_id(chunk_id),
-m_queue_id(queue_id),
 m_data_key(queue_id + ".chunk." + lexical_cast(chunk_id)),
 m_ctl_key(queue_id + ".chunk." + lexical_cast(chunk_id) + ".meta"),
 m_session_data(session.clone()),
@@ -95,9 +94,13 @@ m_chunk(max)
 	m_session_data.set_ioflags(DNET_IO_FLAGS_APPEND | DNET_IO_FLAGS_NOCSUM);
 	m_session_ctl.set_ioflags(DNET_IO_FLAGS_NOCSUM | DNET_IO_FLAGS_OVERWRITE);
 
+	memset(&m_stat, 0, sizeof(struct chunk_stat));
+
 	try {
 		ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
 		m_chunk.assign((char *)d.data(), d.size());
+
+		m_stat.read++;
 #if 0
 		std::cout << "constructor: chunk read: data-key: " << m_data_key.to_string() <<
 			", ctl-key: " << m_ctl_key.to_string() <<
@@ -120,22 +123,24 @@ ioremap::grape::chunk::~chunk()
 void ioremap::grape::chunk::write_chunk(void)
 {
 	m_session_ctl.write_data(m_ctl_key, ioremap::elliptics::data_pointer::from_raw(m_chunk.data()), 0);
+	m_stat.write_ctl_async++;
 }
 
 void ioremap::grape::chunk::remove(void)
 {
 	m_session_ctl.remove(m_ctl_key);
+	m_stat.remove++;
 }
 
 bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 {
 	auto async_data = m_session_data.write_data(m_data_key, d, 0);
+	m_stat.write_data_async++;
 
 	bool full = m_chunk.push(d.size());
 	write_chunk();
 
-	//async_data.wait();
-
+	m_stat.push++;
 	return full;
 }
 
@@ -149,6 +154,8 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(void)
 			if (m_chunk.used() == 0) {
 				ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
 				m_chunk.assign((char *)d.data(), d.size());
+
+				m_stat.read++;
 			}
 
 			m_pop_position = 0;
@@ -170,6 +177,7 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(void)
 			d = ioremap::elliptics::data_pointer::copy((char *)m_chunk_data.data() + m_pop_position, size);
 
 			m_chunk.ack(m_chunk.acked(), 1);
+			m_stat.ack++;
 			write_chunk();
 
 			m_pop_position += size;
@@ -184,5 +192,25 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(void)
 		 */
 	}
 
+	m_stat.pop++;
 	return d;
+}
+
+struct ioremap::grape::chunk_stat ioremap::grape::chunk::stat(void)
+{
+	return m_stat;
+}
+
+void ioremap::grape::chunk::add(struct ioremap::grape::chunk_stat *st)
+{
+#define SUM(member)	st->member += m_stat.member
+	SUM(write_data_async);
+	SUM(write_data_sync);
+	SUM(write_ctl_async);
+	SUM(write_ctl_sync);
+	SUM(read);
+	SUM(remove);
+	SUM(push);
+	SUM(pop);
+	SUM(ack);
 }

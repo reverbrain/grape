@@ -6,20 +6,6 @@
 #include "rapidjson/filestream.h"
 
 #include <cocaine/json.hpp>
-#include <cocaine/framework/logging.hpp>
-
-namespace {
-	//DEBUG: only for debug ioremap::elliptics::sessions
-	std::shared_ptr<cocaine::framework::logger_t> __grape_queue_private_log;
-	#define LOG_INFO(...) COCAINE_LOG_INFO(__grape_queue_private_log, __VA_ARGS__)
-	#define LOG_ERROR(...) COCAINE_LOG_ERROR(__grape_queue_private_log, __VA_ARGS__)
-	#define LOG_DEBUG(...) COCAINE_LOG_DEBUG(__grape_queue_private_log, __VA_ARGS__)
-}
-
-// externally accessible function to set cocaine logger object
-void grape_queue_module_set_logger(std::shared_ptr<cocaine::framework::logger_t> logger) {
-	__grape_queue_private_log = logger;
-}
 
 ioremap::grape::queue::queue(const std::string &config, const std::string &queue_id, int max):
 m_chunk_max(max),
@@ -40,8 +26,6 @@ m_queue_stat_id(queue_id + ".stat")
 	} catch (const ioremap::elliptics::not_found_error &) {
 	}
 
-	//LOG_INFO("%s: chunk_id_push: %d, chunk_id_pop: %d\n", m_stat.chunk_id_push, m_stat.chunk_id_pop);
-
 	ioremap::elliptics::session tmp = m_client.create_session();
 	for (int i = m_stat.chunk_id_pop; i <= m_stat.chunk_id_push; ++i) {
 		m_chunks.insert(std::make_pair(i, std::make_shared<chunk>(tmp, m_queue_id, i, m_chunk_max)));
@@ -61,6 +45,7 @@ void ioremap::grape::queue::push(const ioremap::elliptics::data_pointer &d)
 
 	if (ch->second->push(d)) {
 		m_stat.chunk_id_push++;
+		ch->second->add(&m_stat.chunks_pushed);
 		update_indexes();
 	}
 
@@ -89,6 +74,8 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::pop(void)
 
 		ch->second->remove();
 
+		ch->second->add(&m_stat.chunks_popped);
+
 		m_chunks.erase(ch);
 		m_stat.chunk_id_pop++;
 
@@ -98,7 +85,7 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::pop(void)
 	return d;
 }
 
-struct ioremap::grape::queue_stat &ioremap::grape::queue::stat(void)
+struct ioremap::grape::queue_stat ioremap::grape::queue::stat(void)
 {
 	return m_stat;
 }
@@ -113,4 +100,11 @@ void ioremap::grape::queue::update_indexes(void)
 	m_client.create_session().write_data(m_queue_stat_id,
 			ioremap::elliptics::data_pointer::from_raw(&m_stat, sizeof(struct ioremap::grape::queue_stat)),
 			0).wait();
+
+	m_stat.update_indexes++;
+}
+
+const std::string ioremap::grape::queue::queue_id(void) const
+{
+	return m_queue_id;
 }

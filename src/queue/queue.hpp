@@ -3,6 +3,8 @@
 
 #include "grape/elliptics_client_state.hpp"
 
+#include <cocaine/framework/logging.hpp>
+
 #include <elliptics/cppdef.h>
 #include <map>
 
@@ -60,6 +62,18 @@ class chunk_ctl {
 		struct chunk_disk *m_ptr;
 };
 
+struct chunk_stat {
+	uint64_t		write_data_sync;
+	uint64_t		write_data_async;
+	uint64_t		write_ctl_sync;
+	uint64_t		write_ctl_async;
+	uint64_t		read;
+	uint64_t		remove;
+	uint64_t		push;
+	uint64_t		pop;
+	uint64_t		ack;
+};
+
 class chunk {
 	public:
 		ELLIPTICS_DISABLE_COPY(chunk);
@@ -72,13 +86,17 @@ class chunk {
 
 		void remove(void);
 
+		struct chunk_stat stat(void);
+		void add(struct chunk_stat *st);
+
 	private:
 		int m_chunk_id;
-		std::string m_queue_id;
 		elliptics::key m_data_key;
 		elliptics::key m_ctl_key;
 		elliptics::session m_session_data;
 		elliptics::session m_session_ctl;
+
+		struct chunk_stat m_stat;
 
 		size_t m_pop_position;
 		size_t m_pop_index;
@@ -101,6 +119,11 @@ struct queue_stat {
 	uint64_t	ack_count;
 	int		chunk_id_push;
 	int		chunk_id_pop;
+
+	uint64_t	update_indexes;
+
+	struct chunk_stat	chunks_popped;
+	struct chunk_stat	chunks_pushed;
 };
 
 class queue {
@@ -114,7 +137,8 @@ class queue {
 
 		void reply(const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d);
 
-		struct queue_stat &stat(void);
+		struct queue_stat stat(void);
+		const std::string queue_id(void) const;
 
 	private:
 		int m_chunk_max;
