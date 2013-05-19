@@ -55,7 +55,8 @@ m_queue_ack_event(m_queue_name + "@ack"),
 m_timeout(args.get("timeout", 0.0f).asDouble()),
 m_deadline(args.get("deadline", 0.0f).asDouble()),
 m_queue_length(0),
-m_queue_length_max(0)
+m_queue_length_max(0),
+m_no_data(false)
 {
 	COCAINE_LOG_INFO(m_log, "driver starts\n");
 
@@ -103,6 +104,7 @@ Json::Value queue_driver::info() const
 
 	result["type"] = "persistent-queue";
 	result["name"] = m_queue_name;
+	result["queue-id"] = m_queue_id;
 	result["queue-stats"]["inserted"] = (int)m_queue_length;
 	result["queue-stats"]["max-length"] = (int)m_queue_length_max;
 
@@ -113,8 +115,12 @@ void queue_driver::on_idle_timer_event(ev::timer &, int)
 {
 	COCAINE_LOG_ERROR(m_log, "timer: checking queue: length: %d, max: %d", m_queue_length, m_queue_length_max);
 
-	for (int i = m_queue_length; i < m_queue_length_max; ++i)
+	for (int i = m_queue_length; i < m_queue_length_max; ++i) {
+		if (m_no_data)
+			break;
+
 		get_more_data();
+	}
 }
 
 void queue_driver::get_more_data()
@@ -158,6 +164,7 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 
 		ioremap::elliptics::exec_context context = result.context();
 		if (!context.data().empty()) {
+			m_no_data = false;
 			COCAINE_LOG_INFO(m_log, "%s-%s: data: size: %d", m_queue_name.c_str(), m_queue_id.c_str(), context.data().size());
 
 			bool processed_ok = process_data(context.data());
@@ -165,6 +172,8 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 			COCAINE_LOG_INFO(m_log, "%s-%s: data: size: %d, processed-ok: %d",
 					m_queue_name.c_str(), m_queue_id.c_str(), context.data().size(),
 					processed_ok);
+		} else {
+			m_no_data = true;
 		}
 	} catch(const std::exception &e) {
 		COCAINE_LOG_ERROR(m_log, "%s-%s: exception: %s", m_queue_name.c_str(), m_queue_id.c_str(), e.what());

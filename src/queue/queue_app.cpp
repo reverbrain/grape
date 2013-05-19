@@ -50,13 +50,14 @@ struct rate_stat
 class queue_app_context : public cocaine::framework::application<queue_app_context>
 {
 	public:
-		queue_app_context(std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
+		queue_app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
 
 		void initialize();
 
 		std::string process(const std::string &cocaine_event, const std::vector<std::string> &chunks);
 
 	private:
+		const std::string m_id;
 		ioremap::grape::queue m_queue;
 		std::shared_ptr<cocaine::framework::logger_t> m_log;
 
@@ -64,9 +65,10 @@ class queue_app_context : public cocaine::framework::application<queue_app_conte
 		rate_stat m_rate_pop;
 };
 
-queue_app_context::queue_app_context(std::shared_ptr<cocaine::framework::service_manager_t> service_manager):
+queue_app_context::queue_app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager):
 application<queue_app_context>(service_manager),
-m_queue("queue.conf", "test-queue-id", 1000)
+m_id(id),
+m_queue("queue.conf", "test-queue-id-" + m_id, 1000)
 {
 	// first of all obtain logging facility
 	m_log = service_manager->get_system_logger();
@@ -108,7 +110,7 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 			m_queue.push(d);
 			m_rate_push.update();
 		}
-		m_queue.reply(context, std::string("queue@push:ack"));
+		m_queue.reply(context, std::string(m_id + ": ack"));
 	} else if (event == "pop") {
 		m_queue.reply(context, m_queue.pop());
 		m_rate_pop.update();

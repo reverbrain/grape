@@ -108,6 +108,8 @@ class queue_driver: public api::driver_t {
 
 		std::atomic_int m_queue_length, m_queue_length_max;
 
+		bool m_no_data;
+
 		friend class downstream_t;
 };
 

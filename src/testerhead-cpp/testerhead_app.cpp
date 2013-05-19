@@ -18,18 +18,18 @@ public:
 	// reply delay, in milliseconds
 	int _delay;
 
-	app_context(std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
+	app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
 	void initialize();
 
 	std::string process(const std::string &cocaine_event, const std::vector<std::string> &chunks);
 };
 
-app_context::app_context(std::shared_ptr<cocaine::framework::service_manager_t> service_manager)
+app_context::app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager)
 	: application<app_context>(service_manager)
 {
 	// obtain logging facility
 	m_log = service_manager->get_system_logger();
-	COCAINE_LOG_INFO(m_log, "application start\n");
+	COCAINE_LOG_INFO(m_log, "application start: %s\n", id.c_str());
 
 	_delay = 0;
 }
