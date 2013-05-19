@@ -25,7 +25,7 @@ public:
 };
 
 app_context::app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager)
-	: application<app_context>(service_manager)
+	: application<app_context>(id, service_manager)
 {
 	// obtain logging facility
 	m_log = service_manager->get_system_logger();

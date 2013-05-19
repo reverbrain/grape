@@ -66,7 +66,7 @@ class queue_app_context : public cocaine::framework::application<queue_app_conte
 };
 
 queue_app_context::queue_app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager):
-application<queue_app_context>(service_manager),
+application<queue_app_context>(id, service_manager),
 m_id(id),
 m_queue("queue.conf", "test-queue-id-" + m_id, 1000)
 {
