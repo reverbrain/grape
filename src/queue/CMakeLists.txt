@@ -5,7 +5,7 @@ add_executable(queue-test test.cpp)
 target_link_libraries(queue-test queue ${GRAPE_COMMON_LIBRARIES})
 
 
-add_executable(queue-app queue_app.cpp)
+add_executable(queue-app app.cpp)
 set_target_properties(queue-app PROPERTIES
 	OUTPUT_NAME "queue"
 )

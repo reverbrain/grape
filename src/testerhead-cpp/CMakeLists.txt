@@ -1,4 +1,4 @@
-add_executable(testerhead-cpp testerhead_app.cpp)
+add_executable(testerhead-cpp app.cpp)
 set_target_properties(testerhead-cpp PROPERTIES
 	COMPILE_FLAGS "-std=c++0x"
 )
