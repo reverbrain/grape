@@ -113,7 +113,7 @@ Json::Value queue_driver::info() const
 
 void queue_driver::on_idle_timer_event(ev::timer &, int)
 {
-	COCAINE_LOG_ERROR(m_log, "timer: checking queue: length: %d, max: %d", m_queue_length, m_queue_length_max);
+	COCAINE_LOG_INFO(m_log, "timer: checking queue: length: %d, max: %d", m_queue_length, m_queue_length_max);
 
 	for (int i = m_queue_length; i < m_queue_length_max; ++i) {
 		if (m_no_data)
@@ -172,6 +172,8 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 			COCAINE_LOG_INFO(m_log, "%s-%s: data: size: %d, processed-ok: %d",
 					m_queue_name.c_str(), m_queue_id.c_str(), context.data().size(),
 					processed_ok);
+
+			m_no_data = !processed_ok;
 		} else {
 			m_no_data = true;
 		}
@@ -216,9 +218,6 @@ bool queue_driver::process_data(const ioremap::elliptics::data_pointer &data)
 		api::policy_t policy(false, m_timeout, m_deadline);
 		auto upstream = m_app.enqueue(api::event_t(m_worker_event, policy), downstream);
 		upstream->write(raw_data.data(), raw_data.size());
-
-		// get more data
-		get_more_data();
 
 		return true;
 	} catch (const cocaine::error_t &e) {
@@ -276,14 +275,18 @@ queue_driver::downstream_t::downstream_t(queue_driver *queue, const ioremap::ell
 queue_driver::downstream_t::~downstream_t()
 {
 	m_queue->queue_dec(1);
+
+	if (m_attempts == 0)
+		m_queue->get_more_data();
 }
 
 void queue_driver::downstream_t::write(const char *data, size_t size)
 {
 	std::string ret(data, size);
 
-	COCAINE_LOG_INFO(m_queue->m_log, "%s-%s: from worker: received: '%s'",
-			m_queue->m_queue_name.c_str(), m_queue->m_queue_id.c_str(), ret.c_str());
+	COCAINE_LOG_INFO(m_queue->m_log, "%s-%s: from worker: received: size: %zd, data: '%s'",
+			m_queue->m_queue_name.c_str(), m_queue->m_queue_id.c_str(),
+			ret.size(), ret.c_str());
 }
 
 void queue_driver::downstream_t::error(cocaine::error_code code, const std::string &msg)

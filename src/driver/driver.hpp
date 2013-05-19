@@ -63,6 +63,8 @@ class queue_driver: public api::driver_t {
 		void queue_dec(int num);
 		void queue_inc(int num);
 
+		void get_more_data();
+
 	private:
 		elliptics_client_state m_client;
 		std::atomic_int m_src_key;
@@ -75,7 +77,6 @@ class queue_driver: public api::driver_t {
 		void on_queue_request_complete(const ioremap::elliptics::error_info &error);
 
 		bool process_data(const ioremap::elliptics::data_pointer &data);
-		void get_more_data();
 
 		void on_process_failed(const ioremap::elliptics::data_pointer &data);
 		void on_process_successed(const ioremap::elliptics::data_pointer &data);
