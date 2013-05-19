@@ -79,6 +79,8 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::pop(void)
 		d = ch->second->pop();
 		if (!d.empty()) {
 			m_stat.pop_count++;
+			update_indexes();
+
 			break;
 		}
 

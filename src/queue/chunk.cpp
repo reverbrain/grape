@@ -143,35 +143,45 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(void)
 {
 	ioremap::elliptics::data_pointer d;
 
-	if (m_pop_position >= m_chunk_data.size()) {
-		m_chunk_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
-		if (m_chunk.used() == 0) {
-			ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
-			m_chunk.assign((char *)d.data(), d.size());
+	try {
+		if (m_pop_position >= m_chunk_data.size()) {
+			m_chunk_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
+			if (m_chunk.used() == 0) {
+				ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
+				m_chunk.assign((char *)d.data(), d.size());
+			}
+
+			m_pop_position = 0;
+			for (int i = 0; i < m_chunk.acked(); ++i)
+				m_pop_position += m_chunk[i].size;
+#if 0
+			std::cout << "chunk read: data-key: " << m_data_key.to_string() <<
+				", ctl-key: " << m_ctl_key.to_string() <<
+				", chunk-size: " << m_chunk_data.size() <<
+				", used: " << m_chunk.used() <<
+				", acked: " << m_chunk.acked() <<
+				", m_pop_position: " << m_pop_position <<
+				std::endl;
+#endif
 		}
 
-		m_pop_position = 0;
-		for (int i = 0; i < m_chunk.acked(); ++i)
-			m_pop_position += m_chunk[i].size;
-#if 0
-		std::cout << "chunk read: data-key: " << m_data_key.to_string() <<
-			", ctl-key: " << m_ctl_key.to_string() <<
-			", chunk-size: " << m_chunk_data.size() <<
-			", used: " << m_chunk.used() <<
-			", acked: " << m_chunk.acked() <<
-			", m_pop_position: " << m_pop_position <<
-			std::endl;
-#endif
-	}
+		if (m_chunk.acked() < m_chunk.used() && m_pop_position < m_chunk_data.size()) {
+			int size = m_chunk[m_chunk.acked()].size;
+			d = ioremap::elliptics::data_pointer::copy((char *)m_chunk_data.data() + m_pop_position, size);
 
-	if (m_chunk.acked() < m_chunk.used() && m_pop_position < m_chunk_data.size()) {
-		int size = m_chunk[m_chunk.acked()].size;
-		d = ioremap::elliptics::data_pointer::copy((char *)m_chunk_data.data() + m_pop_position, size);
+			m_chunk.ack(m_chunk.acked(), 1);
+			write_chunk();
 
-		m_chunk.ack(m_chunk.acked(), 1);
-		write_chunk();
-
-		m_pop_position += size;
+			m_pop_position += size;
+		}
+	} catch (const ioremap::elliptics::not_found_error &err) {
+		/*
+		 * Do not explode on not-found-error, return empty data pointer
+		 */
+	} catch (const ioremap::elliptics::timeout_error &err) {
+		/*
+		 * Do not explode on timeout-error, return empty data pointer
+		 */
 	}
 
 	return d;
