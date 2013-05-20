@@ -99,7 +99,7 @@ void ioremap::grape::queue::update_indexes(void)
 {
 	m_client.create_session().write_data(m_queue_stat_id,
 			ioremap::elliptics::data_pointer::from_raw(&m_stat, sizeof(struct ioremap::grape::queue_stat)),
-			0).wait();
+			0);
 
 	m_stat.update_indexes++;
 }
