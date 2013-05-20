@@ -125,8 +125,13 @@ struct elliptics_client_state {
 				try {
 					result.node->add_remote(i.c_str());
 					++added;
-				} catch (const elliptics::error &) {
-					// pass
+				} catch (const elliptics::error &e) {
+					char buf[1024];
+
+					snprintf(buf, sizeof(buf), "could not connect to: %s: %s\n",
+							i.c_str(), e.what());
+
+					result.logger->log(DNET_LOG_ERROR, buf);
 				}
 			}
 			if (added == 0) {
