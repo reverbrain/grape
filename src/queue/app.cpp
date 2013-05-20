@@ -4,7 +4,7 @@
 #include <cocaine/framework/application.hpp>
 #include <cocaine/framework/worker.hpp>
 
-#include <unistd.h>
+#include <fstream>
 
 namespace {
 
@@ -131,6 +131,7 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		root.AddMember("push.rate", m_rate_push.get(), root.GetAllocator());
 		root.AddMember("push-id", st.chunk_id_push, root.GetAllocator());
 		root.AddMember("pop-id", st.chunk_id_pop, root.GetAllocator());
+		root.AddMember("update_indexes", st.update_indexes, root.GetAllocator());
 
 		root.AddMember("chunks_popped.write_data_async", st.chunks_popped.write_data_async, root.GetAllocator());
 		root.AddMember("chunks_popped.write_data_sync", st.chunks_popped.write_data_sync, root.GetAllocator());
@@ -168,5 +169,14 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 
 int main(int argc, char **argv)
 {
-	return cocaine::framework::worker_t::run<queue_app_context>(argc, argv);
+	try {
+		return cocaine::framework::worker_t::run<queue_app_context>(argc, argv);
+	} catch (const std::exception &e) {
+		std::ofstream tmp("/tmp/queue.out");
+
+		std::ostringstream out;
+		out << "queue failed: " << e.what();
+
+		tmp.write(out.str().c_str(), out.str().size());
+	}
 }

@@ -113,10 +113,11 @@ Json::Value queue_driver::info() const
 
 void queue_driver::on_idle_timer_event(ev::timer &, int)
 {
-	COCAINE_LOG_INFO(m_log, "timer: checking queue: length: %d, max: %d", m_queue_length, m_queue_length_max);
+	COCAINE_LOG_INFO(m_log, "timer: checking queue: length: %d, max: %d, no-data: %d",
+			m_queue_length, m_queue_length_max, m_no_data);
 
 	for (int i = m_queue_length; i < m_queue_length_max; ++i) {
-		if (m_no_data)
+		if (i > m_queue_length && m_no_data)
 			break;
 
 		get_more_data();
@@ -125,7 +126,11 @@ void queue_driver::on_idle_timer_event(ev::timer &, int)
 
 void queue_driver::get_more_data()
 {
+	COCAINE_LOG_INFO(m_log, "get_more_data: checking queue: length: %d, max: %d, no-data: %d",
+			m_queue_length, m_queue_length_max, m_no_data);
+
 	if (m_queue_length < m_queue_length_max) {
+
 		ioremap::elliptics::session sess = m_client.create_session();
 
 		dnet_id queue_id;
@@ -163,9 +168,10 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 		// But every time when we actually got data we have to postpone idle timer.
 
 		ioremap::elliptics::exec_context context = result.context();
+		COCAINE_LOG_INFO(m_log, "%s-%s: data: size: %d", m_queue_name.c_str(), m_queue_id.c_str(), context.data().size());
+
 		if (!context.data().empty()) {
 			m_no_data = false;
-			COCAINE_LOG_INFO(m_log, "%s-%s: data: size: %d", m_queue_name.c_str(), m_queue_id.c_str(), context.data().size());
 
 			bool processed_ok = process_data(context.data());
 
@@ -275,6 +281,9 @@ queue_driver::downstream_t::downstream_t(queue_driver *queue, const ioremap::ell
 queue_driver::downstream_t::~downstream_t()
 {
 	m_queue->queue_dec(1);
+
+	COCAINE_LOG_INFO(m_queue->m_log, "%s-%s: ~downstream: attempts: %d\n",
+			m_queue->m_queue_name.c_str(), m_queue->m_queue_id.c_str(), m_attempts);
 
 	if (m_attempts == 0)
 		m_queue->get_more_data();
