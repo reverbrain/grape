@@ -66,6 +66,10 @@ class queue_driver: public api::driver_t {
 		void get_more_data();
 
 	private:
+		cocaine::context_t& m_context;
+		cocaine::app_t& m_app;
+		std::shared_ptr<cocaine::logging::log_t> m_log;
+
 		elliptics_client_state m_client;
 		std::atomic_int m_src_key;
 		std::map<int, std::string> m_events;
@@ -87,10 +91,6 @@ class queue_driver: public api::driver_t {
 				return a.data() < b.data();
 			}
 		};
-
-		cocaine::context_t& m_context;
-		cocaine::app_t& m_app;
-		std::shared_ptr<cocaine::logging::log_t> m_log;
 
 		ev::timer m_idle_timer;
 
