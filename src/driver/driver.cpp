@@ -41,10 +41,10 @@ using namespace cocaine::driver;
 queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &reactor, cocaine::app_t &app,
 		const std::string& name, const Json::Value& args):
 category_type(context, reactor, app, name, args),
-m_src_key(0),
 m_context(context),
 m_app(app),
 m_log(new cocaine::logging::log_t(context, cocaine::format("driver/%s", name))),
+m_src_key(0),
 m_idle_timer(reactor.native()),
 m_worker_event(args.get("emit", name).asString()),
 m_queue_name(args.get("source-queue-app", "queue").asString()),
@@ -89,8 +89,7 @@ m_no_data(false)
 	m_queue_length_max = queue_limit * 9 / 10;
 
 	m_idle_timer.set<queue_driver, &queue_driver::on_idle_timer_event>(this);
-	m_idle_timer.set(1.0f, 5.0f);
-	m_idle_timer.again();
+	m_idle_timer.start(1.0f, 1.0f);
 }
 
 queue_driver::~queue_driver()
@@ -113,7 +112,7 @@ Json::Value queue_driver::info() const
 
 void queue_driver::on_idle_timer_event(ev::timer &, int)
 {
-	COCAINE_LOG_INFO(m_log, "timer: checking queue: length: %d, max: %d, no-data: %d",
+	COCAINE_LOG_ERROR(m_log, "timer: checking queue: length: %d, max: %d, no-data: %d",
 			m_queue_length, m_queue_length_max, m_no_data);
 
 	for (int i = m_queue_length; i < m_queue_length_max; ++i) {
@@ -122,6 +121,9 @@ void queue_driver::on_idle_timer_event(ev::timer &, int)
 
 		get_more_data();
 	}
+
+	COCAINE_LOG_ERROR(m_log, "timer: checking queue completed: length: %d, max: %d, no-data: %d",
+			m_queue_length, m_queue_length_max, m_no_data);
 }
 
 void queue_driver::get_more_data()

@@ -51,6 +51,7 @@ class queue_app_context : public cocaine::framework::application<queue_app_conte
 {
 	public:
 		queue_app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
+		virtual ~queue_app_context();
 
 		void initialize();
 
@@ -71,13 +72,20 @@ m_id(id),
 m_log(service_manager->get_system_logger()),
 m_queue("queue.conf", "test-queue-id-" + m_id, 1000)
 {
+	COCAINE_LOG_INFO(m_log, "%s: constructor", m_id.c_str());
+}
+queue_app_context::~queue_app_context()
+{
+	COCAINE_LOG_INFO(m_log, "%s: destructor", m_id.c_str());
 }
 
 void queue_app_context::initialize()
 {
+	COCAINE_LOG_INFO(m_log, "%s: initialize", m_id.c_str());
 	// register event handlers
 	//FIXME: all at once for now
 	on_unregistered(&queue_app_context::process);
+	COCAINE_LOG_INFO(m_log, "%s: initialized", m_id.c_str());
 }
 
 std::string queue_app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks)
@@ -92,7 +100,7 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		event.assign(p + 1);
 	}
 
-	COCAINE_LOG_INFO(m_log, "event: %s, size: %ld", event.c_str(), context.data().size());
+	COCAINE_LOG_INFO(m_log, "%s: event: %s, size: %ld", m_id.c_str(), event.c_str(), context.data().size());
 
 	if (event == "ping") {
 		m_queue.reply(context, std::string("ok"));
@@ -163,6 +171,8 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		std::string msg = event + ": unknown event";
 		m_queue.reply(context, msg);
 	}
+
+	COCAINE_LOG_INFO(m_log, "%s: completed event: %s, size: %ld", m_id.c_str(), event.c_str(), context.data().size());
 
 	return "";
 }
