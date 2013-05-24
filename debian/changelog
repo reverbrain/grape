@@ -1,3 +1,9 @@
+grape (0.6.7) unstable; urgency=low
+
+  * Updated to the latest cocaine API
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Fri, 24 May 2013 22:54:13 +0400
+
 grape (0.6.6) unstable; urgency=low
 
   * Updated to the latest upstream cocaine version
