@@ -1,3 +1,20 @@
+grape (0.6.5) unstable; urgency=low
+
+  * Depend on cocaine versions which work under the driver's load
+  * Fixed destruction order
+  * Log connection exceptions in elliptics client
+  * More flow and debug
+  * Use async write when updating queue metadata
+  * Renamed appname_app.cpp to app.cpp
+  * Added queue/chunks statistics
+  * Use application ID when creating base class
+  * Idle 0 means 'never stop' timeout
+  * Do not explode on timeout or not-found error in pop command handler, return empty data pointer instead
+  * Updated dependencies
+  * Updated to named workers. Added m_no_data driver flag which signals that queue read failed.
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Fri, 24 May 2013 18:11:32 +0400
+
 grape (0.6.4) unstable; urgency=low
 
   * Try to not overflow queue by checking number of elements in flight
