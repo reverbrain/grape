@@ -45,7 +45,7 @@ class queue_driver: public api::driver_t {
 			~downstream_t();
 
 			virtual void write(const char *data, size_t size);
-			virtual void error(cocaine::error_code, const std::string &message);
+			virtual void error(int, const std::string &message);
 			virtual void close();
 
 			queue_driver *m_queue;

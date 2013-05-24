@@ -300,7 +300,7 @@ void queue_driver::downstream_t::write(const char *data, size_t size)
 			ret.size(), ret.c_str());
 }
 
-void queue_driver::downstream_t::error(cocaine::error_code code, const std::string &msg)
+void queue_driver::downstream_t::error(int code, const std::string &msg)
 {
 	++m_attempts;
 
