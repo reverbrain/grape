@@ -36,7 +36,7 @@ Description: Realtime pipeline processing engine (includes)
 
 Package: libcocaine-plugin-queue-driver
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, elliptics-client (>= 2.24.6.2)
+Depends: ${shlibs:Depends}, ${misc:Depends}, elliptics-client (>= 2.24.6.2), grape (= ${binary:Version})
 Description: Grape queue driver (cocaine plugin)
  Grape queue driver runs as a cocaine plugin and can be turned on for applications,
  which want to pop events from persistent queue (application named 'queue')
