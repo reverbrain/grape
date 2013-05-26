@@ -58,7 +58,7 @@ class queue_app_context : public cocaine::framework::application<queue_app_conte
 		std::string process(const std::string &cocaine_event, const std::vector<std::string> &chunks);
 
 	private:
-		const std::string m_id;
+		std::string m_id;
 		std::shared_ptr<cocaine::framework::logger_t> m_log;
 		std::shared_ptr<ioremap::grape::queue> m_queue;
 
@@ -101,11 +101,10 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 	if (event == "ping") {
 		m_queue->reply(context, std::string("ok"));
 	} else if (event == "configure") {
-		std::string queue_id = context.data().to_string();
-		m_queue.reset(new ioremap::grape::queue("queue.conf", queue_id));
+		m_id = context.data().to_string() + "-" + m_id;
+		m_queue.reset(new ioremap::grape::queue("queue.conf", m_id));
 		m_queue->reply(context, std::string(m_id + ": configured"));
-		COCAINE_LOG_INFO(m_log, "%s: queue '%s' has been successfully configured\n",
-				m_id.c_str(), queue_id.c_str());
+		COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured\n", m_id.c_str());
 	} else if (event == "push") {
 		ioremap::elliptics::data_pointer d = context.data();
 		// skip adding zero length data, because there is no value in that
