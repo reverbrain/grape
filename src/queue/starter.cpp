@@ -74,6 +74,7 @@ int main(int argc, char *argv[])
 	std::vector<int> groups;
 	groups.push_back(routes[0].first.group_id);
 	s.set_groups(groups);
+	s.set_cflags(DNET_FLAGS_DIRECT);
 
 	std::string event, data;
 
