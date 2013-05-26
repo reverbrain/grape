@@ -55,26 +55,6 @@ class starter : public grape::elliptics_node_t {
 			return syscall(SYS_gettid);
 		}
 
-		static std::string lexical_cast(size_t value) {
-			if (value == 0) {
-				return std::string("0");
-			}
-			std::string result;
-			size_t length = 0;
-			size_t calculated = value;
-			while (calculated) {
-				calculated /= 10;
-				++length;
-			}
-			result.resize(length);
-			while (value) {
-				--length;
-				result[length] = '0' + (value % 10);
-				value /= 10;
-			}
-			return result;
-		}
-
 		void loop(void) {
 			elliptics::session s(*m_node);
 
