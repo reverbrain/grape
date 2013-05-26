@@ -1,3 +1,10 @@
+grape (0.6.12) unstable; urgency=low
+
+  * Do not use DIRECT flag when configuring queues, since replies are sent to those IDs specified in original message.
+  *   DIRECT flag breaks route table and replies may never reach node client is connected to
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Mon, 27 May 2013 03:29:15 +0400
+
 grape (0.6.11) unstable; urgency=low
 
   * Let queue starter set log level
