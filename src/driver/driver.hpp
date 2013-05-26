@@ -82,9 +82,6 @@ class queue_driver: public api::driver_t {
 
 		bool process_data(const ioremap::elliptics::data_pointer &data);
 
-		void on_process_failed(const ioremap::elliptics::data_pointer &data);
-		void on_process_successed(const ioremap::elliptics::data_pointer &data);
-
 	private:
 		struct data_pointer_comparator_t {
 			bool operator() (const ioremap::elliptics::data_pointer &a, const ioremap::elliptics::data_pointer &b) const {
@@ -100,7 +97,6 @@ class queue_driver: public api::driver_t {
 
 		const std::string m_worker_event;
 		const std::string m_queue_name;
-		const std::string m_queue_id;
 		const std::string m_queue_pop_event;
 		const std::string m_queue_ack_event;
 

@@ -33,8 +33,8 @@
 
 #include "grape/rapidjson/document.h"
 
-// number of retries for data processing
-const int FAIL_LIMIT = 3;
+#include <stdlib.h>
+#include <time.h>
 
 using namespace cocaine::driver;
 
@@ -48,8 +48,6 @@ m_src_key(0),
 m_idle_timer(reactor.native()),
 m_worker_event(args.get("emit", name).asString()),
 m_queue_name(args.get("source-queue-app", "queue").asString()),
-//FIXME: queue id is important, make it a mandatory conf.value
-m_queue_id(args.get("source-queue-id", "5").asString()),
 m_queue_pop_event(m_queue_name + "@pop"),
 m_queue_ack_event(m_queue_name + "@ack"),
 m_timeout(args.get("timeout", 0.0f).asDouble()),
@@ -58,7 +56,9 @@ m_queue_length(0),
 m_queue_length_max(0),
 m_no_data(false)
 {
-	COCAINE_LOG_INFO(m_log, "driver starts\n");
+	COCAINE_LOG_INFO(m_log, "%s: driver starts\n", m_queue_name.c_str());
+
+	srand(time(NULL));
 
 	try {
 		std::string s = Json::FastWriter().write(args);
@@ -68,7 +68,7 @@ m_no_data(false)
 
 		m_client = elliptics_client_state::create(doc);
 	} catch (const std::exception &e) {
-		COCAINE_LOG_INFO(m_log, "driver exception: %s\n", e.what());
+		COCAINE_LOG_INFO(m_log, "%s: driver constructor exception: %s\n", m_queue_name.c_str(), e.what());
 		throw;
 	}
 
@@ -103,7 +103,6 @@ Json::Value queue_driver::info() const
 
 	result["type"] = "persistent-queue";
 	result["name"] = m_queue_name;
-	result["queue-id"] = m_queue_id;
 	result["queue-stats"]["inserted"] = (int)m_queue_length;
 	result["queue-stats"]["max-length"] = (int)m_queue_length_max;
 
@@ -112,9 +111,6 @@ Json::Value queue_driver::info() const
 
 void queue_driver::on_idle_timer_event(ev::timer &, int)
 {
-	COCAINE_LOG_ERROR(m_log, "timer: checking queue: length: %d, max: %d, no-data: %d",
-			m_queue_length, m_queue_length_max, m_no_data);
-
 	for (int i = m_queue_length; i < m_queue_length_max; ++i) {
 		if (i > m_queue_length && m_no_data)
 			break;
@@ -122,34 +118,36 @@ void queue_driver::on_idle_timer_event(ev::timer &, int)
 		get_more_data();
 	}
 
-	COCAINE_LOG_ERROR(m_log, "timer: checking queue completed: length: %d, max: %d, no-data: %d",
-			m_queue_length, m_queue_length_max, m_no_data);
+	COCAINE_LOG_INFO(m_log, "%s: timer: checking queue completed: queue-len: %d/%d, no-data: %d\n",
+			m_queue_name.c_str(), m_queue_length, m_queue_length_max, m_no_data);
 }
 
 void queue_driver::get_more_data()
 {
-	COCAINE_LOG_INFO(m_log, "get_more_data: checking queue: length: %d, max: %d, no-data: %d",
-			m_queue_length, m_queue_length_max, m_no_data);
+	COCAINE_LOG_INFO(m_log, "%s: more-data: checking queue: queue-len: %d/%d, no-data: %d\n",
+			m_queue_name.c_str(), m_queue_length, m_queue_length_max, m_no_data);
 
 	if (m_queue_length < m_queue_length_max) {
 
 		ioremap::elliptics::session sess = m_client.create_session();
 
-		dnet_id queue_id;
-		queue_id.type = 0;
-		queue_id.group_id = 0;
-		sess.transform(m_queue_id, queue_id);
+		dnet_id req_id;
+		req_id.type = 0;
+		req_id.group_id = 0;
+
+		std::string random_data = m_queue_name + lexical_cast(rand());
+		sess.transform(random_data, req_id);
 
 		queue_inc(1);
 
 		sess.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
-		sess.exec(&queue_id, m_queue_pop_event, ioremap::elliptics::data_pointer()).connect(
+		sess.exec(&req_id, m_queue_pop_event, ioremap::elliptics::data_pointer()).connect(
 			std::bind(&queue_driver::on_queue_request_data, this, std::placeholders::_1),
 			std::bind(&queue_driver::on_queue_request_complete, this, std::placeholders::_1)
 		);
 
-		COCAINE_LOG_INFO(m_log, "%s: request has been sent to queue %s-%s",
-				m_queue_pop_event.c_str(), m_queue_name.c_str(), m_queue_id.c_str());
+		COCAINE_LOG_INFO(m_log, "%s: %s: pop request has been sent: queue-len: %d/%d\n",
+				m_queue_name.c_str(), dnet_dump_id(&req_id), m_queue_length, m_queue_length_max);
 	}
 }
 
@@ -157,9 +155,8 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 {
 	try {
 		if (result.error()) {
-			COCAINE_LOG_INFO(m_log, "%s-%s: error: %d: %s",
-					m_queue_name.c_str(), m_queue_id.c_str(),
-					result.error().code(), result.error().message());
+			COCAINE_LOG_ERROR(m_log, "%s: error: %d: %s\n",
+				m_queue_name.c_str(), result.error().code(), result.error().message());
 			return;
 		}
 
@@ -170,33 +167,29 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 		// But every time when we actually got data we have to postpone idle timer.
 
 		ioremap::elliptics::exec_context context = result.context();
-		COCAINE_LOG_INFO(m_log, "%s-%s: data: size: %d", m_queue_name.c_str(), m_queue_id.c_str(), context.data().size());
+		COCAINE_LOG_INFO(m_log, "%s: poped data: size: %d\n", m_queue_name.c_str(), context.data().size());
 
 		if (!context.data().empty()) {
 			m_no_data = false;
 
 			bool processed_ok = process_data(context.data());
 
-			COCAINE_LOG_INFO(m_log, "%s-%s: data: size: %d, processed-ok: %d",
-					m_queue_name.c_str(), m_queue_id.c_str(), context.data().size(),
-					processed_ok);
+			COCAINE_LOG_INFO(m_log, "%s: data: size: %d, processed-ok: %d\n",
+					m_queue_name.c_str(), context.data().size(), processed_ok);
 
 			m_no_data = !processed_ok;
 		} else {
 			m_no_data = true;
 		}
 	} catch(const std::exception &e) {
-		COCAINE_LOG_ERROR(m_log, "%s-%s: exception: %s", m_queue_name.c_str(), m_queue_id.c_str(), e.what());
+		COCAINE_LOG_ERROR(m_log, "%s: exception: %s\n", m_queue_name.c_str(), e.what());
 	}
 }
 
 void queue_driver::on_queue_request_complete(const ioremap::elliptics::error_info &error)
 {
-	if (!error) {
-		COCAINE_LOG_INFO(m_log, "%s-%s: completed", m_queue_name.c_str(), m_queue_id.c_str());
-	} else {
-		COCAINE_LOG_ERROR(m_log, "%s-%s: completed error: %s", m_queue_name.c_str(), m_queue_id.c_str(), error.message().c_str());
-	}
+	if (!error)
+		COCAINE_LOG_ERROR(m_log, "%s: queue request completion error: %s\n", m_queue_name.c_str(), error.message().c_str());
 
 	queue_dec(1);
 }
@@ -229,39 +222,12 @@ bool queue_driver::process_data(const ioremap::elliptics::data_pointer &data)
 
 		return true;
 	} catch (const cocaine::error_t &e) {
-		COCAINE_LOG_ERROR(m_log, "%s-%s: enqueue failed: %s: queue-len: %d/%d",
-				m_queue_name.c_str(), m_queue_id.c_str(), e.what(),
+		COCAINE_LOG_ERROR(m_log, "%s: enqueue failed: %s: queue-len: %d/%d\n",
+				m_queue_name.c_str(), e.what(),
 				m_queue_length, m_queue_length_max);
 	}
 
 	return false;
-}
-
-void queue_driver::on_process_successed(const ioremap::elliptics::data_pointer &)
-{
-	ioremap::elliptics::session sess = m_client.create_session();
-	sess.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
-
-	dnet_id queue_id;
-	queue_id.type = 0;
-	queue_id.group_id = 0;
-	sess.transform(m_queue_id, queue_id);
-
-
-	sess.exec(&queue_id, m_queue_ack_event, ioremap::elliptics::data_pointer()).connect(
-		ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
-		[this] (const ioremap::elliptics::error_info &error) {
-			if (error) {
-				COCAINE_LOG_ERROR(m_log, "data not acked");
-			} else {
-				COCAINE_LOG_INFO(m_log, "data acked");
-			}
-		}
-		);
-
-	// Successful processing gives right to request more data,
-	// gives support to inbound data rate
-	get_more_data();
 }
 
 void queue_driver::queue_dec(int num)
@@ -282,39 +248,31 @@ queue_driver::downstream_t::downstream_t(queue_driver *queue, const ioremap::ell
 
 queue_driver::downstream_t::~downstream_t()
 {
-	m_queue->queue_dec(1);
-
-	COCAINE_LOG_INFO(m_queue->m_log, "%s-%s: ~downstream: attempts: %d\n",
-			m_queue->m_queue_name.c_str(), m_queue->m_queue_id.c_str(), m_attempts);
-
-	if (m_attempts == 0)
-		m_queue->get_more_data();
 }
 
 void queue_driver::downstream_t::write(const char *data, size_t size)
 {
 	std::string ret(data, size);
 
-	COCAINE_LOG_INFO(m_queue->m_log, "%s-%s: from worker: received: size: %zd, data: '%s'",
-			m_queue->m_queue_name.c_str(), m_queue->m_queue_id.c_str(),
-			ret.size(), ret.c_str());
+	COCAINE_LOG_INFO(m_queue->m_log, "%s: from worker: received: size: %zd, data: '%s'",
+			m_queue->m_queue_name.c_str(), ret.size(), ret.c_str());
 }
 
 void queue_driver::downstream_t::error(int code, const std::string &msg)
 {
 	++m_attempts;
 
-	COCAINE_LOG_ERROR(m_queue->m_log, "%s-%s: from worker: error: attempts: %d/%d: %s [%d]",
-			m_queue->m_queue_name.c_str(), m_queue->m_queue_id.c_str(), m_attempts, FAIL_LIMIT, msg.c_str(), code);
-
-	// disable error processing for now, I'm not sure that downstream-out-of-downstream
-	// creation will not lead to unlimited number of attempts for the same event
-#if 0
-	if (m_attempts < FAIL_LIMIT)
-		m_queue->process_data(m_data);
-#endif
+	COCAINE_LOG_ERROR(m_queue->m_log, "%s: from worker: error: attempts: %d/%d: %s [%d]",
+			m_queue->m_queue_name.c_str(), m_attempts, msg.c_str(), code);
 }
 
 void queue_driver::downstream_t::close()
 {
+	m_queue->queue_dec(1);
+
+	COCAINE_LOG_INFO(m_queue->m_log, "%s: downstream: close: attempts (was-error): %d\n",
+			m_queue->m_queue_name.c_str(), m_attempts);
+
+	if (m_attempts == 0)
+		m_queue->get_more_data();
 }
