@@ -23,7 +23,7 @@ static void starter_usage(const char *name)
 int main(int argc, char *argv[])
 {
 	int ch, err;
-	char *remote_addr = NULL;
+	char *remote = NULL;
 	int port, family;
 	struct dnet_config cfg;
 	int num_workers = -1;
@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
 			err = dnet_parse_addr(optarg, &port, &family);
 			if (err)
 				return err;
-			remote_addr = optarg;
+			remote = optarg;
 			break;
 		case 'n':
 			num_workers = atoi(optarg);
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (num_workers == -1 || remote_addr == NULL || queue_name == NULL) {
+	if (num_workers == -1 || remote == NULL || queue_name == NULL) {
 		starter_usage(argv[0]);
 	}
 
@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 
 	elliptics::session s(n);
 
-	err = dnet_add_state(n.get_native(), remote_addr, port, family, DNET_CFG_NO_ROUTE_LIST);
+	err = dnet_add_state(n.get_native(), remote, port, family, DNET_CFG_NO_ROUTE_LIST);
 	if (err)
 		return err;
 
@@ -76,10 +76,27 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	struct dnet_id id;
+	struct dnet_addr remote_addr;
+
+	memset(&remote_addr, 0, sizeof(struct dnet_addr));
+	remote_addr.addr_len = sizeof(remote_addr.addr);
+	remote_addr.family = family;
+
+	dnet_fill_addr(&remote_addr, remote, port, SOCK_STREAM, IPPROTO_TCP);
+	std::cout << "remote: " << dnet_server_convert_dnet_addr(&remote_addr) << std::endl;
+
+	for (auto it = routes.begin(); it != routes.end(); ++it) {
+	std::cout << "route: " << dnet_server_convert_dnet_addr(&it->second) << std::endl;
+		if (dnet_addr_equal(&remote_addr, &it->second)) {
+			id = it->first;
+			break;
+		}
+	}
+
 	std::vector<int> groups;
-	groups.push_back(routes[0].first.group_id);
+	groups.push_back(id.group_id);
 	s.set_groups(groups);
-	s.set_cflags(DNET_FLAGS_DIRECT);
 
 	std::string event, data;
 
@@ -87,7 +104,6 @@ int main(int argc, char *argv[])
 	s.exec(NULL, event, data).wait();
 
 	for (int i = 0; i < num_workers; ++i) {
-		struct dnet_id id;
 
 		memset(&id, 0, sizeof(struct dnet_id));
 		s.set_filter(elliptics::filters::all_with_ack);
