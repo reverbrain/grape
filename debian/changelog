@@ -1,3 +1,11 @@
+grape (0.6.11) unstable; urgency=low
+
+  * Let queue starter set log level
+  * Set queue ID to what was provided at start (named queue name) + what was received in configuration event.
+  * We do not install queue starter into bin anymore
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Mon, 27 May 2013 02:56:12 +0400
+
 grape (0.6.10) unstable; urgency=low
 
   * Use direct flag when setting up queue - elliptics should not route there messages
