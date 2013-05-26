@@ -29,8 +29,7 @@ set(GRAPE_COMMON_LIBRARIES
 	${Boost_THREAD_LIBRARY}
 )
 
-FILE(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/include/grape/*.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/include/grape/*.h")
-install(FILES ${headers} DESTINATION include/grape)
+install(DIRECTORY include/ DESTINATION include)
 
 include_directories(${PROJECT_SOURCE_DIR}/include ${elliptics_INCLUDE_DIRS} ${CocaineNative_INCLUDE_DIRS} ${LIBEV_INCLUDE_DIRS})
 
