@@ -1,11 +1,11 @@
 add_library(queue STATIC queue.cpp chunk.cpp)
 target_link_libraries(queue ${GRAPE_COMMON_LIBRARIES} ${elliptics_LIBRARIES})
 
-add_executable(queue-test test.cpp)
-target_link_libraries(queue-test queue ${GRAPE_COMMON_LIBRARIES})
+add_executable(grape-queue-test test.cpp)
+target_link_libraries(grape-queue-test queue ${GRAPE_COMMON_LIBRARIES})
 
-add_executable(queue-starter starter.cpp)
-target_link_libraries(queue-starter queue ${GRAPE_COMMON_LIBRARIES} ${elliptics_LIBRARIES})
+add_executable(grape-queue-starter starter.cpp)
+target_link_libraries(grape-queue-starter queue ${GRAPE_COMMON_LIBRARIES} ${elliptics_LIBRARIES})
 
 
 add_executable(queue-app app.cpp)
@@ -18,7 +18,8 @@ install(TARGETS queue-app
     RUNTIME DESTINATION lib/grape
     COMPONENT runtime
 )
-install(TARGETS queue-starter
+
+install(TARGETS grape-queue-starter
     RUNTIME DESTINATION bin
     COMPONENT bin
 )
