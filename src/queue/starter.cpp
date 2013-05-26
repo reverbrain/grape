@@ -104,8 +104,6 @@ int main(int argc, char *argv[])
 	s.exec(NULL, event, data).wait();
 
 	for (int i = 0; i < num_workers; ++i) {
-
-		memset(&id, 0, sizeof(struct dnet_id));
 		s.set_filter(elliptics::filters::all_with_ack);
 
 		event = "queue@configure";
