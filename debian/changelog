@@ -1,3 +1,13 @@
+grape (0.6.9) unstable; urgency=low
+
+  * Added queue starter application - it starts named workers and configures them one after another.
+  * Get rid of obscure m_queue_id, use random ID to talk to queue. Debug prints cleanup.
+  * Use 'configure' event to configure the queue. Its data is queue internal name.
+  * libcocaine-plugin-queue-driver should also depend on grape
+  * Depend on 2.24.7+ elliptics
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Mon, 27 May 2013 02:13:00 +0400
+
 grape (0.6.8) unstable; urgency=low
 
   * Moved rapidjson headers to grape subdir
