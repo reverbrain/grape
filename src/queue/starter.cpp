@@ -13,6 +13,7 @@ static void starter_usage(const char *name)
 		" -r addr:port:family  - remote node to configure queue on.\n" <<
 		" -n num               - number of workers to start (configure). This number must match queue profile.\n"
 		" -q id                - queue will run on given node with given ID. Consider this as per node extension of 'queue' name.\n"
+		" -M level             - log level.\n"
 		" -h                   - this help.\n" <<
 		std::endl;
 
@@ -27,12 +28,16 @@ int main(int argc, char *argv[])
 	struct dnet_config cfg;
 	int num_workers = -1;
 	char *queue_name = NULL;
+	int log_level = DNET_LOG_ERROR;
 
 	memset(&cfg, 0, sizeof(struct dnet_config));
 	cfg.wait_timeout = 60;
 
-	while ((ch = getopt(argc, argv, "g:r:n:q:h")) != -1) {
+	while ((ch = getopt(argc, argv, "M:g:r:n:q:h")) != -1) {
 		switch (ch) {
+		case 'M':
+			log_level = atoi(optarg);
+			break;
 		case 'r':
 			err = dnet_parse_addr(optarg, &port, &family);
 			if (err)
@@ -56,7 +61,7 @@ int main(int argc, char *argv[])
 		starter_usage(argv[0]);
 	}
 
-	elliptics::file_logger log("/dev/stdout", DNET_LOG_ERROR);
+	elliptics::file_logger log("/dev/stdout", log_level);
 	elliptics::node n(log, cfg);
 
 	elliptics::session s(n);
