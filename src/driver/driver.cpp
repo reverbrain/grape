@@ -31,7 +31,7 @@
 
 #include "cocaine-json-trait.hpp"
 
-#include "rapidjson/document.h"
+#include "grape/rapidjson/document.h"
 
 // number of retries for data processing
 const int FAIL_LIMIT = 3;

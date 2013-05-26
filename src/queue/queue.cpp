@@ -1,9 +1,9 @@
 #include "queue.hpp"
 
-#include "rapidjson/document.h"
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/filestream.h"
+#include "grape/rapidjson/document.h"
+#include "grape/rapidjson/prettywriter.h"
+#include "grape/rapidjson/stringbuffer.h"
+#include "grape/rapidjson/filestream.h"
 
 #include <cocaine/json.hpp>
 
