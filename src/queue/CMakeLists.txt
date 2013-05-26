@@ -18,3 +18,7 @@ install(TARGETS queue-app
     RUNTIME DESTINATION lib/grape
     COMPONENT runtime
 )
+install(TARGETS queue-starter
+    RUNTIME DESTINATION bin
+    COMPONENT bin
+)
