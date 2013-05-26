@@ -70,7 +70,7 @@ queue_app_context::queue_app_context(const std::string &id, std::shared_ptr<coca
 application<queue_app_context>(id, service_manager),
 m_id(id),
 m_queue("queue.conf", "test-queue-id-" + m_id, 1000),
-m_log(service_manager->get_system_logger()),
+m_log(service_manager->get_system_logger())
 {
 	COCAINE_LOG_INFO(m_log, "%s: constructor", m_id.c_str());
 }
