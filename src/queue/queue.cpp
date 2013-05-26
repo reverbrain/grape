@@ -7,13 +7,16 @@
 
 #include <cocaine/json.hpp>
 
-ioremap::grape::queue::queue(const std::string &config, const std::string &queue_id, int max):
-m_chunk_max(max),
+ioremap::grape::queue::queue(const std::string &config, const std::string &queue_id):
+m_chunk_max(10000),
 m_queue_id(queue_id),
 m_queue_stat_id(queue_id + ".stat")
 {
 	rapidjson::Document doc;
 	m_client = elliptics_client_state::create(config, doc);
+
+	if (doc.HasMember("chunk-max-size"))
+		m_chunk_max = doc["chunk-max-size"].GetInt();
 
 	memset(&m_stat, 0, sizeof(struct queue_stat));
 

@@ -4,10 +4,10 @@
 
 int main(int argc, char *argv[])
 {
-	ioremap::grape::queue q("queue.conf", "test-queue-id", 4);
+	ioremap::grape::queue q("queue.conf", "test-queue-id");
 
 	for (int i = 0; i < 10; ++i) {
-		std::string data = "this is a test: " + ioremap::grape::lexical_cast(i);
+		std::string data = "this is a test: " + lexical_cast(i);
 		std::cout << data << std::endl;
 
 		q.push(data);

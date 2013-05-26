@@ -59,8 +59,8 @@ class queue_app_context : public cocaine::framework::application<queue_app_conte
 
 	private:
 		const std::string m_id;
-		ioremap::grape::queue m_queue;
 		std::shared_ptr<cocaine::framework::logger_t> m_log;
+		std::shared_ptr<ioremap::grape::queue> m_queue;
 
 		rate_stat m_rate_push;
 		rate_stat m_rate_pop;
@@ -69,23 +69,16 @@ class queue_app_context : public cocaine::framework::application<queue_app_conte
 queue_app_context::queue_app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager):
 application<queue_app_context>(id, service_manager),
 m_id(id),
-m_queue("queue.conf", "test-queue-id-" + m_id, 1000),
 m_log(service_manager->get_system_logger())
 {
-	COCAINE_LOG_INFO(m_log, "%s: constructor", m_id.c_str());
 }
 queue_app_context::~queue_app_context()
 {
-	COCAINE_LOG_INFO(m_log, "%s: destructor", m_id.c_str());
 }
 
 void queue_app_context::initialize()
 {
-	COCAINE_LOG_INFO(m_log, "%s: initialize", m_id.c_str());
-	// register event handlers
-	//FIXME: all at once for now
 	on_unregistered(&queue_app_context::process);
-	COCAINE_LOG_INFO(m_log, "%s: initialized", m_id.c_str());
 }
 
 std::string queue_app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks)
@@ -100,22 +93,32 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		event.assign(p + 1);
 	}
 
-	COCAINE_LOG_INFO(m_log, "%s: event: %s, size: %ld", m_id.c_str(), event.c_str(), context.data().size());
+	COCAINE_LOG_INFO(m_log, "%s: event: %s, size: %ld\n", m_id.c_str(), event.c_str(), context.data().size());
+
+	if (!m_queue && event != "configure")
+		ioremap::elliptics::throw_error(-EINVAL, "Worker '%s' is not configured", m_id.c_str());
 
 	if (event == "ping") {
-		m_queue.reply(context, std::string("ok"));
+		m_queue->reply(context, std::string("ok"));
+	} else if (event == "configure") {
+		std::string queue_id = context.data().to_string();
+		m_queue.reset(new ioremap::grape::queue("queue.conf", queue_id));
+		m_queue->reply(context, std::string(m_id + ": configured"));
+		COCAINE_LOG_INFO(m_log, "%s: queue '%s' has been successfully configured\n",
+				m_id.c_str(), queue_id.c_str());
 	} else if (event == "push") {
 		ioremap::elliptics::data_pointer d = context.data();
 		// skip adding zero length data, because there is no value in that
 		// queue has no method to request size and we can use zero reply in pop
 		// to indicate queue emptiness
 		if (d.size()) {
-			m_queue.push(d);
+			m_queue->push(d);
 			m_rate_push.update();
 		}
-		m_queue.reply(context, std::string(m_id + ": ack"));
+
+		m_queue->reply(context, std::string(m_id + ": ack"));
 	} else if (event == "pop") {
-		m_queue.reply(context, m_queue.pop());
+		m_queue->reply(context, m_queue->pop());
 		m_rate_pop.update();
 	} else if (event == "stats") {
 		rapidjson::StringBuffer stream;
@@ -125,10 +128,10 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		root.SetObject();
 
 		rapidjson::Value name;
-		std::string qname = m_queue.queue_id();
+		std::string qname = m_queue->queue_id();
 		name.SetString(qname.c_str(), qname.size());
 
-		struct ioremap::grape::queue_stat st = m_queue.stat();
+		struct ioremap::grape::queue_stat st = m_queue->stat();
 
 		root.AddMember("queue_id", name, root.GetAllocator());
 		root.AddMember("ack.count", st.ack_count, root.GetAllocator());
@@ -166,13 +169,13 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		std::string text;
 		text.assign(stream.GetString(), stream.GetSize());
 
-		m_queue.reply(context, text);
+		m_queue->reply(context, text);
 	} else {
 		std::string msg = event + ": unknown event";
-		m_queue.reply(context, msg);
+		m_queue->reply(context, msg);
 	}
 
-	COCAINE_LOG_INFO(m_log, "%s: completed event: %s, size: %ld", m_id.c_str(), event.c_str(), context.data().size());
+	COCAINE_LOG_INFO(m_log, "%s: completed event: %s, size: %ld\n", m_id.c_str(), event.c_str(), context.data().size());
 
 	return "";
 }
