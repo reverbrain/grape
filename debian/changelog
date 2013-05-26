@@ -1,3 +1,10 @@
+grape (0.6.8) unstable; urgency=low
+
+  * Moved rapidjson headers to grape subdir
+  * Fixed construction order
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Sun, 26 May 2013 19:39:37 +0400
+
 grape (0.6.7) unstable; urgency=low
 
   * Updated to the latest cocaine API
