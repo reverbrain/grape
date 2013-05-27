@@ -66,6 +66,8 @@ class queue_driver: public api::driver_t {
 		void get_more_data();
 
 	private:
+		std::vector<int> m_queue_groups;
+
 		cocaine::context_t& m_context;
 		cocaine::app_t& m_app;
 		std::shared_ptr<cocaine::logging::log_t> m_log;

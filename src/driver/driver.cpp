@@ -67,6 +67,14 @@ m_no_data(false)
 		doc.Parse<0>(s.c_str());
 
 		m_client = elliptics_client_state::create(doc);
+
+		std::string groups_key = "groups";
+		if (doc.HasMember("queue-groups"))
+			groups_key = "queue-groups";
+
+		const rapidjson::Value &groupsArray = doc[groups_key.c_str()];
+		std::transform(groupsArray.Begin(), groupsArray.End(), std::back_inserter(m_queue_groups),
+				std::bind(&rapidjson::Value::GetInt, std::placeholders::_1));
 	} catch (const std::exception &e) {
 		COCAINE_LOG_INFO(m_log, "%s: driver constructor exception: %s\n", m_queue_name.c_str(), e.what());
 		throw;
@@ -137,6 +145,8 @@ void queue_driver::get_more_data()
 
 		std::string random_data = m_queue_name + lexical_cast(rand());
 		sess.transform(random_data, req_id);
+
+		sess.set_groups(m_queue_groups);
 
 		queue_inc(1);
 
