@@ -1,3 +1,15 @@
+grape (0.6.14) unstable; urgency=low
+
+  * Allow driver to pull events from different groups than that it is started in
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Mon, 27 May 2013 04:06:09 +0400
+
+grape (0.6.14) unstable; urgency=low
+
+  * Allow driver to pull events from different groups than that it is started in
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Mon, 27 May 2013 04:05:38 +0400
+
 grape (0.6.13) unstable; urgency=low
 
   * Removed errorneous ID zeroing
