@@ -12,6 +12,7 @@ static void starter_usage(const char *name)
 	std::cerr << "Usage (all parameters are mandatory): " << name << std::endl <<
 		" -r addr:port:family  - remote node to configure queue on.\n" <<
 		" -n num               - number of workers to start (configure). This number must match queue profile.\n"
+		" -Q name              - queue name, used to send commands like $name@push, $name@pull\n"
 		" -q id                - queue will run on given node with given ID. Consider this as per node extension of 'queue' name.\n"
 		" -M level             - log level.\n"
 		" -h                   - this help.\n" <<
@@ -29,12 +30,16 @@ int main(int argc, char *argv[])
 	int num_workers = -1;
 	char *queue_name = NULL;
 	int log_level = DNET_LOG_ERROR;
+	std::string application_name = "queue";
 
 	memset(&cfg, 0, sizeof(struct dnet_config));
 	cfg.wait_timeout = 60;
 
-	while ((ch = getopt(argc, argv, "M:g:r:n:q:h")) != -1) {
+	while ((ch = getopt(argc, argv, "Q:M:g:r:n:q:h")) != -1) {
 		switch (ch) {
+		case 'Q':
+			application_name = optarg;
+			break;
 		case 'M':
 			log_level = atoi(optarg);
 			break;
@@ -100,13 +105,13 @@ int main(int argc, char *argv[])
 
 	std::string event, data;
 
-	event = "queue@start-multiple-task";
+	event = application_name + "@start-multiple-task";
 	s.exec(NULL, event, data).wait();
 
 	for (int i = 0; i < num_workers; ++i) {
 		s.set_filter(elliptics::filters::all_with_ack);
 
-		event = "queue@configure";
+		event = application_name + "@configure";
 		data = queue_name;
 
 		auto result = s.exec(&id, i, event, data);
