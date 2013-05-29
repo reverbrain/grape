@@ -101,10 +101,15 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 	if (event == "ping") {
 		m_queue->reply(context, std::string("ok"));
 	} else if (event == "configure") {
-		m_id = context.data().to_string() + "-" + m_id;
-		m_queue.reset(new ioremap::grape::queue("queue.conf", m_id));
-		m_queue->reply(context, std::string(m_id + ": configured"));
-		COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured", m_id.c_str());
+		if (m_queue) {
+			m_id = context.data().to_string() + "-" + m_id;
+			m_queue.reset(new ioremap::grape::queue("queue.conf", m_id));
+			m_queue->reply(context, std::string(m_id + ": configured"));
+			COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured", m_id.c_str());
+		} else {
+			m_queue->reply(context, std::string(m_id + ": is already configured"));
+			COCAINE_LOG_INFO(m_log, "%s: queue is already configured", m_id.c_str());
+		}
 	} else if (event == "push") {
 		ioremap::elliptics::data_pointer d = context.data();
 		// skip adding zero length data, because there is no value in that
