@@ -1,3 +1,11 @@
+grape (0.6.15) unstable; urgency=low
+
+  * Do not allow multiple queue configuration event
+  * Do not print \n using cocaine log macroses, since srw logger adds them.
+  * Allow queue starter to provide application name in command line
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Thu, 30 May 2013 03:59:10 +0400
+
 grape (0.6.14) unstable; urgency=low
 
   * Allow driver to pull events from different groups than that it is started in
