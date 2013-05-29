@@ -29,7 +29,7 @@ app_context::app_context(const std::string &id, std::shared_ptr<cocaine::framewo
 {
 	// obtain logging facility
 	m_log = service_manager->get_system_logger();
-	COCAINE_LOG_INFO(m_log, "application start: %s\n", id.c_str());
+	COCAINE_LOG_INFO(m_log, "application start: %s", id.c_str());
 
 	_delay = 0;
 }

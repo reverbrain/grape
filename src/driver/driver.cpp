@@ -56,7 +56,7 @@ m_queue_length(0),
 m_queue_length_max(0),
 m_no_data(false)
 {
-	COCAINE_LOG_INFO(m_log, "%s: driver starts\n", m_queue_name.c_str());
+	COCAINE_LOG_INFO(m_log, "%s: driver starts", m_queue_name.c_str());
 
 	srand(time(NULL));
 
@@ -76,7 +76,7 @@ m_no_data(false)
 		std::transform(groupsArray.Begin(), groupsArray.End(), std::back_inserter(m_queue_groups),
 				std::bind(&rapidjson::Value::GetInt, std::placeholders::_1));
 	} catch (const std::exception &e) {
-		COCAINE_LOG_INFO(m_log, "%s: driver constructor exception: %s\n", m_queue_name.c_str(), e.what());
+		COCAINE_LOG_INFO(m_log, "%s: driver constructor exception: %s", m_queue_name.c_str(), e.what());
 		throw;
 	}
 
@@ -126,13 +126,13 @@ void queue_driver::on_idle_timer_event(ev::timer &, int)
 		get_more_data();
 	}
 
-	COCAINE_LOG_INFO(m_log, "%s: timer: checking queue completed: queue-len: %d/%d, no-data: %d\n",
+	COCAINE_LOG_INFO(m_log, "%s: timer: checking queue completed: queue-len: %d/%d, no-data: %d",
 			m_queue_name.c_str(), m_queue_length, m_queue_length_max, m_no_data);
 }
 
 void queue_driver::get_more_data()
 {
-	COCAINE_LOG_INFO(m_log, "%s: more-data: checking queue: queue-len: %d/%d, no-data: %d\n",
+	COCAINE_LOG_INFO(m_log, "%s: more-data: checking queue: queue-len: %d/%d, no-data: %d",
 			m_queue_name.c_str(), m_queue_length, m_queue_length_max, m_no_data);
 
 	if (m_queue_length < m_queue_length_max) {
@@ -156,7 +156,7 @@ void queue_driver::get_more_data()
 			std::bind(&queue_driver::on_queue_request_complete, this, std::placeholders::_1)
 		);
 
-		COCAINE_LOG_INFO(m_log, "%s: %s: pop request has been sent: queue-len: %d/%d\n",
+		COCAINE_LOG_INFO(m_log, "%s: %s: pop request has been sent: queue-len: %d/%d",
 				m_queue_name.c_str(), dnet_dump_id(&req_id), m_queue_length, m_queue_length_max);
 	}
 }
@@ -165,7 +165,7 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 {
 	try {
 		if (result.error()) {
-			COCAINE_LOG_ERROR(m_log, "%s: error: %d: %s\n",
+			COCAINE_LOG_ERROR(m_log, "%s: error: %d: %s",
 				m_queue_name.c_str(), result.error().code(), result.error().message());
 			return;
 		}
@@ -177,14 +177,14 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 		// But every time when we actually got data we have to postpone idle timer.
 
 		ioremap::elliptics::exec_context context = result.context();
-		COCAINE_LOG_INFO(m_log, "%s: poped data: size: %d\n", m_queue_name.c_str(), context.data().size());
+		COCAINE_LOG_INFO(m_log, "%s: poped data: size: %d", m_queue_name.c_str(), context.data().size());
 
 		if (!context.data().empty()) {
 			m_no_data = false;
 
 			bool processed_ok = process_data(context.data());
 
-			COCAINE_LOG_INFO(m_log, "%s: data: size: %d, processed-ok: %d\n",
+			COCAINE_LOG_INFO(m_log, "%s: data: size: %d, processed-ok: %d",
 					m_queue_name.c_str(), context.data().size(), processed_ok);
 
 			m_no_data = !processed_ok;
@@ -192,14 +192,14 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 			m_no_data = true;
 		}
 	} catch(const std::exception &e) {
-		COCAINE_LOG_ERROR(m_log, "%s: exception: %s\n", m_queue_name.c_str(), e.what());
+		COCAINE_LOG_ERROR(m_log, "%s: exception: %s", m_queue_name.c_str(), e.what());
 	}
 }
 
 void queue_driver::on_queue_request_complete(const ioremap::elliptics::error_info &error)
 {
 	if (!error)
-		COCAINE_LOG_ERROR(m_log, "%s: queue request completion error: %s\n", m_queue_name.c_str(), error.message().c_str());
+		COCAINE_LOG_ERROR(m_log, "%s: queue request completion error: %s", m_queue_name.c_str(), error.message().c_str());
 
 	queue_dec(1);
 }
@@ -232,7 +232,7 @@ bool queue_driver::process_data(const ioremap::elliptics::data_pointer &data)
 
 		return true;
 	} catch (const cocaine::error_t &e) {
-		COCAINE_LOG_ERROR(m_log, "%s: enqueue failed: %s: queue-len: %d/%d\n",
+		COCAINE_LOG_ERROR(m_log, "%s: enqueue failed: %s: queue-len: %d/%d",
 				m_queue_name.c_str(), e.what(),
 				m_queue_length, m_queue_length_max);
 	}
@@ -280,7 +280,7 @@ void queue_driver::downstream_t::close()
 {
 	m_queue->queue_dec(1);
 
-	COCAINE_LOG_INFO(m_queue->m_log, "%s: downstream: close: attempts (was-error): %d\n",
+	COCAINE_LOG_INFO(m_queue->m_log, "%s: downstream: close: attempts (was-error): %d",
 			m_queue->m_queue_name.c_str(), m_attempts);
 
 	if (m_attempts == 0)

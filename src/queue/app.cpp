@@ -93,7 +93,7 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		event.assign(p + 1);
 	}
 
-	COCAINE_LOG_INFO(m_log, "%s: event: %s, size: %ld\n", m_id.c_str(), event.c_str(), context.data().size());
+	COCAINE_LOG_INFO(m_log, "%s: event: %s, size: %ld", m_id.c_str(), event.c_str(), context.data().size());
 
 	if (!m_queue && event != "configure")
 		ioremap::elliptics::throw_error(-EINVAL, "Worker '%s' is not configured", m_id.c_str());
@@ -104,7 +104,7 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		m_id = context.data().to_string() + "-" + m_id;
 		m_queue.reset(new ioremap::grape::queue("queue.conf", m_id));
 		m_queue->reply(context, std::string(m_id + ": configured"));
-		COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured\n", m_id.c_str());
+		COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured", m_id.c_str());
 	} else if (event == "push") {
 		ioremap::elliptics::data_pointer d = context.data();
 		// skip adding zero length data, because there is no value in that
@@ -174,7 +174,7 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		m_queue->reply(context, msg);
 	}
 
-	COCAINE_LOG_INFO(m_log, "%s: completed event: %s, size: %ld\n", m_id.c_str(), event.c_str(), context.data().size());
+	COCAINE_LOG_INFO(m_log, "%s: completed event: %s, size: %ld", m_id.c_str(), event.c_str(), context.data().size());
 
 	return "";
 }
