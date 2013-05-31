@@ -115,7 +115,10 @@ class queue {
 		void push(const elliptics::data_pointer &d);
 		elliptics::data_pointer pop(void);
 
-		void reply(const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d);
+		void reply(const ioremap::elliptics::exec_context &context,
+				const ioremap::elliptics::data_pointer &d,
+				ioremap::elliptics::exec_context::final_state state);
+		void final(const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d);
 
 		struct queue_stat stat(void);
 		const std::string queue_id(void) const;

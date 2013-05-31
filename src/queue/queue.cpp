@@ -93,9 +93,15 @@ struct ioremap::grape::queue_stat ioremap::grape::queue::stat(void)
 	return m_stat;
 }
 
-void ioremap::grape::queue::reply(const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d)
+void ioremap::grape::queue::reply(const ioremap::elliptics::exec_context &context,
+		const ioremap::elliptics::data_pointer &d, ioremap::elliptics::exec_context::final_state state)
 {
-	m_client.create_session().reply(context, d, ioremap::elliptics::exec_context::final);
+	m_client.create_session().reply(context, d, state);
+}
+
+void ioremap::grape::queue::final(const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d)
+{
+	reply(context, d, ioremap::elliptics::exec_context::final);
 }
 
 void ioremap::grape::queue::update_indexes(void)
