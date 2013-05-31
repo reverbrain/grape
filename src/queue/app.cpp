@@ -99,15 +99,15 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		ioremap::elliptics::throw_error(-EINVAL, "Worker '%s' is not configured", m_id.c_str());
 
 	if (event == "ping") {
-		m_queue->reply(context, std::string("ok"));
+		m_queue->final(context, std::string("ok"));
 	} else if (event == "configure") {
 		if (m_queue) {
 			m_id = context.data().to_string() + "-" + m_id;
 			m_queue.reset(new ioremap::grape::queue("queue.conf", m_id));
-			m_queue->reply(context, std::string(m_id + ": configured"));
+			m_queue->final(context, std::string(m_id + ": configured"));
 			COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured", m_id.c_str());
 		} else {
-			m_queue->reply(context, std::string(m_id + ": is already configured"));
+			m_queue->final(context, std::string(m_id + ": is already configured"));
 			COCAINE_LOG_INFO(m_log, "%s: queue is already configured", m_id.c_str());
 		}
 	} else if (event == "push") {
@@ -120,10 +120,22 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 			m_rate_push.update();
 		}
 
-		m_queue->reply(context, std::string(m_id + ": ack"));
+		m_queue->final(context, std::string(m_id + ": ack"));
 	} else if (event == "pop") {
-		m_queue->reply(context, m_queue->pop());
-		m_rate_pop.update();
+	} else if (event == "pop-multiple-string") {
+		int num = atoi(context.data().to_string().c_str());
+		for (int i = 0; i < num; ++i) {
+			ioremap::elliptics::data_pointer pop_data = m_queue->pop();
+			m_rate_pop.update();
+
+			if (pop_data.empty()) {
+				m_queue->final(context, pop_data);
+				break;
+			} else {
+				m_queue->reply(context, pop_data, i == num - 1 ? ioremap::elliptics::exec_context::final :
+						ioremap::elliptics::exec_context::progressive);
+			}
+		}
 	} else if (event == "stats") {
 		rapidjson::StringBuffer stream;
 		rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(stream);
@@ -173,10 +185,10 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		std::string text;
 		text.assign(stream.GetString(), stream.GetSize());
 
-		m_queue->reply(context, text);
+		m_queue->final(context, text);
 	} else {
 		std::string msg = event + ": unknown event";
-		m_queue->reply(context, msg);
+		m_queue->final(context, msg);
 	}
 
 	COCAINE_LOG_INFO(m_log, "%s: completed event: %s, size: %ld", m_id.c_str(), event.c_str(), context.data().size());
