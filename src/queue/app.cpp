@@ -121,9 +121,13 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		}
 
 		m_queue->final(context, std::string(m_id + ": ack"));
-	} else if (event == "pop") {
-	} else if (event == "pop-multiple-string") {
-		int num = atoi(context.data().to_string().c_str());
+	} else if ((event == "pop") || (event == "pop-multiple-string")) {
+		int num = 1;
+
+		if (event == "pop-multiple-string") {
+			num = atoi(context.data().to_string().c_str());
+		}
+
 		for (int i = 0; i < num; ++i) {
 			ioremap::elliptics::data_pointer pop_data = m_queue->pop();
 			m_rate_pop.update();
