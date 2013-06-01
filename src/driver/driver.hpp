@@ -54,6 +54,10 @@ class queue_driver: public api::driver_t {
 			int m_attempts;
 		};
 
+		struct queue_request {
+			std::atomic_int total, success;
+		};
+
 		queue_driver(context_t& context, io::reactor_t& reactor, app_t& app, const std::string& name, const Json::Value& args);
 
 		virtual ~queue_driver();
@@ -79,8 +83,8 @@ class queue_driver: public api::driver_t {
 		void on_idle_timer_event(ev::timer&, int);
 
 		// requests to the queue callbacks
-		void on_queue_request_data(const ioremap::elliptics::exec_result_entry &result);
-		void on_queue_request_complete(const ioremap::elliptics::error_info &error);
+		void on_queue_request_data(std::shared_ptr<queue_request> req, const ioremap::elliptics::exec_result_entry &result);
+		void on_queue_request_complete(std::shared_ptr<queue_request> req, const ioremap::elliptics::error_info &error);
 
 		bool process_data(const ioremap::elliptics::data_pointer &data);
 

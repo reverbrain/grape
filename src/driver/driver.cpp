@@ -151,10 +151,14 @@ void queue_driver::get_more_data()
 
 		queue_inc(num / step);
 
+		std::shared_ptr<queue_request> req = std::make_shared<queue_request>();
+		req->total = num / step;
+		req->success = 0;
+
 		sess.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
 		sess.exec(&req_id, m_queue_src_key, m_queue_pop_event, diff).connect(
-			std::bind(&queue_driver::on_queue_request_data, this, std::placeholders::_1),
-			std::bind(&queue_driver::on_queue_request_complete, this, std::placeholders::_1)
+			std::bind(&queue_driver::on_queue_request_data, this, req, std::placeholders::_1),
+			std::bind(&queue_driver::on_queue_request_complete, this, req, std::placeholders::_1)
 		);
 
 		++m_queue_src_key;
@@ -164,7 +168,7 @@ void queue_driver::get_more_data()
 	}
 }
 
-void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_entry &result)
+void queue_driver::on_queue_request_data(std::shared_ptr<queue_request> req, const ioremap::elliptics::exec_result_entry &result)
 {
 	try {
 		if (result.error()) {
@@ -185,6 +189,8 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 		if (!context.data().empty()) {
 			queue_dec(1);
 
+			req->success++;
+
 			bool processed_ok = process_data(context.data());
 
 			COCAINE_LOG_INFO(m_log, "%s: data: size: %d, processed-ok: %d",
@@ -195,10 +201,17 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 	}
 }
 
-void queue_driver::on_queue_request_complete(const ioremap::elliptics::error_info &error)
+void queue_driver::on_queue_request_complete(std::shared_ptr<queue_request> req, const ioremap::elliptics::error_info &error)
 {
-	if (error)
-		COCAINE_LOG_ERROR(m_log, "%s: queue request completion error: %s", m_queue_name.c_str(), error.message().c_str());
+	if (error) {
+		COCAINE_LOG_ERROR(m_log, "%s: queue request completion error: %s, events: %d/%d",
+				m_queue_name.c_str(), error.message().c_str(),
+				req->success, req->total);
+	} else {
+		COCAINE_LOG_ERROR(m_log, "%s: queue request completed: events: %d/%d", m_queue_name.c_str(), req->success, req->total);
+	}
+
+	queue_dec(req->total - req->success);
 }
 
 bool queue_driver::process_data(const ioremap::elliptics::data_pointer &data)
