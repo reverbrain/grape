@@ -101,7 +101,7 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 	if (event == "ping") {
 		m_queue->final(context, std::string("ok"));
 	} else if (event == "configure") {
-		if (m_queue) {
+		if (!m_queue) {
 			m_id = context.data().to_string() + "-" + m_id;
 			m_queue.reset(new ioremap::grape::queue("queue.conf", m_id));
 			m_queue->final(context, std::string(m_id + ": configured"));
