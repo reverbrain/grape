@@ -1,3 +1,13 @@
+grape (0.6.16) unstable; urgency=low
+
+  * Use queue@pop-multiple-string event to grab all queue data at once (divided by steps though to access multiple inner queues)
+  * Added 'pop-multiple-string num' event, which returns as much popped replies as specified (as string).
+  *   If pop() returns empty data-pointer, stop sending replies
+  * Added final() queue method, which will send data with ioremap::elliptics::exec_context::final flag set.
+  *   reply() method accepts ioremap::elliptics::exec_context flags now.
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Sat, 01 Jun 2013 16:41:10 +0400
+
 grape (0.6.15) unstable; urgency=low
 
   * Do not allow multiple queue configuration event
