@@ -93,7 +93,10 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		event.assign(p + 1);
 	}
 
-	COCAINE_LOG_INFO(m_log, "%s: event: %s, size: %ld", m_id.c_str(), event.c_str(), context.data().size());
+	sph *s = (sph *)chunks[0].c_str();
+
+	COCAINE_LOG_INFO(m_log, "%s: %s: event: %s, size: %ld",
+			m_id.c_str(), dnet_dump_id_str(s->src.id), event.c_str(), context.data().size());
 
 	if (!m_queue && event != "configure")
 		ioremap::elliptics::throw_error(-EINVAL, "Worker '%s' is not configured", m_id.c_str());
@@ -122,13 +125,13 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 
 		m_queue->final(context, std::string(m_id + ": ack"));
 	} else if ((event == "pop") || (event == "pop-multiple-string")) {
-		int num = 1;
+		int i, num = 1;
 
 		if (event == "pop-multiple-string") {
 			num = atoi(context.data().to_string().c_str());
 		}
 
-		for (int i = 0; i < num; ++i) {
+		for (i = 0; i < num; ++i) {
 			ioremap::elliptics::data_pointer pop_data = m_queue->pop();
 			m_rate_pop.update();
 
@@ -140,6 +143,9 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 						ioremap::elliptics::exec_context::progressive);
 			}
 		}
+
+		COCAINE_LOG_INFO(m_log, "%s: %s: completed event: %s, size: %ld, popped: %d/%d",
+				m_id.c_str(), dnet_dump_id_str(s->src.id), event.c_str(), context.data().size(), i, num);
 	} else if (event == "stats") {
 		rapidjson::StringBuffer stream;
 		rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(stream);
@@ -195,7 +201,8 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		m_queue->final(context, msg);
 	}
 
-	COCAINE_LOG_INFO(m_log, "%s: completed event: %s, size: %ld", m_id.c_str(), event.c_str(), context.data().size());
+	COCAINE_LOG_INFO(m_log, "%s: %s: completed event: %s, size: %ld",
+			m_id.c_str(), dnet_dump_id_str(s->src.id), event.c_str(), context.data().size());
 
 	return "";
 }
