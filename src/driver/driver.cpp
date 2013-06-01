@@ -261,7 +261,7 @@ void queue_driver::downstream_t::write(const char *data, size_t size)
 {
 	std::string ret(data, size);
 
-	COCAINE_LOG_INFO(m_queue->m_log, "%s: from worker: received: size: %zd, data: '%s'",
+	COCAINE_LOG_INFO(m_queue->m_log, "%s: from worker: received: size: %d, data: '%s'",
 			m_queue->m_queue_name.c_str(), ret.size(), ret.c_str());
 }
 
@@ -269,7 +269,7 @@ void queue_driver::downstream_t::error(int code, const std::string &msg)
 {
 	++m_attempts;
 
-	COCAINE_LOG_ERROR(m_queue->m_log, "%s: from worker: error: attempts: %d/%d: %s [%d]",
+	COCAINE_LOG_ERROR(m_queue->m_log, "%s: from worker: error: attempts: %d: %s [%d]",
 			m_queue->m_queue_name.c_str(), m_attempts, msg.c_str(), code);
 }
 
