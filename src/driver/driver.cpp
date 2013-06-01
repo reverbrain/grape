@@ -48,13 +48,13 @@ m_src_key(0),
 m_idle_timer(reactor.native()),
 m_worker_event(args.get("emit", name).asString()),
 m_queue_name(args.get("source-queue-app", "queue").asString()),
-m_queue_pop_event(m_queue_name + "@pop"),
+m_queue_pop_event(m_queue_name + "@pop-multiple-string"),
 m_queue_ack_event(m_queue_name + "@ack"),
 m_timeout(args.get("timeout", 0.0f).asDouble()),
 m_deadline(args.get("deadline", 0.0f).asDouble()),
 m_queue_length(0),
 m_queue_length_max(0),
-m_no_data(false)
+m_queue_src_key(0)
 {
 	COCAINE_LOG_INFO(m_log, "%s: driver starts", m_queue_name.c_str());
 
@@ -119,24 +119,25 @@ Json::Value queue_driver::info() const
 
 void queue_driver::on_idle_timer_event(ev::timer &, int)
 {
-	for (int i = m_queue_length; i < m_queue_length_max; ++i) {
-		if (i > m_queue_length && m_no_data)
-			break;
+	get_more_data();
 
-		get_more_data();
-	}
-
-	COCAINE_LOG_INFO(m_log, "%s: timer: checking queue completed: queue-len: %d/%d, no-data: %d",
-			m_queue_name.c_str(), m_queue_length, m_queue_length_max, m_no_data);
+	COCAINE_LOG_INFO(m_log, "%s: timer: checking queue completed: queue-len: %d/%d",
+			m_queue_name.c_str(), m_queue_length, m_queue_length_max);
 }
 
 void queue_driver::get_more_data()
 {
-	COCAINE_LOG_INFO(m_log, "%s: more-data: checking queue: queue-len: %d/%d, no-data: %d",
-			m_queue_name.c_str(), m_queue_length, m_queue_length_max, m_no_data);
+	COCAINE_LOG_INFO(m_log, "%s: more-data: checking queue: queue-len: %d/%d",
+			m_queue_name.c_str(), m_queue_length, m_queue_length_max);
 
-	if (m_queue_length < m_queue_length_max) {
+	int num = m_queue_length_max - m_queue_length;
+	if (num < 100)
+		return;
 
+	int step = 10;
+	ioremap::elliptics::data_pointer diff = lexical_cast(num / step);
+
+	for (int i = 0; i < step; ++i) {
 		ioremap::elliptics::session sess = m_client.create_session();
 
 		dnet_id req_id;
@@ -148,13 +149,15 @@ void queue_driver::get_more_data()
 
 		sess.set_groups(m_queue_groups);
 
-		queue_inc(1);
+		queue_inc(num / step);
 
 		sess.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
-		sess.exec(&req_id, m_queue_pop_event, ioremap::elliptics::data_pointer()).connect(
+		sess.exec(&req_id, m_queue_src_key, m_queue_pop_event, diff).connect(
 			std::bind(&queue_driver::on_queue_request_data, this, std::placeholders::_1),
 			std::bind(&queue_driver::on_queue_request_complete, this, std::placeholders::_1)
 		);
+
+		++m_queue_src_key;
 
 		COCAINE_LOG_INFO(m_log, "%s: %s: pop request has been sent: queue-len: %d/%d",
 				m_queue_name.c_str(), dnet_dump_id(&req_id), m_queue_length, m_queue_length_max);
@@ -180,16 +183,12 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 		COCAINE_LOG_INFO(m_log, "%s: poped data: size: %d", m_queue_name.c_str(), context.data().size());
 
 		if (!context.data().empty()) {
-			m_no_data = false;
+			queue_dec(1);
 
 			bool processed_ok = process_data(context.data());
 
 			COCAINE_LOG_INFO(m_log, "%s: data: size: %d, processed-ok: %d",
 					m_queue_name.c_str(), context.data().size(), processed_ok);
-
-			m_no_data = !processed_ok;
-		} else {
-			m_no_data = true;
 		}
 	} catch(const std::exception &e) {
 		COCAINE_LOG_ERROR(m_log, "%s: exception: %s", m_queue_name.c_str(), e.what());
@@ -198,10 +197,8 @@ void queue_driver::on_queue_request_data(const ioremap::elliptics::exec_result_e
 
 void queue_driver::on_queue_request_complete(const ioremap::elliptics::error_info &error)
 {
-	if (!error)
+	if (error)
 		COCAINE_LOG_ERROR(m_log, "%s: queue request completion error: %s", m_queue_name.c_str(), error.message().c_str());
-
-	queue_dec(1);
 }
 
 bool queue_driver::process_data(const ioremap::elliptics::data_pointer &data)
