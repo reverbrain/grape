@@ -1,3 +1,11 @@
+grape (0.6.17) unstable; urgency=low
+
+  * Fixed plain queue@pop event
+  * Fixed queue@configure event
+  * Depend on 2.24.7.5+ elliptics
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Sat, 01 Jun 2013 17:44:52 +0400
+
 grape (0.6.16) unstable; urgency=low
 
   * Use queue@pop-multiple-string event to grab all queue data at once (divided by steps though to access multiple inner queues)
