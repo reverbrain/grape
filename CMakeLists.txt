@@ -10,7 +10,7 @@ STRING (REGEX MATCH "([0-9]+\\.[0-9]+)" grape_VERSION_MAJOR "${DEBFULLVERSION}")
 STRING (REGEX MATCH "([0-9]+$)" grape_VERSION_MINOR "${DEBFULLVERSION}")
 set(${grape_VERSION} "${grape_VERSION_MAJOR}.${grape_VERSION_MINOR}")
 
-find_package(Boost REQUIRED system thread program_options)
+find_package(Boost REQUIRED system program_options)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
