@@ -56,6 +56,7 @@ class queue_driver: public api::driver_t {
 
 		struct queue_request {
 			std::atomic_int total, success;
+			dnet_id id;
 		};
 
 		queue_driver(context_t& context, io::reactor_t& reactor, app_t& app, const std::string& name, const Json::Value& args);
