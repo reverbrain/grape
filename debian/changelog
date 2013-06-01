@@ -1,3 +1,12 @@
+grape (0.6.18) unstable; urgency=low
+
+  * Use std::string instead of data_pointer
+  * A lot of debug cleanups and changes
+  * We must maintain number of successfull events and number of total requests
+  * Drop boost::thread package from search list
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Sun, 02 Jun 2013 01:23:35 +0400
+
 grape (0.6.17) unstable; urgency=low
 
   * Fixed plain queue@pop event
