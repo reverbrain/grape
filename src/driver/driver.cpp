@@ -135,7 +135,6 @@ void queue_driver::get_more_data()
 		return;
 
 	int step = 10;
-	ioremap::elliptics::data_pointer diff = lexical_cast(num / step);
 
 	for (int i = 0; i < step; ++i) {
 		ioremap::elliptics::session sess = m_client.create_session();
@@ -154,6 +153,8 @@ void queue_driver::get_more_data()
 		sess.set_groups(m_queue_groups);
 
 		queue_inc(req->total);
+
+		ioremap::elliptics::data_pointer diff = lexical_cast(req->total);
 
 		sess.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
 		sess.exec(&req->id, m_queue_src_key, m_queue_pop_event, diff).connect(

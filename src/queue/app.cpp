@@ -144,8 +144,9 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 			}
 		}
 
-		COCAINE_LOG_INFO(m_log, "%s: %s: completed event: %s, size: %ld, popped: %d/%d",
-				m_id.c_str(), dnet_dump_id_str(s->src.id), event.c_str(), context.data().size(), i, num);
+		COCAINE_LOG_INFO(m_log, "%s: %s: completed event: %s, size: %ld, popped: %d/%d (multiple: '%s')",
+				m_id.c_str(), dnet_dump_id_str(s->src.id), event.c_str(), context.data().size(), i, num,
+				context.data().to_string().c_str());
 	} else if (event == "stats") {
 		rapidjson::StringBuffer stream;
 		rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(stream);
