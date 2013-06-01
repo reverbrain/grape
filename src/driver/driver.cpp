@@ -154,7 +154,7 @@ void queue_driver::get_more_data()
 
 		queue_inc(req->total);
 
-		ioremap::elliptics::data_pointer diff = lexical_cast(req->total);
+		std::string diff = lexical_cast(req->total);
 
 		sess.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
 		sess.exec(&req->id, m_queue_src_key, m_queue_pop_event, diff).connect(
