@@ -138,8 +138,10 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 
 		if (d.empty()) {
 			m_queue->final(context, ioremap::elliptics::data_pointer());
-		} else {
+		} else if (event == "pop-multiple-string") {
 			m_queue->final(context, d.serialize());
+		} else {
+			m_queue->final(context, d.data());
 		}
 
 		COCAINE_LOG_INFO(m_log, "%s: %s: completed event: %s, size: %ld, popped: %d/%d (multiple: '%s')",

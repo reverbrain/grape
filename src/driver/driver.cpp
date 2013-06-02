@@ -36,6 +36,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include "grape/data_array.hpp"
+
 using namespace cocaine::driver;
 
 queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &reactor, cocaine::app_t &app,
@@ -186,11 +188,16 @@ void queue_driver::on_queue_request_data(std::shared_ptr<queue_request> req, con
 
 		ioremap::elliptics::exec_context context = result.context();
 		if (!context.data().empty()) {
-			queue_dec(1);
+			grape::data_array ret = grape::data_array::deserialize(context.data());
+			size_t pos = 0;
+			for (auto sz : ret.sizes()) {
+				queue_dec(1);
 
-			req->success++;
+				req->success++;
 
-			process_data(context.data());
+				process_data(ret.data().substr(pos, sz));
+				pos += sz;
+			}
 		}
 
 		COCAINE_LOG_INFO(m_log, "%s: %s: processed popped data: size: %d, events: %d/%d",
