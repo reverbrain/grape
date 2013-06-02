@@ -147,10 +147,14 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 {
 	ioremap::grape::data_array ret;
+	bool already_read = false;
 
 	try {
 		while (num > 0) {
 			if (m_pop_position >= m_chunk_data.size()) {
+				if (already_read)
+					break;
+
 				m_chunk_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
 				if (m_chunk.used() == 0) {
 					ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
@@ -162,6 +166,8 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 				m_pop_position = 0;
 				for (int i = 0; i < m_chunk.acked(); ++i)
 					m_pop_position += m_chunk[i].size;
+
+				already_read = true;
 
 #if 0
 				std::cout << "chunk read: data-key: " << m_data_key.to_string() <<

@@ -16,14 +16,19 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < 10; ++i) {
 		ioremap::grape::data_array d = q.pop(3);
 
+		if (d.empty())
+			break;
+
 		size_t pos = 0;
 		for (auto sz : d.sizes()) {
-			std::cout << pos << ", " << sz << " >> " << d.data().substr(pos, sz) << std::endl;
+			std::cout << ">> " << d.data().substr(pos, sz) << std::endl;
 			pos += sz;
 		}
 	}
 
 	std::string end = "at the end (test push/pop in the same chunk)";
 	q.push(end);
-	std::cout << end << " : " << q.pop(1).data() << std::endl;
+
+	std::cout << "going to pop final message" << std::endl;
+	std::cout << end << " : " << q.pop(10).data() << std::endl;
 }
