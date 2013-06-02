@@ -32,12 +32,14 @@ struct rate_stat
 		return t.tv_sec * 1000000 + t.tv_nsec / 1000;
 	}
 
-	void update() {
-		uint64_t now = microseconds_now();
-		double elapsed = double(now - last_update) / 1000000; // in seconds
-		double alpha = (elapsed > 1.0) ? 1.0 : elapsed;
-		avg = exponential_moving_average(avg, (1.0 / elapsed), alpha);
-		last_update = now;
+	void update(size_t num) {
+		for (size_t i = 0; i < num; ++i) {
+			uint64_t now = microseconds_now();
+			double elapsed = double(now - last_update) / 1000000; // in seconds
+			double alpha = (elapsed > 1.0) ? 1.0 : elapsed;
+			avg = exponential_moving_average(avg, (1.0 / elapsed), alpha);
+			last_update = now;
+		}
 	}
 
 	double get() {
@@ -120,32 +122,28 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		// to indicate queue emptiness
 		if (d.size()) {
 			m_queue->push(d);
-			m_rate_push.update();
+			m_rate_push.update(1);
 		}
 
 		m_queue->final(context, std::string(m_id + ": ack"));
 	} else if ((event == "pop") || (event == "pop-multiple-string")) {
-		int i, num = 1;
+		int num = 1;
 
 		if (event == "pop-multiple-string") {
 			num = atoi(context.data().to_string().c_str());
 		}
 
-		for (i = 0; i < num; ++i) {
-			ioremap::elliptics::data_pointer pop_data = m_queue->pop();
-			m_rate_pop.update();
+		ioremap::grape::data_array d = m_queue->pop(num);
+		m_rate_pop.update(d.sizes().size());
 
-			if (pop_data.empty()) {
-				m_queue->final(context, pop_data);
-				break;
-			} else {
-				m_queue->reply(context, pop_data, i == num - 1 ? ioremap::elliptics::exec_context::final :
-						ioremap::elliptics::exec_context::progressive);
-			}
+		if (d.empty()) {
+			m_queue->final(context, ioremap::elliptics::data_pointer());
+		} else {
+			m_queue->final(context, d.serialize());
 		}
 
 		COCAINE_LOG_INFO(m_log, "%s: %s: completed event: %s, size: %ld, popped: %d/%d (multiple: '%s')",
-				m_id.c_str(), dnet_dump_id_str(s->src.id), event.c_str(), context.data().size(), i, num,
+				m_id.c_str(), dnet_dump_id_str(s->src.id), event.c_str(), context.data().size(), d.sizes().size(), num,
 				context.data().to_string().c_str());
 	} else if (event == "stats") {
 		rapidjson::StringBuffer stream;

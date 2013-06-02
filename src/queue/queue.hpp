@@ -3,12 +3,32 @@
 
 #include "grape/elliptics_client_state.hpp"
 
+#include <msgpack.hpp>
+
 #include <cocaine/framework/logging.hpp>
 
 #include <elliptics/cppdef.h>
 #include <map>
 
 namespace ioremap { namespace grape {
+
+class data_array {
+	public:
+		void append(const char *data, size_t size);
+		void append(const data_array &d);
+
+		const std::vector<int> &sizes(void) const;
+		const std::string &data(void) const;
+
+		bool empty(void) const;
+
+		elliptics::data_pointer serialize(void);
+
+		MSGPACK_DEFINE(m_size, m_data);
+	private:
+		std::vector<int>	m_size;
+		std::string		m_data;
+};
 
 struct chunk_entry {
 	int		size;
@@ -62,7 +82,7 @@ class chunk {
 		~chunk();
 
 		bool push(const elliptics::data_pointer &d); // returns true if chunk is full
-		elliptics::data_pointer pop(void);
+		data_array pop(int num);
 
 		void remove(void);
 
@@ -113,7 +133,7 @@ class queue {
 		queue(const std::string &config, const std::string &queue_id);
 
 		void push(const elliptics::data_pointer &d);
-		elliptics::data_pointer pop(void);
+		data_array pop(int num);
 
 		void reply(const ioremap::elliptics::exec_context &context,
 				const ioremap::elliptics::data_pointer &d,

@@ -122,7 +122,7 @@ ioremap::grape::chunk::~chunk()
 
 void ioremap::grape::chunk::write_chunk(void)
 {
-	m_session_ctl.write_data(m_ctl_key, ioremap::elliptics::data_pointer::from_raw(m_chunk.data()), 0);
+	m_session_ctl.write_data(m_ctl_key, ioremap::elliptics::data_pointer::from_raw(m_chunk.data()), 0).wait();
 	m_stat.write_ctl_async++;
 }
 
@@ -144,40 +144,52 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 	return full;
 }
 
-ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(void)
+ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 {
-	ioremap::elliptics::data_pointer d;
+	ioremap::grape::data_array ret;
 
 	try {
-		if (m_pop_position >= m_chunk_data.size()) {
-			m_chunk_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
-			if (m_chunk.used() == 0) {
-				ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
-				m_chunk.assign((char *)d.data(), d.size());
+		while (num > 0) {
+			if (m_pop_position >= m_chunk_data.size()) {
+				m_chunk_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
+				if (m_chunk.used() == 0) {
+					ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
+					m_chunk.assign((char *)d.data(), d.size());
 
-				m_stat.read++;
+					m_stat.read++;
+				}
+
+				m_pop_position = 0;
+				for (int i = 0; i < m_chunk.acked(); ++i)
+					m_pop_position += m_chunk[i].size;
+
+#if 0
+				std::cout << "chunk read: data-key: " << m_data_key.to_string() <<
+					", ctl-key: " << m_ctl_key.to_string() <<
+					", chunk-size: " << m_chunk_data.size() <<
+					", used: " << m_chunk.used() <<
+					", acked: " << m_chunk.acked() <<
+					", m_pop_position: " << m_pop_position <<
+					": " << m_chunk_data.skip(m_pop_position).to_string() <<
+					std::endl;
+#endif
 			}
 
-			m_pop_position = 0;
-			for (int i = 0; i < m_chunk.acked(); ++i)
-				m_pop_position += m_chunk[i].size;
-#if 0
-			std::cout << "chunk read: data-key: " << m_data_key.to_string() <<
-				", ctl-key: " << m_ctl_key.to_string() <<
-				", chunk-size: " << m_chunk_data.size() <<
-				", used: " << m_chunk.used() <<
-				", acked: " << m_chunk.acked() <<
-				", m_pop_position: " << m_pop_position <<
-				std::endl;
-#endif
-		}
+			// chunk has been completely sucked out
+			if ((m_chunk.acked() >= m_chunk.used()) || (m_pop_position >= m_chunk_data.size()))
+				break;
 
-		if (m_chunk.acked() < m_chunk.used() && m_pop_position < m_chunk_data.size()) {
 			int size = m_chunk[m_chunk.acked()].size;
-			d = ioremap::elliptics::data_pointer::copy((char *)m_chunk_data.data() + m_pop_position, size);
+
+			ret.append((char *)m_chunk_data.data() + m_pop_position, size);
+
+			num--;
 
 			m_chunk.ack(m_chunk.acked(), 1);
 			m_stat.ack++;
+
+			m_stat.pop++;
+
 			write_chunk();
 
 			m_pop_position += size;
@@ -192,8 +204,7 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(void)
 		 */
 	}
 
-	m_stat.pop++;
-	return d;
+	return ret;
 }
 
 struct ioremap::grape::chunk_stat ioremap::grape::chunk::stat(void)

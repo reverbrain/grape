@@ -1,4 +1,4 @@
-add_library(queue STATIC queue.cpp chunk.cpp)
+add_library(queue STATIC queue.cpp chunk.cpp data_array.cpp)
 target_link_libraries(queue ${GRAPE_COMMON_LIBRARIES} ${elliptics_LIBRARIES})
 
 add_executable(queue-test test.cpp)

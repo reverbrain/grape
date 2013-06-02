@@ -55,21 +55,30 @@ void ioremap::grape::queue::push(const ioremap::elliptics::data_pointer &d)
 	m_stat.push_count++;
 }
 
-ioremap::elliptics::data_pointer ioremap::grape::queue::pop(void)
+ioremap::grape::data_array ioremap::grape::queue::pop(int num)
 {
-	ioremap::elliptics::data_pointer d;
+	ioremap::grape::data_array ret;
 
-	while (true) {
+	while (num > 0) {
 		auto ch = m_chunks.find(m_stat.chunk_id_pop);
 		if (ch == m_chunks.end())
 			break;
 
-		d = ch->second->pop();
+		ioremap::grape::data_array d;
+
+		d = ch->second->pop(num);
 		if (!d.empty()) {
-			m_stat.pop_count++;
+			num -= d.sizes().size();
+			m_stat.pop_count += d.sizes().size();
+
 			update_indexes();
 
-			break;
+			ret.append(d);
+
+			if (!num)
+				break;
+
+			continue;
 		}
 
 		if (m_stat.chunk_id_pop == m_stat.chunk_id_push)
@@ -85,7 +94,7 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::pop(void)
 		update_indexes();
 	}
 
-	return d;
+	return ret;
 }
 
 struct ioremap::grape::queue_stat ioremap::grape::queue::stat(void)
