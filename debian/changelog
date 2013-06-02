@@ -1,3 +1,9 @@
+grape (0.6.19) unstable; urgency=low
+
+  * Implemented new queue::pop(int num) API
+
+ -- Evgeniy Polyakov <zbr@ioremap.net>  Mon, 03 Jun 2013 01:10:55 +0400
+
 grape (0.6.18) unstable; urgency=low
 
   * Use std::string instead of data_pointer
