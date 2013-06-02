@@ -8,7 +8,7 @@ FILE (READ "${CMAKE_CURRENT_SOURCE_DIR}/debian/changelog" DEBCHANGELOG)
 string(REGEX MATCH "([0-9]+\\.[0-9]+\\.[0-9]+)" DEBFULLVERSION "${DEBCHANGELOG}")
 STRING (REGEX MATCH "([0-9]+\\.[0-9]+)" grape_VERSION_MAJOR "${DEBFULLVERSION}")
 STRING (REGEX MATCH "([0-9]+$)" grape_VERSION_MINOR "${DEBFULLVERSION}")
-set(${grape_VERSION} "${grape_VERSION_MAJOR}.${grape_VERSION_MINOR}")
+set(grape_VERSION "${grape_VERSION_MAJOR}.${grape_VERSION_MINOR}")
 
 find_package(Boost REQUIRED system program_options)
 
@@ -34,6 +34,7 @@ install(DIRECTORY include/ DESTINATION include)
 
 include_directories(${PROJECT_SOURCE_DIR}/include ${elliptics_INCLUDE_DIRS} ${CocaineNative_INCLUDE_DIRS} ${LIBEV_INCLUDE_DIRS})
 
+add_subdirectory(src/data_array)
 add_subdirectory(src/queue)
 add_subdirectory(src/driver)
 add_subdirectory(src/testerhead-cpp)

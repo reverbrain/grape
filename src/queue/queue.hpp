@@ -2,6 +2,7 @@
 #define __QUEUE_HPP
 
 #include "grape/elliptics_client_state.hpp"
+#include "grape/data_array.hpp"
 
 #include <msgpack.hpp>
 
@@ -11,26 +12,6 @@
 #include <map>
 
 namespace ioremap { namespace grape {
-
-class data_array {
-	public:
-		static data_array deserialize(const elliptics::data_pointer &d);
-
-		void append(const char *data, size_t size);
-		void append(const data_array &d);
-
-		const std::vector<int> &sizes(void) const;
-		const std::string &data(void) const;
-
-		bool empty(void) const;
-
-		elliptics::data_pointer serialize(void);
-
-		MSGPACK_DEFINE(m_size, m_data);
-	private:
-		std::vector<int>	m_size;
-		std::string		m_data;
-};
 
 struct chunk_entry {
 	int		size;
