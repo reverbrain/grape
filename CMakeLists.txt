@@ -20,6 +20,7 @@ find_package(Cocaine REQUIRED)
 
 include(cmake/Modules/locate_library.cmake)
 locate_library(LIBEV "ev++.h" "ev" "libev")
+locate_library(MSGPACK "msgpack.hpp" "msgpack")
 
 set(GRAPE_COMMON_LIBRARIES
 	${elliptics_cpp_LIBRARY}

@@ -53,3 +53,16 @@ elliptics::data_pointer data_array::serialize(void)
 
 	return elliptics::data_pointer::copy(sbuf.data(), sbuf.size());
 }
+
+data_array data_array::deserialize(const elliptics::data_pointer &d)
+{
+	msgpack::unpacked msg;
+        msgpack::unpack(&msg, (const char *)d.data(), d.size());
+ 
+        msgpack::object obj = msg.get();
+	data_array array;
+
+	obj.convert(&array);
+
+       return array;	
+}

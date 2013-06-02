@@ -14,6 +14,8 @@ namespace ioremap { namespace grape {
 
 class data_array {
 	public:
+		static data_array deserialize(const elliptics::data_pointer &d);
+
 		void append(const char *data, size_t size);
 		void append(const data_array &d);
 

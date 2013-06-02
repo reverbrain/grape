@@ -24,6 +24,13 @@ int main(int argc, char *argv[])
 			std::cout << ">> " << d.data().substr(pos, sz) << std::endl;
 			pos += sz;
 		}
+
+		ioremap::grape::data_array copy = ioremap::grape::data_array::deserialize(d.serialize());
+		pos = 0;
+		for (auto sz : copy.sizes()) {
+			std::cout << "copy >> " << d.data().substr(pos, sz) << std::endl;
+			pos += sz;
+		}
 	}
 
 	std::string end = "at the end (test push/pop in the same chunk)";
