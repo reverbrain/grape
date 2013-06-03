@@ -143,8 +143,7 @@ void queue_driver::get_more_data()
 
 
 		std::shared_ptr<queue_request> req = std::make_shared<queue_request>();
-		req->total = num / step;
-		req->success = 0;
+		req->num = num / step;
 
 		req->id.type = 0;
 		req->id.group_id = 0;
@@ -154,20 +153,20 @@ void queue_driver::get_more_data()
 
 		sess.set_groups(m_queue_groups);
 
-		queue_inc(req->total);
+		queue_inc(1);
 
-		std::string diff = lexical_cast(req->total);
+		std::string strnum = lexical_cast(req->num);
 
 		sess.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
-		sess.exec(&req->id, m_queue_src_key, m_queue_pop_event, diff).connect(
+		sess.exec(&req->id, m_queue_src_key, m_queue_pop_event, strnum).connect(
 			std::bind(&queue_driver::on_queue_request_data, this, req, std::placeholders::_1),
 			std::bind(&queue_driver::on_queue_request_complete, this, req, std::placeholders::_1)
 		);
 
 		++m_queue_src_key;
 
-		COCAINE_LOG_INFO(m_log, "%s: %s: pop request has been sent: queue-len: %d/%d",
-				m_queue_name.c_str(), dnet_dump_id(&req->id), m_queue_length, m_queue_length_max);
+		COCAINE_LOG_INFO(m_log, "%s: %s: pop request has been sent: requested number of events: %d, queue-len: %d/%d",
+				m_queue_name.c_str(), dnet_dump_id(&req->id), req->num, m_queue_length, m_queue_length_max);
 	}
 }
 
@@ -190,9 +189,8 @@ void queue_driver::on_queue_request_data(std::shared_ptr<queue_request> req, con
 		if (!context.data().empty())
 			process_data(context.data());
 
-		COCAINE_LOG_INFO(m_log, "%s: %s: processed popped data: size: %d, events: %d/%d",
-				m_queue_name.c_str(), dnet_dump_id(&req->id), context.data().size(),
-				req->success, req->total);
+		COCAINE_LOG_INFO(m_log, "%s: %s: processed popped data: size: %d",
+				m_queue_name.c_str(), dnet_dump_id(&req->id), context.data().size());
 
 	} catch(const std::exception &e) {
 		COCAINE_LOG_ERROR(m_log, "%s: exception: %s", m_queue_name.c_str(), e.what());
@@ -202,15 +200,13 @@ void queue_driver::on_queue_request_data(std::shared_ptr<queue_request> req, con
 void queue_driver::on_queue_request_complete(std::shared_ptr<queue_request> req, const ioremap::elliptics::error_info &error)
 {
 	if (error) {
-		COCAINE_LOG_ERROR(m_log, "%s: %s: queue request completion error: %s, events: %d/%d",
-				m_queue_name.c_str(), dnet_dump_id(&req->id), error.message().c_str(),
-				req->success, req->total);
+		COCAINE_LOG_ERROR(m_log, "%s: %s: queue request completion error: %s",
+				m_queue_name.c_str(), dnet_dump_id(&req->id), error.message().c_str());
 	} else {
-		COCAINE_LOG_INFO(m_log, "%s: %s: queue request completed: events: %d/%d",
-				m_queue_name.c_str(), dnet_dump_id(&req->id), req->success, req->total);
+		COCAINE_LOG_INFO(m_log, "%s: %s: queue request completed", m_queue_name.c_str(), dnet_dump_id(&req->id));
 	}
 
-	queue_dec(req->total - req->success);
+	queue_dec(1);
 }
 
 bool queue_driver::process_data(const ioremap::elliptics::data_pointer &data)
