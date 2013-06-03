@@ -132,7 +132,8 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		}
 
 		ioremap::grape::data_array d = m_queue->pop(num);
-		m_rate_pop.update(d.sizes().size());
+		if (!d.empty())
+			m_rate_pop.update(d.sizes().size());
 
 		if (d.empty()) {
 			m_queue->final(context, ioremap::elliptics::data_pointer());
