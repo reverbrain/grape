@@ -33,13 +33,11 @@ struct rate_stat
 	}
 
 	void update(size_t num) {
-		for (size_t i = 0; i < num; ++i) {
-			uint64_t now = microseconds_now();
-			double elapsed = double(now - last_update) / 1000000; // in seconds
-			double alpha = (elapsed > 1.0) ? 1.0 : elapsed;
-			avg = exponential_moving_average(avg, (1.0 / elapsed), alpha);
-			last_update = now;
-		}
+		uint64_t now = microseconds_now();
+		double elapsed = double(now - last_update) / 1000000; // in seconds
+		double alpha = (elapsed > 1.0) ? 1.0 : elapsed;
+		avg = exponential_moving_average(avg, ((double)num / elapsed), alpha);
+		last_update = now;
 	}
 
 	double get() {
