@@ -8,6 +8,7 @@ set_target_properties(queue-driver PROPERTIES
 target_link_libraries(queue-driver
 	${elliptics_cpp_LIBRARIES}
 	${Cocaine_LIBRARIES}
+	grape_data_array
 )
 
 install(TARGETS queue-driver
