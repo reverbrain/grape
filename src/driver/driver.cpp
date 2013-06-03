@@ -189,19 +189,8 @@ void queue_driver::on_queue_request_data(std::shared_ptr<queue_request> req, con
 		// But every time when we actually got data we have to postpone idle timer.
 
 		ioremap::elliptics::exec_context context = result.context();
-		if (!context.data().empty()) {
-			grape::data_array ret = grape::data_array::deserialize(context.data());
-			size_t pos = 0;
-			for (auto sz : ret.sizes()) {
-				queue_dec(1);
-
-				req->success++;
-				m_total++;
-
-				process_data(ret.data().substr(pos, sz));
-				pos += sz;
-			}
-		}
+		if (!context.data().empty())
+			process_data(context.data());
 
 		COCAINE_LOG_INFO(m_log, "%s: %s: processed popped data: size: %d, events: %d/%d",
 				m_queue_name.c_str(), dnet_dump_id(&req->id), context.data().size(),
