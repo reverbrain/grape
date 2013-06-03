@@ -114,6 +114,8 @@ class queue_driver: public api::driver_t {
 
 		std::atomic_int m_queue_src_key;
 
+		long m_total;
+
 		friend class downstream_t;
 };
 
