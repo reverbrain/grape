@@ -56,8 +56,7 @@ m_timeout(args.get("timeout", 0.0f).asDouble()),
 m_deadline(args.get("deadline", 0.0f).asDouble()),
 m_queue_length(0),
 m_queue_length_max(0),
-m_queue_src_key(0),
-m_total(0)
+m_queue_src_key(0)
 {
 	COCAINE_LOG_INFO(m_log, "%s: driver starts", m_queue_name.c_str());
 
@@ -114,7 +113,6 @@ Json::Value queue_driver::info() const
 
 	result["type"] = "persistent-queue";
 	result["name"] = m_queue_name;
-	result["queue-stats"]["total-processed"] = (Json::Value::UInt64)m_total;
 	result["queue-stats"]["inserted"] = (int)m_queue_length;
 	result["queue-stats"]["max-length"] = (int)m_queue_length_max;
 
@@ -131,8 +129,8 @@ void queue_driver::on_idle_timer_event(ev::timer &, int)
 
 void queue_driver::get_more_data()
 {
-	COCAINE_LOG_INFO(m_log, "%s: more-data: checking queue: queue-len: %d/%d, total: %ld",
-			m_queue_name.c_str(), m_queue_length, m_queue_length_max, m_total);
+	COCAINE_LOG_INFO(m_log, "%s: more-data: checking queue: queue-len: %d/%d",
+			m_queue_name.c_str(), m_queue_length, m_queue_length_max);
 
 	int num = m_queue_length_max - m_queue_length;
 	if (num < 100)
