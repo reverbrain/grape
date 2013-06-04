@@ -141,7 +141,7 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 		m_chunk_data = ioremap::elliptics::data_pointer::copy(tmp.data(), tmp.size());
 	}
 
-	m_session_data.write_data(m_data_key, d, 0).wait();
+	m_session_data.write_data(m_data_key, d, 0);
 	m_stat.write_data_async++;
 
 	bool full = m_chunk.push(d.size());
