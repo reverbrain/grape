@@ -143,7 +143,7 @@ void queue_driver::get_more_data()
 
 
 		std::shared_ptr<queue_request> req = std::make_shared<queue_request>();
-		req->num = num / step;
+		req->num = 1000;
 
 		req->id.type = 0;
 		req->id.group_id = 0;
