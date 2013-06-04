@@ -122,7 +122,7 @@ ioremap::grape::chunk::~chunk()
 
 void ioremap::grape::chunk::write_chunk(void)
 {
-	m_session_ctl.write_data(m_ctl_key, ioremap::elliptics::data_pointer::from_raw(m_chunk.data()), 0).wait();
+	m_session_ctl.write_data(m_ctl_key, ioremap::elliptics::data_pointer::from_raw(m_chunk.data()), 0);
 	m_stat.write_ctl_async++;
 }
 
@@ -138,7 +138,8 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 	m_stat.write_data_async++;
 
 	bool full = m_chunk.push(d.size());
-	write_chunk();
+	if (full)
+		write_chunk();
 
 	m_stat.push++;
 	return full;
@@ -147,12 +148,14 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 {
 	ioremap::grape::data_array ret;
-	bool already_read = false;
 
 	try {
 		while (num > 0) {
 			if (m_pop_position >= m_chunk_data.size()) {
-				if (already_read)
+				// if chunk has at least something, it is already in the ram
+				// no need to read it again, we dried it already
+
+				if (m_chunk.used())
 					break;
 
 				m_chunk_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
@@ -167,8 +170,6 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 				for (int i = 0; i < m_chunk.acked(); ++i)
 					m_pop_position += m_chunk[i].size;
 
-				already_read = true;
-
 #if 0
 				std::cout << "chunk read: data-key: " << m_data_key.to_string() <<
 					", ctl-key: " << m_ctl_key.to_string() <<
@@ -179,11 +180,10 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 					": " << m_chunk_data.skip(m_pop_position).to_string() <<
 					std::endl;
 #endif
+				// we read chunk from the storage, but it is 'dry' - just give it up
+				if ((m_chunk.acked() >= m_chunk.used()) || (m_pop_position >= m_chunk_data.size()))
+					break;
 			}
-
-			// chunk has been completely sucked out
-			if ((m_chunk.acked() >= m_chunk.used()) || (m_pop_position >= m_chunk_data.size()))
-				break;
 
 			int size = m_chunk[m_chunk.acked()].size;
 
@@ -196,9 +196,13 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 
 			m_stat.pop++;
 
-			write_chunk();
-
 			m_pop_position += size;
+
+			// chunk has been completely sucked out, update it in the storage
+			if ((m_chunk.acked() >= m_chunk.used()) || (m_pop_position >= m_chunk_data.size())) {
+				write_chunk();
+				break;
+			}
 		}
 	} catch (const ioremap::elliptics::not_found_error &err) {
 		/*
