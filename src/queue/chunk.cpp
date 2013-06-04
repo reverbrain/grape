@@ -9,8 +9,6 @@ m_ptr(NULL)
 	m_ptr = (struct chunk_disk *)m_chunk.data();
 	
 	m_ptr->max = max;
-
-	//std::cout << "new chunk: max: " << max << std::endl;
 }
 
 bool ioremap::grape::chunk_ctl::push(int size)
@@ -101,7 +99,7 @@ m_chunk(max)
 		m_chunk.assign((char *)d.data(), d.size());
 
 		m_stat.read++;
-#if 0
+#ifdef QUEUE_STDOUT_DEBUG
 		std::cout << "constructor: chunk read: data-key: " << m_data_key.to_string() <<
 			", ctl-key: " << m_ctl_key.to_string() <<
 			", chunk-size: " << m_chunk_data.size() <<
@@ -118,6 +116,7 @@ m_chunk(max)
 
 ioremap::grape::chunk::~chunk()
 {
+	write_chunk();
 }
 
 void ioremap::grape::chunk::write_chunk(void)
@@ -134,7 +133,15 @@ void ioremap::grape::chunk::remove(void)
 
 bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 {
-	auto async_data = m_session_data.write_data(m_data_key, d, 0);
+	// if given chunk already has some cached data, update it too
+	if (m_chunk_data.size()) {
+		std::string tmp = m_chunk_data.to_string();
+		tmp += d.to_string();
+
+		m_chunk_data = ioremap::elliptics::data_pointer::copy(tmp.data(), tmp.size());
+	}
+
+	m_session_data.write_data(m_data_key, d, 0).wait();
 	m_stat.write_data_async++;
 
 	bool full = m_chunk.push(d.size());
@@ -151,11 +158,24 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 
 	try {
 		while (num > 0) {
+#ifdef QUEUE_STDOUT_DEBUG
+			std::cout << "first check: data-key: " << m_data_key.to_string() <<
+				", ctl-key: " << m_ctl_key.to_string() <<
+				", chunk-size: " << m_chunk_data.size() <<
+				", used: " << m_chunk.used() <<
+				", acked: " << m_chunk.acked() <<
+				", m_pop_position: " << m_pop_position <<
+				std::endl;
+#endif
+			// if there is data, and acked (pop) >= used (push), then chunk is already fully read,
+			// do not try to squize more out of it
+			if (m_chunk.used() && m_chunk.acked() >= m_chunk.used())
+				break;
+
 			if (m_pop_position >= m_chunk_data.size()) {
 				// if chunk has at least something, it is already in the ram
 				// no need to read it again, we dried it already
-
-				if (m_chunk.used())
+				if (m_chunk.used() && m_chunk_data.size())
 					break;
 
 				m_chunk_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
@@ -170,7 +190,7 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 				for (int i = 0; i < m_chunk.acked(); ++i)
 					m_pop_position += m_chunk[i].size;
 
-#if 0
+#ifdef QUEUE_STDOUT_DEBUG
 				std::cout << "chunk read: data-key: " << m_data_key.to_string() <<
 					", ctl-key: " << m_ctl_key.to_string() <<
 					", chunk-size: " << m_chunk_data.size() <<

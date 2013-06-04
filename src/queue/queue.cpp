@@ -83,11 +83,7 @@ ioremap::grape::data_array ioremap::grape::queue::pop(int num)
 
 			continue;
 		}
-#if 0
-		std::cout << "pop-id: " << m_stat.chunk_id_pop <<
-			", push-id: " << m_stat.chunk_id_push <<
-			std::endl;
-#endif
+
 		if (m_stat.chunk_id_pop == m_stat.chunk_id_push)
 			break;
 
