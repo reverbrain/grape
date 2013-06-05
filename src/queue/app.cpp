@@ -72,6 +72,7 @@ m_id(id),
 m_log(service_manager->get_system_logger())
 {
 }
+
 queue_app_context::~queue_app_context()
 {
 }
