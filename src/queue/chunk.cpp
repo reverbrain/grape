@@ -182,9 +182,9 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 				if (m_chunk.used() == 0) {
 					ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
 					m_chunk.assign((char *)d.data(), d.size());
-
-					m_stat.read++;
 				}
+
+				m_stat.read++;
 
 				m_pop_position = 0;
 				for (int i = 0; i < m_chunk.acked(); ++i)
