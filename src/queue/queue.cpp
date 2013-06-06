@@ -71,8 +71,6 @@ ioremap::grape::data_array ioremap::grape::queue::pop(int num)
 			num -= d.sizes().size();
 			m_stat.pop_count += d.sizes().size();
 
-			update_indexes();
-
 			ret.append(d);
 
 			if (!num)
