@@ -17,7 +17,8 @@
 	along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "driver.hpp"
+#include <stdlib.h>
+#include <time.h>
 
 #include <cocaine/context.hpp>
 #include <cocaine/logging.hpp>
@@ -33,10 +34,10 @@
 
 #include "grape/rapidjson/document.h"
 
-#include <stdlib.h>
-#include <time.h>
+#include <grape/data_array.hpp>
+#include <grape/entry_id.hpp>
 
-#include "grape/data_array.hpp"
+#include "driver.hpp"
 
 using namespace cocaine::driver;
 
@@ -50,7 +51,8 @@ m_src_key(0),
 m_idle_timer(reactor.native()),
 m_worker_event(args.get("emit", name).asString()),
 m_queue_name(args.get("source-queue-app", "queue").asString()),
-m_queue_pop_event(m_queue_name + "@pop-multiple-string"),
+m_queue_pop_event(m_queue_name + "@pop"),
+//m_queue_pop_event(m_queue_name + "@pop-multiple-string"),
 m_queue_ack_event(m_queue_name + "@ack"),
 m_timeout(args.get("timeout", 0.0f).asDouble()),
 m_deadline(args.get("deadline", 0.0f).asDouble()),
@@ -69,7 +71,6 @@ m_queue_src_key(0)
 		doc.Parse<0>(s.c_str());
 
 		m_client = elliptics_client_state::create(doc);
-
 		std::string groups_key = "groups";
 		if (doc.HasMember("queue-groups"))
 			groups_key = "queue-groups";
@@ -141,7 +142,6 @@ void queue_driver::get_more_data()
 	for (int i = 0; i < step; ++i) {
 		ioremap::elliptics::session sess = m_client.create_session();
 
-
 		std::shared_ptr<queue_request> req = std::make_shared<queue_request>();
 		req->num = m_queue_length_max / 10;
 
@@ -156,7 +156,6 @@ void queue_driver::get_more_data()
 		queue_inc(1);
 
 		std::string strnum = lexical_cast(req->num);
-
 		sess.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
 		sess.exec(&req->id, m_queue_src_key, m_queue_pop_event, strnum).connect(
 			std::bind(&queue_driver::on_queue_request_data, this, req, std::placeholders::_1),
@@ -186,14 +185,26 @@ void queue_driver::on_queue_request_data(std::shared_ptr<queue_request> req, con
 		// But every time when we actually got data we have to postpone idle timer.
 
 		ioremap::elliptics::exec_context context = result.context();
-		if (!context.data().empty())
-			process_data(context.data());
+		COCAINE_LOG_INFO(m_log, "%s-%s: data: size: %d", m_queue_name.c_str(), dnet_dump_id(&req->id), context.data().size());
 
-		COCAINE_LOG_INFO(m_log, "%s: %s: processed popped data: size: %d",
-				m_queue_name.c_str(), dnet_dump_id(&req->id), context.data().size());
+		if (!context.data().empty()) {
+			ioremap::grape::entry_id entry_id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
+			COCAINE_LOG_INFO(m_log, "%s-%s: id: %d-%d, size: %d", m_queue_name.c_str(), dnet_dump_id(&req->id),
+					entry_id.chunk, entry_id.pos,
+					context.data().size()
+					);
+
+			bool processed = process_data(context);
+
+			COCAINE_LOG_INFO(m_log, "%s-%s: id: %d-%d, size: %d, processed %d", m_queue_name.c_str(), dnet_dump_id(&req->id),
+					entry_id.chunk, entry_id.pos,
+					context.data().size(),
+					processed
+					);
+		}
 
 	} catch(const std::exception &e) {
-		COCAINE_LOG_ERROR(m_log, "%s: exception: %s", m_queue_name.c_str(), e.what());
+		COCAINE_LOG_ERROR(m_log, "%s-%s: exception: %s", m_queue_name.c_str(), dnet_dump_id(&req->id), e.what());
 	}
 }
 
@@ -209,33 +220,23 @@ void queue_driver::on_queue_request_complete(std::shared_ptr<queue_request> req,
 	queue_dec(1);
 }
 
-bool queue_driver::process_data(const ioremap::elliptics::data_pointer &data)
+bool queue_driver::process_data(const ioremap::elliptics::exec_context &context)
 {
 	// Pass data to the worker, return it back to the local queue if failed.
 
 	try {
-		auto downstream = std::make_shared<downstream_t>(this, data);
-
-		std::string raw_data;
-		raw_data.resize(sizeof(struct sph) + m_worker_event.size() + data.size());
-
-		struct sph *sph = (struct sph *)raw_data.data();
-		sph->flags = DNET_SPH_FLAGS_SRC_BLOCK;
-		sph->src_key = m_src_key++;
-		sph->event_size = m_worker_event.size();
-		sph->data_size = data.size();
-
-		memcpy(sph + 1, m_worker_event.data(), sph->event_size);
-		memcpy(((char *)(sph + 1)) + sph->event_size, data.data(), sph->data_size);
+		auto downstream = std::make_shared<downstream_t>(this, context.data());
 
 		// this map should be used to store iteration counter
 		//m_events.insert(std::make_pair(static_cast<const int>(sph->src_key), data.to_string()));
 
+		ioremap::elliptics::data_pointer packet = context.self();
 		api::policy_t policy(false, m_timeout, m_deadline);
 		auto upstream = m_app.enqueue(api::event_t(m_worker_event, policy), downstream);
-		upstream->write(raw_data.data(), raw_data.size());
+		upstream->write((char *)packet.data(), packet.size());
 
 		return true;
+
 	} catch (const cocaine::error_t &e) {
 		COCAINE_LOG_ERROR(m_log, "%s: enqueue failed: %s: queue-len: %d/%d",
 				m_queue_name.c_str(), e.what(),

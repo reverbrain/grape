@@ -8,6 +8,7 @@
 
 namespace {
 
+
 template <unsigned N>
 double approx_moving_average(double avg, double input) {
 	avg -= avg/N;
@@ -62,15 +63,19 @@ class queue_app_context : public cocaine::framework::application<queue_app_conte
 		std::shared_ptr<cocaine::framework::logger_t> m_log;
 		std::shared_ptr<ioremap::grape::queue> m_queue;
 
-		rate_stat m_rate_push;
-		rate_stat m_rate_pop;
+		rate_stat m_push_rate;
+		rate_stat m_pop_rate;
+		rate_stat m_ack_rate;
 };
 
-queue_app_context::queue_app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager):
-application<queue_app_context>(id, service_manager),
-m_id(id),
-m_log(service_manager->get_system_logger())
+queue_app_context::queue_app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager)
+	: application<queue_app_context>(id, service_manager)
+	, m_id(id)
+	, m_log(service_manager->get_system_logger())
 {
+	//FIXME: pass logger explicitly everywhere
+	extern void grape_queue_module_set_logger(std::shared_ptr<cocaine::framework::logger_t>);
+	grape_queue_module_set_logger(m_log);
 }
 
 queue_app_context::~queue_app_context()
@@ -79,6 +84,7 @@ queue_app_context::~queue_app_context()
 
 void queue_app_context::initialize()
 {
+	// register event handlers
 	on_unregistered(&queue_app_context::process);
 }
 
@@ -94,59 +100,85 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		event.assign(p + 1);
 	}
 
-	sph *s = (sph *)chunks[0].c_str();
-
 	COCAINE_LOG_INFO(m_log, "%s: %s: event: %s, size: %ld",
-			m_id.c_str(), dnet_dump_id_str(s->src.id), event.c_str(), context.data().size());
+			m_id.c_str(), dnet_dump_id_str(context.src_id()->id), event.c_str(), context.data().size());
 
 	if (!m_queue && event != "configure")
-		ioremap::elliptics::throw_error(-EINVAL, "Worker '%s' is not configured", m_id.c_str());
+		ioremap::elliptics::throw_error(-EINVAL, "worker '%s' is not configured", m_id.c_str());
 
 	if (event == "ping") {
 		m_queue->final(context, std::string("ok"));
+
 	} else if (event == "configure") {
 		if (!m_queue) {
 			m_id = context.data().to_string() + "-" + m_id;
-			m_queue.reset(new ioremap::grape::queue("queue.conf", m_id));
+			
+			// creating the queue
+			m_queue.reset(new ioremap::grape::queue(m_id, service_manager()->get_reactor_native()));
+			m_queue->initialize("queue.conf");
+
 			m_queue->final(context, std::string(m_id + ": configured"));
 			COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured", m_id.c_str());
 		} else {
 			m_queue->final(context, std::string(m_id + ": is already configured"));
 			COCAINE_LOG_INFO(m_log, "%s: queue is already configured", m_id.c_str());
 		}
+
 	} else if (event == "push") {
 		ioremap::elliptics::data_pointer d = context.data();
 		// skip adding zero length data, because there is no value in that
 		// queue has no method to request size and we can use zero reply in pop
 		// to indicate queue emptiness
-		if (d.size()) {
+		if (!d.empty()) {
 			m_queue->push(d);
-			m_rate_push.update(1);
+			m_push_rate.update(1);
 		}
+		m_queue->final(context, ioremap::elliptics::data_pointer());
 
-		m_queue->final(context, std::string(m_id + ": ack"));
-	} else if ((event == "pop") || (event == "pop-multiple-string")) {
-		int num = 1;
-
-		if (event == "pop-multiple-string") {
-			num = atoi(context.data().to_string().c_str());
-		}
+	} else if (event == "pop-multiple-string") {
+		int num = atoi(context.data().to_string().c_str());
 
 		ioremap::grape::data_array d = m_queue->pop(num);
-		if (!d.empty())
-			m_rate_pop.update(d.sizes().size());
-
-		if (d.empty()) {
-			m_queue->final(context, ioremap::elliptics::data_pointer());
-		} else if (event == "pop-multiple-string") {
+		if (!d.empty()) {
 			m_queue->final(context, d.serialize());
+			m_pop_rate.update(d.sizes().size());
 		} else {
-			m_queue->final(context, d.data());
+			m_queue->final(context, ioremap::elliptics::data_pointer());
 		}
 
 		COCAINE_LOG_INFO(m_log, "%s: %s: completed event: %s, size: %ld, popped: %d/%d (multiple: '%s')",
-				m_id.c_str(), dnet_dump_id_str(s->src.id), event.c_str(), context.data().size(), d.sizes().size(), num,
+				m_id.c_str(), dnet_dump_id_str(context.src_id()->id), event.c_str(), context.data().size(), d.sizes().size(), num,
 				context.data().to_string().c_str());
+
+	} else if (event == "pop") {
+		m_queue->final(context, m_queue->pop());
+		m_pop_rate.update(1);
+
+	} else if (event == "peek") {
+		ioremap::grape::entry_id entry_id;
+		ioremap::elliptics::data_pointer d = m_queue->peek(&entry_id);
+
+		COCAINE_LOG_INFO(m_log, "peeked entry: %d-%d: (%ld)'%s'", entry_id.chunk, entry_id.pos, d.size(), d.to_string());
+
+		// embed entry id directly into sph of the reply
+		dnet_raw_id *src = context.src_id();
+		memcpy(&src->id[DNET_ID_SIZE - sizeof(entry_id)], &entry_id, sizeof(entry_id));
+
+		m_queue->final(context, d);
+
+		m_pop_rate.update(1);
+
+	} else if (event == "ack") {
+		ioremap::elliptics::data_pointer d = context.data();
+		ioremap::grape::entry_id entry_id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
+
+		COCAINE_LOG_INFO(m_log, "ack entry: %d-%d", entry_id.chunk, entry_id.pos);
+
+		m_queue->ack(entry_id);
+		m_queue->final(context, ioremap::elliptics::data_pointer());
+
+		m_ack_rate.update(1);
+
 	} else if (event == "stats") {
 		rapidjson::StringBuffer stream;
 		rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(stream);
@@ -162,19 +194,18 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 
 		root.AddMember("queue_id", name, root.GetAllocator());
 		root.AddMember("ack.count", st.ack_count, root.GetAllocator());
-		root.AddMember("fail.count", st.fail_count, root.GetAllocator());
+		root.AddMember("ack.rate", m_ack_rate.get(), root.GetAllocator());
+		root.AddMember("timeout.count", st.timeout_count, root.GetAllocator());
 		root.AddMember("pop.count", st.pop_count, root.GetAllocator());
-		root.AddMember("pop.rate", m_rate_pop.get(), root.GetAllocator());
+		root.AddMember("pop.rate", m_pop_rate.get(), root.GetAllocator());
 		root.AddMember("push.count", st.push_count, root.GetAllocator());
-		root.AddMember("push.rate", m_rate_push.get(), root.GetAllocator());
+		root.AddMember("push.rate", m_push_rate.get(), root.GetAllocator());
 		root.AddMember("push-id", st.chunk_id_push, root.GetAllocator());
 		root.AddMember("pop-id", st.chunk_id_pop, root.GetAllocator());
 		root.AddMember("update_indexes", st.update_indexes, root.GetAllocator());
 
 		root.AddMember("chunks_popped.write_data_async", st.chunks_popped.write_data_async, root.GetAllocator());
-		root.AddMember("chunks_popped.write_data_sync", st.chunks_popped.write_data_sync, root.GetAllocator());
 		root.AddMember("chunks_popped.write_ctl_async", st.chunks_popped.write_ctl_async, root.GetAllocator());
-		root.AddMember("chunks_popped.write_ctl_sync", st.chunks_popped.write_ctl_sync, root.GetAllocator());
 		root.AddMember("chunks_popped.read", st.chunks_popped.read, root.GetAllocator());
 		root.AddMember("chunks_popped.remove", st.chunks_popped.remove, root.GetAllocator());
 		root.AddMember("chunks_popped.push", st.chunks_popped.push, root.GetAllocator());
@@ -182,9 +213,7 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		root.AddMember("chunks_popped.ack", st.chunks_popped.ack, root.GetAllocator());
 
 		root.AddMember("chunks_pushed.write_data_async", st.chunks_pushed.write_data_async, root.GetAllocator());
-		root.AddMember("chunks_pushed.write_data_sync", st.chunks_pushed.write_data_sync, root.GetAllocator());
 		root.AddMember("chunks_pushed.write_ctl_async", st.chunks_pushed.write_ctl_async, root.GetAllocator());
-		root.AddMember("chunks_pushed.write_ctl_sync", st.chunks_pushed.write_ctl_sync, root.GetAllocator());
 		root.AddMember("chunks_pushed.read", st.chunks_pushed.read, root.GetAllocator());
 		root.AddMember("chunks_pushed.remove", st.chunks_pushed.remove, root.GetAllocator());
 		root.AddMember("chunks_pushed.push", st.chunks_pushed.push, root.GetAllocator());
@@ -197,13 +226,14 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		text.assign(stream.GetString(), stream.GetSize());
 
 		m_queue->final(context, text);
+
 	} else {
 		std::string msg = event + ": unknown event";
 		m_queue->final(context, msg);
 	}
 
 	COCAINE_LOG_INFO(m_log, "%s: %s: completed event: %s, size: %ld",
-			m_id.c_str(), dnet_dump_id_str(s->src.id), event.c_str(), context.data().size());
+			m_id.c_str(), dnet_dump_id_str(context.src_id()->id), event.c_str(), context.data().size());
 
 	return "";
 }

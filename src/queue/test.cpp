@@ -4,7 +4,8 @@
 
 int main(int argc, char *argv[])
 {
-	ioremap::grape::queue q("queue.conf", "test-queue-id");
+	ioremap::grape::queue q("test-queue-id");
+	q.initialize("queue.conf");
 
 	for (int i = 0; i < 10; ++i) {
 		std::string data = "this is a test: " + lexical_cast(i);
@@ -35,7 +36,6 @@ int main(int argc, char *argv[])
 
 	std::string end = "at the end (test push/pop in the same chunk)";
 	q.push(end);
-
 	std::cout << "going to pop final message" << std::endl;
 	std::cout << end << " : " << q.pop(10).data() << std::endl;
 }

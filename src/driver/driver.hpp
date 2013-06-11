@@ -45,7 +45,7 @@ class queue_driver: public api::driver_t {
 			~downstream_t();
 
 			virtual void write(const char *data, size_t size);
-			virtual void error(int, const std::string &message);
+			virtual void error(int code, const std::string &message);
 			virtual void close();
 
 			queue_driver *m_queue;
@@ -76,7 +76,6 @@ class queue_driver: public api::driver_t {
 		cocaine::context_t& m_context;
 		cocaine::app_t& m_app;
 		std::shared_ptr<cocaine::logging::log_t> m_log;
-
 		elliptics_client_state m_client;
 		std::atomic_int m_src_key;
 		std::map<int, std::string> m_events;
@@ -87,7 +86,7 @@ class queue_driver: public api::driver_t {
 		void on_queue_request_data(std::shared_ptr<queue_request> req, const ioremap::elliptics::exec_result_entry &result);
 		void on_queue_request_complete(std::shared_ptr<queue_request> req, const ioremap::elliptics::error_info &error);
 
-		bool process_data(const ioremap::elliptics::data_pointer &data);
+		bool process_data(const ioremap::elliptics::exec_context &context);
 
 	private:
 		struct data_pointer_comparator_t {

@@ -2,7 +2,8 @@
 #include <cocaine/framework/application.hpp>
 #include <cocaine/framework/worker.hpp>
 
-#include "grape/elliptics_client_state.hpp"
+#include <grape/elliptics_client_state.hpp>
+#include <grape/entry_id.hpp>
 
 using namespace ioremap::elliptics;
 
@@ -17,6 +18,7 @@ public:
     
 	// reply delay, in milliseconds
 	int _delay;
+	std::string _queue_ack_event;
 
 	app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
 	void initialize();
@@ -32,6 +34,7 @@ app_context::app_context(const std::string &id, std::shared_ptr<cocaine::framewo
 	COCAINE_LOG_INFO(m_log, "application start: %s", id.c_str());
 
 	_delay = 0;
+	_queue_ack_event = "queue@ack";
 }
 
 void app_context::initialize()
@@ -42,10 +45,12 @@ void app_context::initialize()
 		rapidjson::Document doc;
 		_elliptics_client_state = elliptics_client_state::create("testerhead-cpp.conf", doc);
 
-
-		_delay = 0;
-		if (doc.HasMember("delay"))
+		if (doc.HasMember("delay")) {
 			_delay = doc["delay"].GetInt() * 1000;
+		}
+		if (doc.HasMember("queue-ack-event")) {
+			_queue_ack_event = doc["queue-ack-event"].GetString();
+		}
 	}
 
 	// register event handlers
@@ -68,7 +73,12 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		client.reply(context, d, exec_context::final);
 	};
 
-	COCAINE_LOG_INFO(m_log, "testerhead: event: '%s', data: '%s'", cocaine_event.c_str(), context.data().to_string().c_str());
+	ioremap::grape::entry_id id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
+	COCAINE_LOG_INFO(m_log, "event: '%s', entry: %d-%d, data: '%s'",
+			cocaine_event.c_str(),
+			id.chunk, id.pos,
+			context.data().to_string().c_str()
+			);
 
 	// std::string app;
 	// std::string event;
@@ -82,9 +92,27 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		usleep(_delay);
 	}
 
-	//reply(cocaine_event + ": completed");
+	// acking success
+//	if (m_ack_on_success) {
+		client.set_exceptions_policy(session::no_exceptions);
 
-	return "testerhead-cpp: return: " + context.data().to_string();
+		dnet_id queue_id;
+		dnet_setup_id(&queue_id, 0, context.src_id()->id);
+		queue_id.type = 0;
+
+		client.exec(&queue_id, _queue_ack_event, data_pointer()).connect(
+				async_result<exec_result_entry>::result_function(),
+				[m_log, id] (const error_info &error) {
+					if (error) {
+						COCAINE_LOG_ERROR(m_log, "entry %d-%d not acked", id.chunk, id.pos);
+					} else {
+						COCAINE_LOG_INFO(m_log, "entry %d-%d acked", id.chunk, id.pos);
+					}
+				}
+		);
+//	}
+
+	return "return: " + context.data().to_string();
 }
 
 int main(int argc, char **argv)

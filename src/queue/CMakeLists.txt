@@ -1,8 +1,8 @@
 add_library(queue STATIC queue.cpp chunk.cpp)
 target_link_libraries(queue ${GRAPE_COMMON_LIBRARIES} ${elliptics_LIBRARIES} grape_data_array)
 
-add_executable(queue-test test.cpp)
-target_link_libraries(queue-test queue ${GRAPE_COMMON_LIBRARIES} grape_data_array)
+#add_executable(queue-test test.cpp)
+#target_link_libraries(queue-test queue ${GRAPE_COMMON_LIBRARIES} grape_data_array)
 
 add_executable(queue-starter starter.cpp)
 target_link_libraries(queue-starter queue ${GRAPE_COMMON_LIBRARIES} ${elliptics_LIBRARIES})
