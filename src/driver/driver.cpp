@@ -42,25 +42,23 @@
 using namespace cocaine::driver;
 
 queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &reactor, cocaine::app_t &app,
-		const std::string& name, const Json::Value& args):
-category_type(context, reactor, app, name, args),
-m_context(context),
-m_app(app),
-m_log(new cocaine::logging::log_t(context, cocaine::format("driver/%s", name))),
-m_src_key(0),
-m_idle_timer(reactor.native()),
-m_worker_event(args.get("emit", name).asString()),
-m_queue_name(args.get("source-queue-app", "queue").asString()),
-m_queue_pop_event(m_queue_name + "@pop"),
-//m_queue_pop_event(m_queue_name + "@pop-multiple-string"),
-m_queue_ack_event(m_queue_name + "@ack"),
-m_timeout(args.get("timeout", 0.0f).asDouble()),
-m_deadline(args.get("deadline", 0.0f).asDouble()),
-m_queue_length(0),
-m_queue_length_max(0),
-m_queue_src_key(0)
+		const std::string& name, const Json::Value& args)
+	: category_type(context, reactor, app, name, args)
+	, m_context(context)
+	, m_app(app)
+	, m_log(new cocaine::logging::log_t(context, cocaine::format("driver/%s", name)))
+	, m_src_key(0)
+	, m_idle_timer(reactor.native())
+	, m_queue_name(args.get("source-queue-app", "queue").asString())
+	, m_worker_event(args.get("worker-emit-event", "emit").asString())
+	, m_queue_pop_event(m_queue_name + "@" + args.get("source-queue-pop-event", "pop-multiple-string").asString())
+	, m_timeout(args.get("timeout", 0.0f).asDouble())
+	, m_deadline(args.get("deadline", 0.0f).asDouble())
+	, m_queue_length(0)
+	, m_queue_length_max(0)
+	, m_queue_src_key(0)
 {
-	COCAINE_LOG_INFO(m_log, "%s: driver starts", m_queue_name.c_str());
+	COCAINE_LOG_INFO(m_log, "init: %s driver", m_queue_name.c_str());
 
 	srand(time(NULL));
 
@@ -78,8 +76,11 @@ m_queue_src_key(0)
 		const rapidjson::Value &groupsArray = doc[groups_key.c_str()];
 		std::transform(groupsArray.Begin(), groupsArray.End(), std::back_inserter(m_queue_groups),
 				std::bind(&rapidjson::Value::GetInt, std::placeholders::_1));
+
+		COCAINE_LOG_INFO(m_log, "init: elliptics client created");
+
 	} catch (const std::exception &e) {
-		COCAINE_LOG_INFO(m_log, "%s: driver constructor exception: %s", m_queue_name.c_str(), e.what());
+		COCAINE_LOG_ERROR(m_log, "init: %s driver constructor exception: %s", m_queue_name.c_str(), e.what());
 		throw;
 	}
 
@@ -101,6 +102,8 @@ m_queue_src_key(0)
 
 	m_idle_timer.set<queue_driver, &queue_driver::on_idle_timer_event>(this);
 	m_idle_timer.start(1.0f, 1.0f);
+
+	COCAINE_LOG_INFO(m_log, "init: %s driver started", m_queue_name.c_str());
 }
 
 queue_driver::~queue_driver()
@@ -185,18 +188,18 @@ void queue_driver::on_queue_request_data(std::shared_ptr<queue_request> req, con
 		// But every time when we actually got data we have to postpone idle timer.
 
 		ioremap::elliptics::exec_context context = result.context();
-		COCAINE_LOG_INFO(m_log, "%s-%s: data: size: %d", m_queue_name.c_str(), dnet_dump_id(&req->id), context.data().size());
+		COCAINE_LOG_INFO(m_log, "%s: %s: data: size: %d", m_queue_name.c_str(), dnet_dump_id(&req->id), context.data().size());
 
 		if (!context.data().empty()) {
 			ioremap::grape::entry_id entry_id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
-			COCAINE_LOG_INFO(m_log, "%s-%s: id: %d-%d, size: %d", m_queue_name.c_str(), dnet_dump_id(&req->id),
+			COCAINE_LOG_INFO(m_log, "%s: %s: id: %d-%d, size: %d", m_queue_name.c_str(), dnet_dump_id(&req->id),
 					entry_id.chunk, entry_id.pos,
 					context.data().size()
 					);
 
 			bool processed = process_data(context);
 
-			COCAINE_LOG_INFO(m_log, "%s-%s: id: %d-%d, size: %d, processed %d", m_queue_name.c_str(), dnet_dump_id(&req->id),
+			COCAINE_LOG_INFO(m_log, "%s: %s: id: %d-%d, size: %d, processed %d", m_queue_name.c_str(), dnet_dump_id(&req->id),
 					entry_id.chunk, entry_id.pos,
 					context.data().size(),
 					processed
@@ -204,7 +207,7 @@ void queue_driver::on_queue_request_data(std::shared_ptr<queue_request> req, con
 		}
 
 	} catch(const std::exception &e) {
-		COCAINE_LOG_ERROR(m_log, "%s-%s: exception: %s", m_queue_name.c_str(), dnet_dump_id(&req->id), e.what());
+		COCAINE_LOG_ERROR(m_log, "%s: %s: exception: %s", m_queue_name.c_str(), dnet_dump_id(&req->id), e.what());
 	}
 }
 

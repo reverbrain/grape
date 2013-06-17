@@ -60,10 +60,12 @@ void ioremap::grape::queue::initialize(const std::string &config)
 		LOG_INFO("init: no queue meta found, starting in pristine state");
 	}
 
+	// load metadata of existing chunk into memory
 	ioremap::elliptics::session tmp = m_client.create_session();
 	for (int i = m_stat.chunk_id_ack; i <= m_stat.chunk_id_push; ++i) {
 		auto p = std::make_shared<chunk>(tmp, m_queue_id, i, m_chunk_max);
 		m_chunks.insert(std::make_pair(i, p));
+		p->load_meta();
 	}
 
 	LOG_INFO("init: queue started");
@@ -73,9 +75,10 @@ void ioremap::grape::queue::push(const ioremap::elliptics::data_pointer &d)
 {
 	auto found = m_chunks.find(m_stat.chunk_id_push);
 	if (found == m_chunks.end()) {
+		// create new empty chunk
 		ioremap::elliptics::session tmp = m_client.create_session();
-		auto inserted = m_chunks.insert(std::make_pair(m_stat.chunk_id_push,
-					std::make_shared<chunk>(tmp, m_queue_id, m_stat.chunk_id_push, m_chunk_max)));
+		auto p = std::make_shared<chunk>(tmp, m_queue_id, m_stat.chunk_id_push, m_chunk_max);
+		auto inserted = m_chunks.insert(std::make_pair(m_stat.chunk_id_push, p));
 
 		found = inserted.first;
 	}
@@ -242,10 +245,66 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::pop()
 	return d;
 }
 
-//XXX: update bulk version of pop to sanity
 ioremap::grape::data_array ioremap::grape::queue::pop(int num)
 {
-	ioremap::grape::data_array d;
+	ioremap::grape::data_array d = peek(num);
+	if (!d.empty()) {
+		ack(d.ids());
+	}
+	return d;
+}
+
+ioremap::grape::data_array ioremap::grape::queue::peek(int num)
+{
+	ioremap::grape::data_array ret;
+
+	while (num > 0) {
+		auto found = m_chunks.begin();
+		if (found == m_chunks.end()) {
+			break;
+		}
+
+		int chunk_id = found->first;
+		auto chunk = found->second;
+
+		ioremap::grape::data_array d = chunk->pop(num);
+		LOG_INFO("chunk %d, popping %d entries", chunk_id, d.sizes().size());
+		if (!d.empty()) {
+			m_stat.pop_count += d.sizes().size();
+
+			ret.append(d);
+
+			// set or reset timeout timer for the chunk
+			{
+				auto inserted = m_wait_completion.insert(std::make_pair(chunk_id, wait_item(this, chunk_id, chunk)));
+				if (inserted.second) {
+					wait_item &w = inserted.first->second;
+					w.timeout.reset(new ev::timer(loop));
+					w.timeout->set(0.0, 5.0);
+					w.timeout->set<ioremap::grape::queue::wait_item, &ioremap::grape::queue::wait_item::on_timeout>(&w);
+				}
+				inserted.first->second.timeout->again();
+			}
+
+			break;
+		}
+
+		if (chunk_id == m_stat.chunk_id_push) {
+			break;
+		}
+
+		//FIXME: this could happen to be called many times for the same chunk
+		// (between queue restarts or because of chunk replaying)
+		chunk->add(&m_stat.chunks_popped);
+
+		LOG_INFO("chunk %d exhausted, dropped from the popping line", chunk_id);
+
+		// drop chunk from the pop list
+		m_chunks.erase(found);
+
+		update_indexes();
+	}
+
 /*
 	while (num > 0) {
 		auto ch = m_chunks.find(m_stat.chunk_id_pop);
@@ -283,7 +342,15 @@ ioremap::grape::data_array ioremap::grape::queue::pop(int num)
 		update_indexes();
 	}
 */
-	return d;
+	return ret;
+}
+
+void ioremap::grape::queue::ack(const std::vector<entry_id> &ids)
+{
+	for (auto i = ids.begin(); i != ids.end(); ++i) {
+		const entry_id &id = *i;
+		ack(id);
+	}
 }
 
 ioremap::grape::queue_stat ioremap::grape::queue::stat()

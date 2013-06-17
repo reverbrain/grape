@@ -172,6 +172,9 @@ class chunk {
 		chunk(elliptics::session &session, const std::string &queue_id, int chunk_id, int max);
 		~chunk();
 
+		void load_meta();
+		const chunk_ctl &meta();
+
 		// single entry methods
 		bool push(const elliptics::data_pointer &d); // returns true if chunk is full
 		elliptics::data_pointer pop(int32_t *pos);
@@ -181,8 +184,6 @@ class chunk {
 		data_array pop(int num);
 
 		void reset_iteration();
-
-		const chunk_ctl &meta();
 
 		void remove();
 
@@ -209,6 +210,7 @@ class chunk {
 
 		void write_meta();
 		void reset_iteration_mode();
+		void prepare_iteration();
 };
 
 typedef std::shared_ptr<chunk> shared_chunk;
@@ -239,11 +241,13 @@ class queue {
 
 		// single entry methods
 		void push(const elliptics::data_pointer &d);
-		elliptics::data_pointer pop();
 		elliptics::data_pointer peek(entry_id *entry_id);
 		void ack(const entry_id id);
+		elliptics::data_pointer pop();
 
 		// multiple entries methods
+		data_array peek(int num);
+		void ack(const std::vector<entry_id> &ids);
 		data_array pop(int num);
 
 		void reply(const ioremap::elliptics::exec_context &context,
@@ -256,7 +260,6 @@ class queue {
 
 	private:
 		int m_chunk_max;
-
 
 		std::string m_queue_id;
 		std::string m_queue_stat_id;

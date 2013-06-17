@@ -101,10 +101,9 @@ class queue_driver: public api::driver_t {
 		std::mutex m_local_queue_mutex;
 		std::mutex m_local_queue_processing_mutex;
 
-		const std::string m_worker_event;
 		const std::string m_queue_name;
+		std::string m_worker_event;
 		const std::string m_queue_pop_event;
-		const std::string m_queue_ack_event;
 
 		const double m_timeout;
 		const double m_deadline;

@@ -4,6 +4,7 @@
 
 #include <grape/elliptics_client_state.hpp>
 #include <grape/entry_id.hpp>
+#include <grape/data_array.hpp>
 
 using namespace ioremap::elliptics;
 
@@ -23,7 +24,9 @@ public:
 	app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
 	void initialize();
 
-	std::string process(const std::string &cocaine_event, const std::vector<std::string> &chunks);
+	// void single_entry(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response);
+	// void multi_entry(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response);
+	void process(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response);
 };
 
 app_context::app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager)
@@ -48,16 +51,114 @@ void app_context::initialize()
 		if (doc.HasMember("delay")) {
 			_delay = doc["delay"].GetInt() * 1000;
 		}
-		if (doc.HasMember("queue-ack-event")) {
-			_queue_ack_event = doc["queue-ack-event"].GetString();
+		if (doc.HasMember("source-queue-ack-event")) {
+			_queue_ack_event = doc["source-queue-ack-event"].GetString();
 		}
 	}
 
 	// register event handlers
+
+	//XXX: it seems that "unregistered" entry has higher precedence over all
+	// more specific ones: "unregistered" highjacks all events.
+	// It's so counter intuitive, and most propably is a bug.
+	// cocaine-framework-native version 0.10.5~prerelease~0.
+	 
+	// on("single-entry", &app_context::single_entry);
+	// on("multi-entry", &app_context::multi_entry);
 	on_unregistered(&app_context::process);
 }
 
-std::string app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks)
+void app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response)
+{
+	session client = _elliptics_client_state.create_session();
+
+	exec_context context = exec_context::from_raw(chunks[0].c_str(), chunks[0].size());
+
+	// auto reply_ack = [&client, &context] () {
+	//     client.reply(context, std::string(), exec_context::final);
+	// };
+	// auto reply_error = [&client, &context] (const char *msg) {
+	//     client.reply(context, std::string(msg), exec_context::final);
+	// };
+	// auto reply = [&client, &context] (data_pointer d) {
+	// 	client.reply(context, d, exec_context::final);
+	// };
+
+	std::string app;
+	std::string event;
+	{
+		char *p = strchr((char*)cocaine_event.c_str(), '@');
+		app.assign(cocaine_event.c_str(), p - cocaine_event.c_str());
+		event.assign(p + 1);
+	}
+
+	COCAINE_LOG_INFO(m_log, "event: '%s', data: '%s'",
+			cocaine_event.c_str(),
+			context.data().to_string().c_str()
+			);
+
+	if (_delay) {
+		usleep(_delay);
+	}
+
+	COCAINE_LOG_INFO(m_log, "event: '%s'", event.c_str());
+
+	if (event == "single-entry") {
+		ioremap::grape::entry_id id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
+		COCAINE_LOG_INFO(m_log, "received entry: %d-%d", id.chunk, id.pos);
+
+		// acking success
+		//if (m_ack_on_success) {
+			client.set_exceptions_policy(session::no_exceptions);
+
+			dnet_id queue_id;
+			dnet_setup_id(&queue_id, 0, context.src_id()->id);
+			queue_id.type = 0;
+
+			COCAINE_LOG_INFO(m_log, "acking entry %d-%d to queue %s", id.chunk, id.pos, dnet_dump_id_str(context.src_id()->id));
+
+			client.exec(&queue_id, _queue_ack_event, data_pointer()).connect(
+					async_result<exec_result_entry>::result_function(),
+					[m_log, id] (const error_info &error) {
+						if (error) {
+							COCAINE_LOG_ERROR(m_log, "entry %d-%d not acked", id.chunk, id.pos);
+						} else {
+							COCAINE_LOG_INFO(m_log, "entry %d-%d acked", id.chunk, id.pos);
+						}
+					}
+			);
+		//}
+
+	} else if (event == "multi-entry") {
+		// acking success
+		//if (m_ack_on_success) {
+			client.set_exceptions_policy(session::no_exceptions);
+
+			dnet_id queue_id;
+			dnet_setup_id(&queue_id, 0, context.src_id()->id);
+			queue_id.type = 0;
+
+			ioremap::grape::data_array d = ioremap::grape::data_array::deserialize(context.data());
+			size_t count = d.ids().size();
+
+			COCAINE_LOG_INFO(m_log, "acking multi entry, size %ld, to queue %s", count, dnet_dump_id_str(context.src_id()->id));
+
+			//FIXME: drop data, leave in the reply only ids 
+			client.exec(&queue_id, _queue_ack_event, context.data()).connect(
+					async_result<exec_result_entry>::result_function(),
+					[m_log, count] (const error_info &error) {
+						if (error) {
+							COCAINE_LOG_ERROR(m_log, "%ld entries not acked", count);
+						} else {
+							COCAINE_LOG_INFO(m_log, "%ld entries acked", count);
+						}
+					}
+			);
+		//}
+	}
+}
+/*
+void app_context::single_entry(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response)
 {
 	session client = _elliptics_client_state.create_session();
 
@@ -80,13 +181,55 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 			context.data().to_string().c_str()
 			);
 
-	// std::string app;
-	// std::string event;
-	// {
-	//     char *p = strchr((char*)context.event().c_str(), '@');
-	//     app.assign(context.event().c_str(), p - context.event().c_str());
-	//     event.assign(p + 1);
-	// }
+	if (_delay) {
+		usleep(_delay);
+	}
+
+	// acking success
+//	if (m_ack_on_success) {
+		client.set_exceptions_policy(session::no_exceptions);
+
+		dnet_id queue_id;
+		dnet_setup_id(&queue_id, 0, context.src_id()->id);
+		queue_id.type = 0;
+
+		COCAINE_LOG_INFO(m_log, "acking entry %d-%d to queue %s", id.chunk, id.pos, dnet_dump_id_str(context.src_id()->id));
+
+		client.exec(&queue_id, _queue_ack_event, data_pointer()).connect(
+				async_result<exec_result_entry>::result_function(),
+				[m_log, id] (const error_info &error) {
+					if (error) {
+						COCAINE_LOG_ERROR(m_log, "entry %d-%d not acked", id.chunk, id.pos);
+					} else {
+						COCAINE_LOG_INFO(m_log, "entry %d-%d acked", id.chunk, id.pos);
+					}
+				}
+		);
+//	}
+}
+
+void app_context::multi_entry(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response)
+{
+	session client = _elliptics_client_state.create_session();
+
+	exec_context context = exec_context::from_raw(chunks[0].c_str(), chunks[0].size());
+
+	// auto reply_ack = [&client, &context] () {
+	//     client.reply(context, std::string(), exec_context::final);
+	// };
+	// auto reply_error = [&client, &context] (const char *msg) {
+	//     client.reply(context, std::string(msg), exec_context::final);
+	// };
+	// auto reply = [&client, &context] (data_pointer d) {
+	// 	client.reply(context, d, exec_context::final);
+	// };
+
+	ioremap::grape::entry_id id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
+	COCAINE_LOG_INFO(m_log, "event: '%s', entry: %d-%d, data: '%s'",
+			cocaine_event.c_str(),
+			id.chunk, id.pos,
+			context.data().to_string().c_str()
+			);
 
 	if (_delay) {
 		usleep(_delay);
@@ -100,21 +243,23 @@ std::string app_context::process(const std::string &cocaine_event, const std::ve
 		dnet_setup_id(&queue_id, 0, context.src_id()->id);
 		queue_id.type = 0;
 
-		client.exec(&queue_id, _queue_ack_event, data_pointer()).connect(
+		ioremap::grape::data_array d = ioremap::grape::data_array::deserialize(context.data());
+		size_t count = d.ids().size();
+
+		//FIXME: drop data, leave in the reply only ids 
+		client.exec(&queue_id, _queue_ack_event, context.data()).connect(
 				async_result<exec_result_entry>::result_function(),
-				[m_log, id] (const error_info &error) {
+				[m_log, count] (const error_info &error) {
 					if (error) {
-						COCAINE_LOG_ERROR(m_log, "entry %d-%d not acked", id.chunk, id.pos);
+						COCAINE_LOG_ERROR(m_log, "%ld entries not acked", count);
 					} else {
-						COCAINE_LOG_INFO(m_log, "entry %d-%d acked", id.chunk, id.pos);
+						COCAINE_LOG_INFO(m_log, "%ld entries acked", count);
 					}
 				}
 		);
 //	}
-
-	return "return: " + context.data().to_string();
 }
-
+*/
 int main(int argc, char **argv)
 {
 	return cocaine::framework::worker_t::run<app_context>(argc, argv);

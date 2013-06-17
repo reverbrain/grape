@@ -135,7 +135,7 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		}
 		m_queue->final(context, ioremap::elliptics::data_pointer());
 
-	} else if (event == "pop-multiple-string") {
+	} else if (event == "pop-multi" || event == "pop-multiple-string") {
 		int num = atoi(context.data().to_string().c_str());
 
 		ioremap::grape::data_array d = m_queue->pop(num);
@@ -168,6 +168,20 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 
 		m_pop_rate.update(1);
 
+	} else if (event == "peek-multi") {
+		int num = atoi(context.data().to_string().c_str());
+
+		ioremap::grape::data_array d = m_queue->peek(num);
+
+		COCAINE_LOG_INFO(m_log, "peeked %ld entries", d.sizes().size());
+
+		if (!d.empty()) {
+			m_queue->final(context, d.serialize());
+			m_pop_rate.update(d.sizes().size());
+		} else {
+			m_queue->final(context, ioremap::elliptics::data_pointer());
+		}
+
 	} else if (event == "ack") {
 		ioremap::elliptics::data_pointer d = context.data();
 		ioremap::grape::entry_id entry_id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
@@ -178,6 +192,16 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		m_queue->final(context, ioremap::elliptics::data_pointer());
 
 		m_ack_rate.update(1);
+
+	} else if (event == "ack-multi") {
+		ioremap::grape::data_array d = ioremap::grape::data_array::deserialize(context.data());
+
+		COCAINE_LOG_INFO(m_log, "ack %ld entries", d.ids().size());
+
+		m_queue->ack(d.ids());
+		m_queue->final(context, ioremap::elliptics::data_pointer());
+
+		m_ack_rate.update(d.ids().size());
 
 	} else if (event == "stats") {
 		rapidjson::StringBuffer stream;
@@ -193,15 +217,15 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		struct ioremap::grape::queue_stat st = m_queue->stat();
 
 		root.AddMember("queue_id", name, root.GetAllocator());
+		root.AddMember("high-id", st.chunk_id_push, root.GetAllocator());
+		root.AddMember("low-id", st.chunk_id_ack, root.GetAllocator());
+		root.AddMember("push.count", st.push_count, root.GetAllocator());
+		root.AddMember("push.rate", m_push_rate.get(), root.GetAllocator());
+		root.AddMember("pop.count", st.pop_count, root.GetAllocator());
+		root.AddMember("pop.rate", m_pop_rate.get(), root.GetAllocator());
 		root.AddMember("ack.count", st.ack_count, root.GetAllocator());
 		root.AddMember("ack.rate", m_ack_rate.get(), root.GetAllocator());
 		root.AddMember("timeout.count", st.timeout_count, root.GetAllocator());
-		root.AddMember("pop.count", st.pop_count, root.GetAllocator());
-		root.AddMember("pop.rate", m_pop_rate.get(), root.GetAllocator());
-		root.AddMember("push.count", st.push_count, root.GetAllocator());
-		root.AddMember("push.rate", m_push_rate.get(), root.GetAllocator());
-		root.AddMember("push-id", st.chunk_id_push, root.GetAllocator());
-		root.AddMember("pop-id", st.chunk_id_pop, root.GetAllocator());
 		root.AddMember("update_indexes", st.update_indexes, root.GetAllocator());
 
 		root.AddMember("chunks_popped.write_data_async", st.chunks_popped.write_data_async, root.GetAllocator());
