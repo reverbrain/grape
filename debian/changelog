@@ -1,3 +1,15 @@
+grape (0.6.20) unstable; urgency=low
+
+  * Merged acknowledgement mechanics, timeout retries, queue
+  entry id circulation
+  * Added bulk methods pop,peek,ack and its support to queue
+  and testerhead-cpp apps. 
+  * Updated up to cocaine-core 0.10.5-0
+  * Use unapproved feature from cocaine-framework-native and so require
+    specific version of it (0.10.5-1~1.gbp0311cf) at runtime)
+
+ -- Ivan Chelyubeev <ijon@yandex-team.ru>  Mon, 17 Jun 2013 17:27:58 +0400
+
 grape (0.6.19) unstable; urgency=low
 
   * Implemented new queue::pop(int num) API
