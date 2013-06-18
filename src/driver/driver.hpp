@@ -57,6 +57,7 @@ class queue_driver: public api::driver_t {
 		struct queue_request {
 			int num;
 			dnet_id id;
+			int src_key;
 		};
 
 		queue_driver(context_t& context, io::reactor_t& reactor, app_t& app, const std::string& name, const Json::Value& args);
@@ -71,14 +72,12 @@ class queue_driver: public api::driver_t {
 		void get_more_data();
 
 	private:
-		std::vector<int> m_queue_groups;
-
 		cocaine::context_t& m_context;
 		cocaine::app_t& m_app;
 		std::shared_ptr<cocaine::logging::log_t> m_log;
+
 		elliptics_client_state m_client;
-		std::atomic_int m_src_key;
-		std::map<int, std::string> m_events;
+		std::vector<int> m_queue_groups;
 
 		void on_idle_timer_event(ev::timer&, int);
 
@@ -97,9 +96,9 @@ class queue_driver: public api::driver_t {
 
 		ev::timer m_idle_timer;
 
-		std::queue<ioremap::elliptics::data_pointer> m_local_queue;
-		std::mutex m_local_queue_mutex;
-		std::mutex m_local_queue_processing_mutex;
+		// std::queue<ioremap::elliptics::data_pointer> m_local_queue;
+		// std::mutex m_local_queue_mutex;
+		// std::mutex m_local_queue_processing_mutex;
 
 		const std::string m_queue_name;
 		std::string m_worker_event;
@@ -108,7 +107,9 @@ class queue_driver: public api::driver_t {
 		const double m_timeout;
 		const double m_deadline;
 
-		std::atomic_int m_queue_length, m_queue_length_max;
+		std::atomic_int m_queue_length;
+		std::atomic_int m_queue_length_max;
+		std::atomic_int m_factor;
 
 		std::atomic_int m_queue_src_key;
 

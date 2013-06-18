@@ -62,7 +62,7 @@ void app_context::initialize()
 	// more specific ones: "unregistered" highjacks all events.
 	// It's so counter intuitive, and most propably is a bug.
 	// cocaine-framework-native version 0.10.5~prerelease~0.
-	 
+
 	// on("single-entry", &app_context::single_entry);
 	// on("multi-entry", &app_context::multi_entry);
 	on_unregistered(&app_context::process);
@@ -92,16 +92,16 @@ void app_context::process(const std::string &cocaine_event, const std::vector<st
 		event.assign(p + 1);
 	}
 
-	COCAINE_LOG_INFO(m_log, "event: '%s', data: '%s'",
-			cocaine_event.c_str(),
-			context.data().to_string().c_str()
+	const std::string action_id = cocaine::format("%s %d", dnet_dump_id_str(context.src_id()->id), context.src_key());
+
+	COCAINE_LOG_INFO(m_log, "%s, event: %s, data-size: %ld",
+			action_id.c_str(),
+			event.c_str(), context.data().size()
 			);
 
 	if (_delay) {
 		usleep(_delay);
 	}
-
-	COCAINE_LOG_INFO(m_log, "event: '%s'", event.c_str());
 
 	if (event == "single-entry") {
 		ioremap::grape::entry_id id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
@@ -111,19 +111,18 @@ void app_context::process(const std::string &cocaine_event, const std::vector<st
 		//if (m_ack_on_success) {
 			client.set_exceptions_policy(session::no_exceptions);
 
-			dnet_id queue_id;
-			dnet_setup_id(&queue_id, 0, context.src_id()->id);
-			queue_id.type = 0;
+			// dnet_id queue_id;
+			// dnet_setup_id(&queue_id, 0, context.src_id()->id);
 
-			COCAINE_LOG_INFO(m_log, "acking entry %d-%d to queue %s", id.chunk, id.pos, dnet_dump_id_str(context.src_id()->id));
+			COCAINE_LOG_INFO(m_log, "%s, acking entry %d-%d to queue %s", action_id.c_str(), id.chunk, id.pos, dnet_dump_id_str(context.src_id()->id));
 
-			client.exec(&queue_id, _queue_ack_event, data_pointer()).connect(
+			client.exec(context, _queue_ack_event, data_pointer()).connect(
 					async_result<exec_result_entry>::result_function(),
-					[m_log, id] (const error_info &error) {
+					[m_log, action_id, id] (const error_info &error) {
 						if (error) {
-							COCAINE_LOG_ERROR(m_log, "entry %d-%d not acked", id.chunk, id.pos);
+							COCAINE_LOG_ERROR(m_log, "%s, entry %d-%d not acked", action_id.c_str(), id.chunk, id.pos);
 						} else {
-							COCAINE_LOG_INFO(m_log, "entry %d-%d acked", id.chunk, id.pos);
+							COCAINE_LOG_INFO(m_log, "%s, entry %d-%d acked", action_id.c_str(), id.chunk, id.pos);
 						}
 					}
 			);
@@ -134,23 +133,24 @@ void app_context::process(const std::string &cocaine_event, const std::vector<st
 		//if (m_ack_on_success) {
 			client.set_exceptions_policy(session::no_exceptions);
 
-			dnet_id queue_id;
-			dnet_setup_id(&queue_id, 0, context.src_id()->id);
-			queue_id.type = 0;
+			// dnet_id queue_id;
+			// dnet_setup_id(&queue_id, 0, context.src_id()->id);
+			// queue_id.type = 0;
+			// int queue_sub_id = context.src_key();
 
 			ioremap::grape::data_array d = ioremap::grape::data_array::deserialize(context.data());
 			size_t count = d.ids().size();
 
-			COCAINE_LOG_INFO(m_log, "acking multi entry, size %ld, to queue %s", count, dnet_dump_id_str(context.src_id()->id));
+			COCAINE_LOG_INFO(m_log, "%s, acking multi entry, size %ld, to queue %s", action_id.c_str(), count, dnet_dump_id_str(context.src_id()->id));
 
 			//FIXME: drop data, leave in the reply only ids 
-			client.exec(&queue_id, _queue_ack_event, context.data()).connect(
+			client.exec(context, _queue_ack_event, context.data()).connect(
 					async_result<exec_result_entry>::result_function(),
-					[m_log, count] (const error_info &error) {
+					[m_log, action_id, count] (const error_info &error) {
 						if (error) {
-							COCAINE_LOG_ERROR(m_log, "%ld entries not acked", count);
+							COCAINE_LOG_ERROR(m_log, "%s, %ld entries not acked: %s", action_id.c_str(), count, error.message().c_str());
 						} else {
-							COCAINE_LOG_INFO(m_log, "%ld entries acked", count);
+							COCAINE_LOG_INFO(m_log, "%s, %ld entries acked", action_id.c_str(), count);
 						}
 					}
 			);

@@ -202,18 +202,13 @@ void ioremap::grape::queue::ack(const entry_id id)
 
 		// Stop timeout timer for the chunk if its active,
 		// and forget about chunk
-		{
-			auto found = m_wait_completion.find(id.chunk);
-			if (found != m_wait_completion.end()) {
-				found->second.timeout->stop();
-				m_wait_completion.erase(found);
-			}
-		}
+		found->second.timeout->stop();
+		m_wait_completion.erase(found);
 
 		chunk->add(&m_stat.chunks_popped);
 
-		// Chunk would be uncomplete here if its the only chunk in the queue
-		// (filled only partially and serving both as a push and a pop/ack target)
+		// Chunk would be uncomplete here only if its the only chunk in the queue
+		// (filled partially and serving both as a push and a pop/ack target)
 		if (chunk->meta().complete()) {
 			chunk->remove();
 			LOG_INFO("chunk %d complete", id.chunk);

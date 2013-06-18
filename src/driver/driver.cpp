@@ -47,7 +47,6 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 	, m_context(context)
 	, m_app(app)
 	, m_log(new cocaine::logging::log_t(context, cocaine::format("driver/%s", name)))
-	, m_src_key(0)
 	, m_idle_timer(reactor.native())
 	, m_queue_name(args.get("source-queue-app", "queue").asString())
 	, m_worker_event(args.get("worker-emit-event", "emit").asString())
@@ -56,6 +55,7 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 	, m_deadline(args.get("deadline", 0.0f).asDouble())
 	, m_queue_length(0)
 	, m_queue_length_max(0)
+	, m_factor(0)
 	, m_queue_src_key(0)
 {
 	COCAINE_LOG_INFO(m_log, "init: %s driver", m_queue_name.c_str());
@@ -101,7 +101,8 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 	m_queue_length_max = queue_limit * 9 / 10;
 
 	m_idle_timer.set<queue_driver, &queue_driver::on_idle_timer_event>(this);
-	m_idle_timer.start(1.0f, 1.0f);
+	m_idle_timer.set(0.0f, 1.0f);
+	m_idle_timer.again();
 
 	COCAINE_LOG_INFO(m_log, "init: %s driver started", m_queue_name.c_str());
 }
@@ -125,10 +126,10 @@ Json::Value queue_driver::info() const
 
 void queue_driver::on_idle_timer_event(ev::timer &, int)
 {
-	get_more_data();
-
 	COCAINE_LOG_INFO(m_log, "%s: timer: checking queue completed: queue-len: %d/%d",
 			m_queue_name.c_str(), m_queue_length, m_queue_length_max);
+
+	get_more_data();
 }
 
 void queue_driver::get_more_data()
@@ -139,7 +140,7 @@ void queue_driver::get_more_data()
 	int num = m_queue_length_max - m_queue_length;
 	if (num < 100)
 		return;
-
+	
 	int step = 10;
 
 	for (int i = 0; i < step; ++i) {
@@ -147,11 +148,11 @@ void queue_driver::get_more_data()
 
 		std::shared_ptr<queue_request> req = std::make_shared<queue_request>();
 		req->num = m_queue_length_max / 10;
+		req->src_key = m_queue_src_key;
 
-		req->id.type = 0;
 		req->id.group_id = 0;
 
-		std::string random_data = m_queue_name + lexical_cast(rand());
+		std::string random_data = m_queue_name + lexical_cast(req->src_key) + lexical_cast(rand());
 		sess.transform(random_data, req->id);
 
 		sess.set_groups(m_queue_groups);
@@ -160,7 +161,7 @@ void queue_driver::get_more_data()
 
 		std::string strnum = lexical_cast(req->num);
 		sess.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
-		sess.exec(&req->id, m_queue_src_key, m_queue_pop_event, strnum).connect(
+		sess.exec(&req->id, req->src_key, m_queue_pop_event, strnum).connect(
 			std::bind(&queue_driver::on_queue_request_data, this, req, std::placeholders::_1),
 			std::bind(&queue_driver::on_queue_request_complete, this, req, std::placeholders::_1)
 		);
@@ -182,26 +183,43 @@ void queue_driver::on_queue_request_data(std::shared_ptr<queue_request> req, con
 		}
 
 		// queue.pop returns no data when queue is empty.
-		// Idle timer handles queue emptiness firing periodically to check
-		// if there is new data in the queue.
-		//
-		// But every time when we actually got data we have to postpone idle timer.
+		// Idle timer handles queue emptiness firing periodic check,
+		// but every time when we actually got data we have to postpone
+		// the idle timer further into the future.
+		m_idle_timer.again();
 
 		ioremap::elliptics::exec_context context = result.context();
-		COCAINE_LOG_INFO(m_log, "%s: %s: data: size: %d", m_queue_name.c_str(), dnet_dump_id(&req->id), context.data().size());
+
+		// Received context is passed directly to the worker, so that
+		// worker could use it to continue talking to the same queue instance.
+		//
+		// But before that context.src_key must be restored back
+		// to the original src_key used in the original request to the queue,
+		// or else our worker's ack will not be routed to the exact same
+		// queue worker that issued reply with this context.
+		//
+		// (src_key of the request gets replaced by job id server side,
+		// so reply does not carries the same src_key as a request.
+		// Which is unfortunate.)
+		context.set_src_key(req->src_key);
+
+		COCAINE_LOG_INFO(m_log, "%s: %s: src-key: %d, data-size: %d",
+				m_queue_name.c_str(), dnet_dump_id(&req->id),
+				context.src_key(), context.data().size()
+				);
 
 		if (!context.data().empty()) {
-			ioremap::grape::entry_id entry_id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
-			COCAINE_LOG_INFO(m_log, "%s: %s: id: %d-%d, size: %d", m_queue_name.c_str(), dnet_dump_id(&req->id),
-					entry_id.chunk, entry_id.pos,
-					context.data().size()
-					);
+			// ioremap::grape::entry_id entry_id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
+			// COCAINE_LOG_INFO(m_log, "%s: %s: id: %d-%d, size: %d", m_queue_name.c_str(), dnet_dump_id(&req->id),
+			// 		entry_id.chunk, entry_id.pos,
+			// 		context.data().size()
+			// 		);
 
 			bool processed = process_data(context);
 
-			COCAINE_LOG_INFO(m_log, "%s: %s: id: %d-%d, size: %d, processed %d", m_queue_name.c_str(), dnet_dump_id(&req->id),
-					entry_id.chunk, entry_id.pos,
-					context.data().size(),
+			COCAINE_LOG_INFO(m_log, "%s: %s: src-key: %d, data-size: %d, processed %d",
+					m_queue_name.c_str(), dnet_dump_id(&req->id),
+					context.src_key(), context.data().size(),
 					processed
 					);
 		}
@@ -217,7 +235,8 @@ void queue_driver::on_queue_request_complete(std::shared_ptr<queue_request> req,
 		COCAINE_LOG_ERROR(m_log, "%s: %s: queue request completion error: %s",
 				m_queue_name.c_str(), dnet_dump_id(&req->id), error.message().c_str());
 	} else {
-		COCAINE_LOG_INFO(m_log, "%s: %s: queue request completed", m_queue_name.c_str(), dnet_dump_id(&req->id));
+		COCAINE_LOG_INFO(m_log, "%s: %s: queue request completed",
+				m_queue_name.c_str(), dnet_dump_id(&req->id));
 	}
 
 	queue_dec(1);
@@ -233,7 +252,7 @@ bool queue_driver::process_data(const ioremap::elliptics::exec_context &context)
 		// this map should be used to store iteration counter
 		//m_events.insert(std::make_pair(static_cast<const int>(sph->src_key), data.to_string()));
 
-		ioremap::elliptics::data_pointer packet = context.self();
+		ioremap::elliptics::data_pointer packet = context.native_data();
 		api::policy_t policy(false, m_timeout, m_deadline);
 		auto upstream = m_app.enqueue(api::event_t(m_worker_event, policy), downstream);
 		upstream->write((char *)packet.data(), packet.size());
@@ -292,6 +311,12 @@ void queue_driver::downstream_t::close()
 	COCAINE_LOG_INFO(m_queue->m_log, "%s: downstream: close: attempts (was-error): %d",
 			m_queue->m_queue_name.c_str(), m_attempts);
 
-	if (m_attempts == 0)
+	if (m_attempts == 0) {
+		// pour way to limit exponential growth of number of requests 
+		// if (++m_queue->m_factor == 10) {
+		// 	m_queue->m_factor = 0;
+		// 	m_queue->get_more_data();
+		// }
 		m_queue->get_more_data();
+	}
 }

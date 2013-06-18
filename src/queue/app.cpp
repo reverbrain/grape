@@ -1,5 +1,6 @@
 #include "queue.hpp"
 
+#include <cocaine/format.hpp>
 #include <cocaine/framework/logging.hpp>
 #include <cocaine/framework/application.hpp>
 #include <cocaine/framework/worker.hpp>
@@ -56,7 +57,7 @@ class queue_app_context : public cocaine::framework::application<queue_app_conte
 
 		void initialize();
 
-		std::string process(const std::string &cocaine_event, const std::vector<std::string> &chunks);
+		void process(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response);
 
 	private:
 		std::string m_id;
@@ -88,7 +89,7 @@ void queue_app_context::initialize()
 	on_unregistered(&queue_app_context::process);
 }
 
-std::string queue_app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks)
+void queue_app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response)
 {
 	ioremap::elliptics::exec_context context = ioremap::elliptics::exec_context::from_raw(chunks[0].c_str(), chunks[0].size());
 
@@ -100,8 +101,12 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		event.assign(p + 1);
 	}
 
-	COCAINE_LOG_INFO(m_log, "%s: %s: event: %s, size: %ld",
-			m_id.c_str(), dnet_dump_id_str(context.src_id()->id), event.c_str(), context.data().size());
+	const std::string action_id = cocaine::format("%s %d, %s", dnet_dump_id_str(context.src_id()->id), context.src_key(), m_id.c_str());
+
+	COCAINE_LOG_INFO(m_log, "%s, event: %s, data-size: %ld",
+			action_id.c_str(),
+			event.c_str(), context.data().size()
+			);
 
 	if (!m_queue && event != "configure")
 		ioremap::elliptics::throw_error(-EINVAL, "worker '%s' is not configured", m_id.c_str());
@@ -146,9 +151,11 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 			m_queue->final(context, ioremap::elliptics::data_pointer());
 		}
 
-		COCAINE_LOG_INFO(m_log, "%s: %s: completed event: %s, size: %ld, popped: %d/%d (multiple: '%s')",
-				m_id.c_str(), dnet_dump_id_str(context.src_id()->id), event.c_str(), context.data().size(), d.sizes().size(), num,
-				context.data().to_string().c_str());
+		COCAINE_LOG_INFO(m_log, "%s, completed event: %s, size: %ld, popped: %d/%d (multiple: '%s')",
+				action_id.c_str(),
+				event.c_str(), context.data().size(),
+				d.sizes().size(), num, context.data().to_string().c_str()
+				);
 
 	} else if (event == "pop") {
 		m_queue->final(context, m_queue->pop());
@@ -158,7 +165,10 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		ioremap::grape::entry_id entry_id;
 		ioremap::elliptics::data_pointer d = m_queue->peek(&entry_id);
 
-		COCAINE_LOG_INFO(m_log, "peeked entry: %d-%d: (%ld)'%s'", entry_id.chunk, entry_id.pos, d.size(), d.to_string());
+		COCAINE_LOG_INFO(m_log, "%s, peeked entry: %d-%d: (%ld)'%s'",
+				action_id.c_str(),
+				entry_id.chunk, entry_id.pos, d.size(), d.to_string()
+				);
 
 		// embed entry id directly into sph of the reply
 		dnet_raw_id *src = context.src_id();
@@ -173,8 +183,6 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 
 		ioremap::grape::data_array d = m_queue->peek(num);
 
-		COCAINE_LOG_INFO(m_log, "peeked %ld entries", d.sizes().size());
-
 		if (!d.empty()) {
 			m_queue->final(context, d.serialize());
 			m_pop_rate.update(d.sizes().size());
@@ -182,26 +190,37 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 			m_queue->final(context, ioremap::elliptics::data_pointer());
 		}
 
+		COCAINE_LOG_INFO(m_log, "%s, peeked %ld entries (asked %d)",
+				action_id.c_str(),
+				d.sizes().size(), num
+				);
+
 	} else if (event == "ack") {
 		ioremap::elliptics::data_pointer d = context.data();
 		ioremap::grape::entry_id entry_id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
-
-		COCAINE_LOG_INFO(m_log, "ack entry: %d-%d", entry_id.chunk, entry_id.pos);
 
 		m_queue->ack(entry_id);
 		m_queue->final(context, ioremap::elliptics::data_pointer());
 
 		m_ack_rate.update(1);
 
+		COCAINE_LOG_INFO(m_log, "%s, acked entry %d-%d",
+				action_id.c_str(),
+				entry_id.chunk, entry_id.pos
+				);
+
 	} else if (event == "ack-multi") {
 		ioremap::grape::data_array d = ioremap::grape::data_array::deserialize(context.data());
-
-		COCAINE_LOG_INFO(m_log, "ack %ld entries", d.ids().size());
 
 		m_queue->ack(d.ids());
 		m_queue->final(context, ioremap::elliptics::data_pointer());
 
 		m_ack_rate.update(d.ids().size());
+
+		COCAINE_LOG_INFO(m_log, "%s, acked %ld entries",
+				action_id.c_str(),
+				d.ids().size()
+				);
 
 	} else if (event == "stats") {
 		rapidjson::StringBuffer stream;
@@ -256,10 +275,10 @@ std::string queue_app_context::process(const std::string &cocaine_event, const s
 		m_queue->final(context, msg);
 	}
 
-	COCAINE_LOG_INFO(m_log, "%s: %s: completed event: %s, size: %ld",
-			m_id.c_str(), dnet_dump_id_str(context.src_id()->id), event.c_str(), context.data().size());
-
-	return "";
+	COCAINE_LOG_INFO(m_log, "%s, event: %s, data-size: %ld, completed",
+			action_id.c_str(),
+			event.c_str(), context.data().size()
+			);
 }
 
 int main(int argc, char **argv)
