@@ -138,6 +138,7 @@ struct replay_iterator : public iterator {
 				return true;
 			}
 		}
+		return false;
 	}
 
 	virtual void begin() {
@@ -260,6 +261,7 @@ class queue {
 
 	private:
 		int m_chunk_max;
+		ev::loop_ref &loop; // event loop for timers
 
 		std::string m_queue_id;
 		std::string m_queue_stat_id;
@@ -267,16 +269,14 @@ class queue {
 		elliptics_client_state m_client;
 
 		queue_stat m_stat;
-		void update_indexes();
 
 		std::map<int, shared_chunk> m_chunks;
 
-		ev::loop_ref &loop; // event loop for timers
 		struct wait_item {
-			std::unique_ptr<ev::timer> timeout;
-			shared_chunk chunk;
 			queue *host;
 			int chunk_id;
+			shared_chunk chunk;
+			std::unique_ptr<ev::timer> timeout;
 
 			wait_item(queue *host, int chunk_id, shared_chunk chunk)
 				: host(host), chunk_id(chunk_id), chunk(chunk)
@@ -290,6 +290,7 @@ class queue {
 		std::map<int, wait_item> m_wait_completion;
 
 		void check_chunk_completion(int chunk_id);
+		void update_indexes();
 };
 
 }} /* namespace ioremap::grape */
