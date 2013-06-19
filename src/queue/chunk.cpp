@@ -196,21 +196,9 @@ void ioremap::grape::chunk::prepare_iteration()
 		// Metadata is read only at start (as it resides in memory and properly updated by push).
 		//
 		if (iteration_state.byte_offset >= m_data.size()) {
-
 			LOG_INFO("chunk::pop(): chunk %d, (re)reading data, iteration.byte_offset %lld, m_data.size() %ld", m_chunk_id, iteration_state.byte_offset, m_data.size());
 			
 			m_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
-
-//			// read meta if it's wasn't already read
-//			if (m_meta.high_mark() == 0) {
-//
-//				LOG_INFO("chunk::pop(): chunk %d, reading meta", m_chunk_id);
-//
-//				ioremap::elliptics::data_pointer d = m_session_meta.read_data(m_meta_key, 0, 0).get_one().file();
-//				m_meta.assign((char *)d.data(), d.size());
-//
-//				m_stat.read++;
-//			}
 		}
 
 		if (!iter) {
@@ -278,14 +266,12 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(int *pos)
 	return d;
 }
 
-//bulk version of pop without acking support
-//FIXME: update it and/or merge with working pop()
 ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 {
 	ioremap::grape::data_array ret;
 
 	// Fast track for the case when chunk is empty (not exist).
-	// It valid to check only metadata as push() updates metadata in memory
+	// Its valid to check only metadata as push() updates metadata in memory
 	if (m_meta.high_mark() == 0) {
 		LOG_INFO("chunk::pop(num): empty");
 		return ret;
@@ -320,81 +306,6 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 		--num;
 	}
 
-/*
-	try {
-		while (num > 0) {
-#ifdef QUEUE_STDOUT_DEBUG
-			std::cout << "first check: data-key: " << m_data_key.to_string() <<
-				", ctl-key: " << m_ctl_key.to_string() <<
-				", chunk-size: " << m_chunk_data.size() <<
-				", used: " << m_chunk.used() <<
-				", acked: " << m_chunk.acked() <<
-				", m_pop_position: " << m_pop_position <<
-				std::endl;
-#endif
-			// if there is data, and acked (pop) >= used (push), then chunk is already fully read,
-			// do not try to squize more out of it
-			if (m_chunk.used() && m_chunk.acked() >= m_chunk.used())
-				break;
-
-			if (m_pop_position >= m_chunk_data.size()) {
-				// if chunk has at least something, it is already in the ram
-				// no need to read it again, we dried it already
-				if (m_chunk.used() && m_chunk_data.size())
-					break;
-
-				m_chunk_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
-				if (m_chunk.used() == 0) {
-					ioremap::elliptics::data_pointer d = m_session_ctl.read_data(m_ctl_key, 0, 0).get_one().file();
-					m_chunk.assign((char *)d.data(), d.size());
-				}
-
-				m_stat.read++;
-
-				m_pop_position = 0;
-				for (int i = 0; i < m_chunk.acked(); ++i)
-					m_pop_position += m_chunk[i].size;
-
-#ifdef QUEUE_STDOUT_DEBUG
-				std::cout << "chunk read: data-key: " << m_data_key.to_string() <<
-					", ctl-key: " << m_ctl_key.to_string() <<
-					", chunk-size: " << m_chunk_data.size() <<
-					", used: " << m_chunk.used() <<
-					", acked: " << m_chunk.acked() <<
-					", m_pop_position: " << m_pop_position <<
-					": " << m_chunk_data.skip(m_pop_position).to_string() <<
-					std::endl;
-#endif
-				// we read chunk from the storage, but it is 'dry' - just give it up
-				if ((m_chunk.acked() >= m_chunk.used()) || (m_pop_position >= m_chunk_data.size()))
-					break;
-			}
-
-			int size = m_chunk[m_chunk.acked()].size;
-
-			ret.append((char *)m_chunk_data.data() + m_pop_position, size);
-
-			num--;
-
-			m_chunk.ack(m_chunk.acked(), 1);
-			m_stat.ack++;
-
-			m_stat.pop++;
-
-			m_pop_position += size;
-
-			// chunk has been completely sucked out, update it in the storage
-			if ((m_chunk.acked() >= m_chunk.used()) || (m_pop_position >= m_chunk_data.size())) {
-				write_chunk();
-				break;
-			}
-		}
-	} catch (const ioremap::elliptics::not_found_error &err) {
-		// Do not explode on not-found-error, return empty data pointer
-	} catch (const ioremap::elliptics::timeout_error &err) {
-		// Do not explode on timeout-error, return empty data pointer
-	}
-*/
 	return ret;
 }
 

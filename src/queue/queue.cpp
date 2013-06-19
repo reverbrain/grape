@@ -300,43 +300,6 @@ ioremap::grape::data_array ioremap::grape::queue::peek(int num)
 		update_indexes();
 	}
 
-/*
-	while (num > 0) {
-		auto ch = m_chunks.find(m_stat.chunk_id_pop);
-		if (ch == m_chunks.end())
-			break;
-
-		ioremap::grape::data_array d;
-
-		d = ch->second->pop(num);
-		if (!d.empty()) {
-			num -= d.sizes().size();
-			m_stat.pop_count += d.sizes().size();
-
-			ret.append(d);
-
-			if (!num)
-				break;
-
-			if (m_stat.chunk_id_pop == m_stat.chunk_id_push)
-				break;
-
-			continue;
-		}
-
-		if (m_stat.chunk_id_pop == m_stat.chunk_id_push)
-			break;
-
-		ch->second->remove();
-
-		ch->second->add(&m_stat.chunks_popped);
-
-		m_chunks.erase(ch);
-		m_stat.chunk_id_pop++;
-
-		update_indexes();
-	}
-*/
 	return ret;
 }
 
