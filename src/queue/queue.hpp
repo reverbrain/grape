@@ -106,9 +106,6 @@ struct forward_iterator : public iterator {
 		// advance low_mark
 		meta.pop();
 		state.entry_index = meta.low_mark();
-		if (at_end()) {
-			return;
-		}
 		state.byte_offset += size;
 	}
 	virtual bool at_end() {
@@ -122,23 +119,18 @@ struct replay_iterator : public iterator {
 		: iterator(REPLAY, state, meta)
 	{}
 
-	bool step() {
+	void step() {
 		int size = meta[state.entry_index].size;
 		++state.entry_index;
-		if (at_end()) {
-			return true;
-		}
 		state.byte_offset += size;
-		return false;
 	}
-
-	bool skip_acked() {
+	void skip_acked() {
 		while (meta[state.entry_index].state == 1) {
-			if (step()) {
-				return true;
+			step();
+			if (at_end()) {
+				break;
 			}
 		}
-		return false;
 	}
 
 	virtual void begin() {
@@ -147,15 +139,16 @@ struct replay_iterator : public iterator {
 		skip_acked();
 	}
 	virtual void advance() {
-		if (skip_acked()) {
-			return;
+		skip_acked();
+		if (!at_end()) {
+			step();
 		}
-		step();
 	}
 	virtual bool at_end() {
 		return (state.entry_index >= meta.low_mark());
 	}
 };
+
 struct chunk_stat {
 	uint64_t		write_data_async;
 	uint64_t		write_ctl_async;
