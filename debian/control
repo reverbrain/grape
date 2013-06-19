@@ -5,10 +5,10 @@ Maintainer: Ivan Chelyubeev <ijon@yandex-team.ru>
 Build-Depends: debhelper (>= 7),
 		cmake,
 		cdbs,
-		elliptics-dev (>= 2.24.7.7),
-		elliptics-client (>= 2.24.7.7),
-		cocaine-framework-native-dev (>= 0.10.5~prerelease~3),
-		libcocaine-dev (>= 0.10.5~prerelease~27),
+		elliptics-dev (>> 2.24.8.1),
+		elliptics-client (>> 2.24.8.1),
+		cocaine-framework-native-dev (= 0.10.5-1~1.gbp0311cf),
+		libcocaine-dev (>= 0.10.5-4),
 		libboost-dev,
 		libboost-system-dev,
 		libboost-program-options-dev,
@@ -36,13 +36,13 @@ Description: Realtime pipeline processing engine (includes)
 
 Package: libcocaine-plugin-queue-driver
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, elliptics-client (>= 2.24.7.7), grape (= ${binary:Version})
+Depends: ${shlibs:Depends}, ${misc:Depends}, elliptics-client (>> 2.24.8.1), grape (= ${binary:Version})
 Description: Grape queue driver (cocaine plugin)
  Grape queue driver runs as a cocaine plugin and can be turned on for applications,
  which want to pop events from persistent queue (application named 'queue')
 
 Package: grape-components
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, grape (= ${binary:Version}), cocaine-framework-native (>= 0.10.5~prerelease~0)
+Depends: ${shlibs:Depends}, ${misc:Depends}, grape (= ${binary:Version}), cocaine-framework-native (= 0.10.5-1~1.gbp0311cf)
 Description: Grape queue and other components (cocaine apps)
  Grape queue and other component apps
