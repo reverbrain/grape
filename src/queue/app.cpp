@@ -147,6 +147,7 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		if (!d.empty()) {
 			m_queue->final(context, d.serialize());
 			m_pop_rate.update(d.sizes().size());
+			m_ack_rate.update(d.sizes().size());
 		} else {
 			m_queue->final(context, ioremap::elliptics::data_pointer());
 		}
@@ -160,6 +161,7 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 	} else if (event == "pop") {
 		m_queue->final(context, m_queue->pop());
 		m_pop_rate.update(1);
+		m_ack_rate.update(1);
 
 	} else if (event == "peek") {
 		ioremap::grape::entry_id entry_id;
