@@ -69,6 +69,9 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 		doc.Parse<0>(s.c_str());
 
 		m_client = elliptics_client_state::create(doc);
+
+		//TODO: remove extra code with queue-groups: driver doesn't need group set override
+		// 
 		std::string groups_key = "groups";
 		if (doc.HasMember("queue-groups"))
 			groups_key = "queue-groups";

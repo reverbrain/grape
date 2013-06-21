@@ -208,12 +208,11 @@ void ioremap::grape::chunk::prepare_iteration()
 
 	} catch (const ioremap::elliptics::not_found_error &e) {
 		// Do not explode on not-found-error, return empty data pointer
-		LOG_INFO("chunk::pop(): not found B");
-		LOG_ERROR(e.what());
+		LOG_ERROR("chunk::pop(): chunk %d, ERROR: %s", m_chunk_id, e.what());
 
 	} catch (const ioremap::elliptics::timeout_error &e) {
 		// Do not explode on timeout-error, return empty data pointer
-		LOG_ERROR(e.what());
+		LOG_ERROR("chunk::pop(): chunk %d, ERROR: %s", m_chunk_id, e.what());
 
 		//XXX: this means we silently ignore unreachable data,
 		// and it can't be good
@@ -221,7 +220,7 @@ void ioremap::grape::chunk::prepare_iteration()
 	} catch (const ioremap::elliptics::error &e) {
 		// Special case to ignore bad chunk meta format error
 		// (raised by chunk_clt::assign())
-		LOG_ERROR(e.what());
+		LOG_ERROR("chunk::pop(): chunk %d, ERROR: %s", m_chunk_id, e.what());
 		if (e.error_code() != -ERANGE) {
 			throw;
 		}

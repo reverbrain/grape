@@ -133,11 +133,6 @@ void app_context::process(const std::string &cocaine_event, const std::vector<st
 		//if (m_ack_on_success) {
 			client.set_exceptions_policy(session::no_exceptions);
 
-			// dnet_id queue_id;
-			// dnet_setup_id(&queue_id, 0, context.src_id()->id);
-			// queue_id.type = 0;
-			// int queue_sub_id = context.src_key();
-
 			ioremap::grape::data_array d = ioremap::grape::data_array::deserialize(context.data());
 			size_t count = d.ids().size();
 
