@@ -35,6 +35,21 @@ static inline std::string lexical_cast(size_t value) {
 	return result;
 }
 
+static inline void read_groups_array(std::vector<int> *result, const char *name, const rapidjson::Value value) {
+    if (const auto *m = value.FindMember(name)) {
+        if (m->value.IsArray()) {
+            std::transform(m->value.Begin(), m->value.End(),
+                std::back_inserter(*result),
+                std::bind(&rapidjson::Value::GetInt, std::placeholders::_1)
+                );
+        } else {
+			std::ostringstream str;
+			str << name << "value must be of array type";
+            throw configuration_error_t(str.str().c_str());
+        }
+    }
+}
+
 struct elliptics_client_state {
 	std::shared_ptr<elliptics::file_logger> logger;
 	std::shared_ptr<elliptics::node> node;
@@ -61,11 +76,18 @@ struct elliptics_client_state {
 		std::vector<int> groups;
 
 		try {
-			if (args.HasMember("logfile"))
-				logfile = args["logfile"].GetString();
-
-			if (args.HasMember("loglevel"))
-				loglevel = args["loglevel"].GetInt();
+			{
+				const auto *m = args.FindMember("logfile");
+				if (m && m->value.IsString()) {
+					logfile = m->value.GetString();
+				}
+			}
+			{
+				const auto *m = args.FindMember("loglevel");
+				if (m && m->value.IsInt()) {
+					loglevel = m->value.GetInt();
+				}
+			}
 
 			const rapidjson::Value &remotesArray = args["remotes"];
 			std::transform(remotesArray.Begin(), remotesArray.End(),
