@@ -58,6 +58,10 @@ class queue_driver: public api::driver_t {
 			int num;
 			dnet_id id;
 			int src_key;
+
+			queue_request(void) : num(0), src_key(0) {
+				memset(&id, 0, sizeof(dnet_id));
+			}
 		};
 
 		queue_driver(context_t& context, io::reactor_t& reactor, app_t& app, const std::string& name, const Json::Value& args);

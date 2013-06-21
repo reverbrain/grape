@@ -85,6 +85,10 @@ queue_app_context::~queue_app_context()
 
 void queue_app_context::initialize()
 {
+	m_queue.reset(new ioremap::grape::queue(m_id, service_manager()->get_reactor_native()));
+	m_queue->initialize("queue.conf");
+	COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured", m_id.c_str());
+
 	// register event handlers
 	on_unregistered(&queue_app_context::process);
 }
@@ -108,26 +112,8 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 			event.c_str(), context.data().size()
 			);
 
-	if (!m_queue && event != "configure")
-		ioremap::elliptics::throw_error(-EINVAL, "worker '%s' is not configured", m_id.c_str());
-
 	if (event == "ping") {
 		m_queue->final(context, std::string("ok"));
-
-	} else if (event == "configure") {
-		if (!m_queue) {
-			m_id = context.data().to_string() + "-" + m_id;
-			
-			// creating the queue
-			m_queue.reset(new ioremap::grape::queue(m_id, service_manager()->get_reactor_native()));
-			m_queue->initialize("queue.conf");
-
-			m_queue->final(context, std::string(m_id + ": configured"));
-			COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured", m_id.c_str());
-		} else {
-			m_queue->final(context, std::string(m_id + ": is already configured"));
-			COCAINE_LOG_INFO(m_log, "%s: queue is already configured", m_id.c_str());
-		}
 
 	} else if (event == "push") {
 		ioremap::elliptics::data_pointer d = context.data();
