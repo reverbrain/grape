@@ -114,15 +114,18 @@ void app_context::process(const std::string &cocaine_event, const std::vector<st
 			// dnet_id queue_id;
 			// dnet_setup_id(&queue_id, 0, context.src_id()->id);
 
-			COCAINE_LOG_INFO(m_log, "%s, acking entry %d-%d to queue %s", action_id.c_str(), id.chunk, id.pos, dnet_dump_id_str(context.src_id()->id));
+			COCAINE_LOG_INFO(m_log, "%s, acking entry %d-%d to queue %s",
+					action_id.c_str(), id.chunk, id.pos, dnet_dump_id_str(context.src_id()->id));
 
 			client.exec(context, _queue_ack_event, data_pointer()).connect(
 					async_result<exec_result_entry>::result_function(),
-					[m_log, action_id, id] (const error_info &error) {
+					[this, action_id, id] (const error_info &error) {
 						if (error) {
-							COCAINE_LOG_ERROR(m_log, "%s, entry %d-%d not acked", action_id.c_str(), id.chunk, id.pos);
+							COCAINE_LOG_ERROR(m_log, "%s, entry %d-%d not acked",
+								action_id.c_str(), id.chunk, id.pos);
 						} else {
-							COCAINE_LOG_INFO(m_log, "%s, entry %d-%d acked", action_id.c_str(), id.chunk, id.pos);
+							COCAINE_LOG_INFO(m_log, "%s, entry %d-%d acked",
+								action_id.c_str(), id.chunk, id.pos);
 						}
 					}
 			);
@@ -136,14 +139,16 @@ void app_context::process(const std::string &cocaine_event, const std::vector<st
 			ioremap::grape::data_array d = ioremap::grape::data_array::deserialize(context.data());
 			size_t count = d.ids().size();
 
-			COCAINE_LOG_INFO(m_log, "%s, acking multi entry, size %ld, to queue %s", action_id.c_str(), count, dnet_dump_id_str(context.src_id()->id));
+			COCAINE_LOG_INFO(m_log, "%s, acking multi entry, size %ld, to queue %s",
+					action_id.c_str(), count, dnet_dump_id_str(context.src_id()->id));
 
 			//FIXME: drop data, leave in the reply only ids 
 			client.exec(context, _queue_ack_event, context.data()).connect(
 					async_result<exec_result_entry>::result_function(),
-					[m_log, action_id, count] (const error_info &error) {
+					[this, action_id, count] (const error_info &error) {
 						if (error) {
-							COCAINE_LOG_ERROR(m_log, "%s, %ld entries not acked: %s", action_id.c_str(), count, error.message().c_str());
+							COCAINE_LOG_ERROR(m_log, "%s, %ld entries not acked: %s",
+								action_id.c_str(), count, error.message().c_str());
 						} else {
 							COCAINE_LOG_INFO(m_log, "%s, %ld entries acked", action_id.c_str(), count);
 						}
@@ -192,7 +197,7 @@ void app_context::single_entry(const std::string &cocaine_event, const std::vect
 
 		client.exec(&queue_id, _queue_ack_event, data_pointer()).connect(
 				async_result<exec_result_entry>::result_function(),
-				[m_log, id] (const error_info &error) {
+				[this, id] (const error_info &error) {
 					if (error) {
 						COCAINE_LOG_ERROR(m_log, "entry %d-%d not acked", id.chunk, id.pos);
 					} else {
@@ -244,7 +249,7 @@ void app_context::multi_entry(const std::string &cocaine_event, const std::vecto
 		//FIXME: drop data, leave in the reply only ids 
 		client.exec(&queue_id, _queue_ack_event, context.data()).connect(
 				async_result<exec_result_entry>::result_function(),
-				[m_log, count] (const error_info &error) {
+				[this, count] (const error_info &error) {
 					if (error) {
 						COCAINE_LOG_ERROR(m_log, "%ld entries not acked", count);
 					} else {
