@@ -27,9 +27,8 @@ std::shared_ptr<cocaine::framework::logger_t> grape_queue_module_get_logger() {
 
 const int DEFAULT_MAX_CHUNK_SIZE = 10000;
 
-ioremap::grape::queue::queue(const std::string &queue_id, ev::loop_ref &event_loop)
+ioremap::grape::queue::queue(const std::string &queue_id)
 	: m_chunk_max(DEFAULT_MAX_CHUNK_SIZE)
-	, loop(event_loop)
 	, m_queue_id(queue_id)
 	, m_queue_stat_id(queue_id + ".stat")
 {
@@ -102,7 +101,7 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
 	*entry_id = {-1, -1};
 
 	while (true) {
-		auto found = m_chunks.begin();
+		auto found = m_chunks.find(entry_id->chunk);
 		if (found == m_chunks.end()) {
 			break;
 		}
@@ -117,18 +116,7 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
 		if (!d.empty()) {
 			m_stat.pop_count++;
 
-			// set or reset timeout timer for the chunk
-			{
-				auto inserted = m_wait_completion.insert(std::make_pair(chunk_id, wait_item(this, chunk_id, chunk)));
-				if (inserted.second) {
-					wait_item &w = inserted.first->second;
-					w.timeout.reset(new ev::timer(loop));
-					w.timeout->set(0.0, 5.0);
-					w.timeout->set<ioremap::grape::queue::wait_item, &ioremap::grape::queue::wait_item::on_timeout>(&w);
-				}
-				inserted.first->second.timeout->again();
-			}
-
+			update_in_flight(chunk);
 			break;
 		}
 
@@ -143,6 +131,7 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
 		LOG_INFO("chunk %d exhausted, dropped from the popping line", chunk_id);
 
 		// drop chunk from the pop list
+		m_wait_ack.insert(std::make_pair(chunk_id, chunk));
 		m_chunks.erase(found);
 
 		update_indexes();
@@ -151,19 +140,24 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
 	return d;
 }
 
-void ioremap::grape::queue::check_chunk_completion(int chunk_id)
+void ioremap::grape::queue::rebalance_chunks(void)
 {
-	auto found = m_wait_completion.find(chunk_id);
-	if (found == m_wait_completion.end()) {
+	auto last = m_in_flight.rbegin();
+	if (last == m_in_flight.rend()) {
 		return;
 	}
 
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+
+	if ((*last)->get_time() > tv.tv_sec)
+		return;
+
 	// Time passed but chunk still is not complete
 	// so we must replay unacked items from it.
-	LOG_ERROR("chunk %d timed out, returning back to the popping line", chunk_id);
-
-	const wait_item &w = found->second;
-	w.timeout->stop();
+	LOG_ERROR("chunk %d timed out, returning back to the popping line, current time: %ld, chunk expiration time: %f",
+			(*last)->id(), tv.tv_sec, (*last)->get_time());
 
 	// There are two cases when chunk can still be in m_chunks
 	// while experiencing a timeout:
@@ -173,16 +167,19 @@ void ioremap::grape::queue::check_chunk_completion(int chunk_id)
 	//    and then later this chunk timed out in its turn
 	// Timeout requires switch chunk's iteration into the replay mode.
 
-	auto inserted = m_chunks.insert({chunk_id, w.chunk});
+	auto inserted = m_chunks.insert({(*last)->id(), *last});
 	auto chunk = inserted.first->second;
 	if (!inserted.second) {
-		LOG_INFO("chunk %d is already in popping line", chunk_id);
+		LOG_INFO("chunk %d is already in popping line", (*last)->id());
 	} else {
-		LOG_INFO("chunk %d inserted back to the popping line anew", chunk_id);
+		LOG_INFO("chunk %d inserted back to the popping line anew", (*last)->id());
 	}
 	chunk->reset_iteration();
 
-	m_wait_completion.erase(found);
+	auto found = m_wait_ack.find((*last)->id());
+	if (found != m_wait_ack.end())
+		m_wait_ack.erase(found);
+	m_in_flight.pop_back();
 
 	// number of popped but still unacked entries
 	m_stat.timeout_count += (chunk->meta().low_mark() - chunk->meta().acked());
@@ -190,20 +187,17 @@ void ioremap::grape::queue::check_chunk_completion(int chunk_id)
 
 void ioremap::grape::queue::ack(const entry_id id)
 {
-	auto found = m_wait_completion.find(id.chunk);
-	if (found == m_wait_completion.end()) {
+	auto found = m_wait_ack.find(id.chunk);
+	if (found == m_wait_ack.end()) {
 		return;
 	}
 
-	auto chunk = found->second.chunk;
+	auto chunk = found->second;
 	chunk->ack(id.pos);
 	if (chunk->meta().acked() == chunk->meta().low_mark()) {
 		// Real end of the chunk's lifespan, all popped entries are acked
 
-		// Stop timeout timer for the chunk if its active,
-		// and forget about chunk
-		found->second.timeout->stop();
-		m_wait_completion.erase(found);
+		m_wait_ack.erase(found);
 
 		chunk->add(&m_stat.chunks_popped);
 
@@ -215,13 +209,13 @@ void ioremap::grape::queue::ack(const entry_id id)
 		}
 
 		// Set chunk_id_ack to the lowest active chunk
-		//NOTE: its important to have m_chunks and m_wait_completion both sorted
+		//NOTE: its important to have m_chunks and m_wait_ack both sorted
 		m_stat.chunk_id_ack = m_stat.chunk_id_push;
 		if (!m_chunks.empty()) {
 			m_stat.chunk_id_ack = std::min(m_stat.chunk_id_ack, m_chunks.begin()->first);
 		}
-		if (!m_wait_completion.empty()) {
-			m_stat.chunk_id_ack = std::min(m_stat.chunk_id_ack, m_wait_completion.begin()->first);	
+		if (!m_wait_ack.empty()) {
+			m_stat.chunk_id_ack = std::min(m_stat.chunk_id_ack, m_wait_ack.begin()->first);	
 		}
 
 		update_indexes();
@@ -269,18 +263,7 @@ ioremap::grape::data_array ioremap::grape::queue::peek(int num)
 
 			ret.extend(d);
 
-			// set or reset timeout timer for the chunk
-			{
-				auto inserted = m_wait_completion.insert(std::make_pair(chunk_id, wait_item(this, chunk_id, chunk)));
-				if (inserted.second) {
-					wait_item &w = inserted.first->second;
-					w.timeout.reset(new ev::timer(loop));
-					w.timeout->set(0.0, 5.0);
-					w.timeout->set<ioremap::grape::queue::wait_item, &ioremap::grape::queue::wait_item::on_timeout>(&w);
-				}
-				inserted.first->second.timeout->again();
-			}
-
+			update_in_flight(chunk);
 			break;
 		}
 
@@ -339,4 +322,15 @@ void ioremap::grape::queue::update_indexes()
 const std::string ioremap::grape::queue::queue_id(void) const
 {
 	return m_queue_id;
+}
+
+void ioremap::grape::queue::update_in_flight(ioremap::grape::shared_chunk chunk)
+{
+	auto last = m_in_flight.rbegin();
+	if ((last != m_in_flight.rend()) && ((*last)->id() == chunk->id())) {
+		(*last)->reset_time(5.0);
+	} else {
+		chunk->reset_time(5.0);
+		m_in_flight.push_back(chunk);
+	}
 }

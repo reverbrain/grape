@@ -25,6 +25,7 @@ locate_library(MSGPACK "msgpack.hpp" "msgpack")
 set(GRAPE_COMMON_LIBRARIES
 	${elliptics_cpp_LIBRARY}
 	${CocaineNative_LIBRARIES}
+	${Cocaine_LIBRARY}
 	${LIBEV_LIBRARIES}
 	${Boost_SYSTEM_LIBRARY}
 	${Boost_THREAD_LIBRARY}

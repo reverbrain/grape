@@ -153,6 +153,7 @@ ioremap::grape::chunk::chunk(ioremap::elliptics::session &session, const std::st
 	, m_session_data(session.clone())
 	, m_session_meta(session.clone())
 	, m_meta(max)
+	, m_fire_time(0)
 {
 	m_session_data.set_ioflags(DNET_IO_FLAGS_APPEND | DNET_IO_FLAGS_NOCSUM);
 	m_session_meta.set_ioflags(DNET_IO_FLAGS_NOCSUM | DNET_IO_FLAGS_OVERWRITE);
@@ -393,4 +394,22 @@ void ioremap::grape::chunk::add(struct ioremap::grape::chunk_stat *st)
 	SUM(pop);
 	SUM(ack);
 #undef SUM
+}
+
+int ioremap::grape::chunk::id(void) const
+{
+	return m_chunk_id;
+}
+
+void ioremap::grape::chunk::reset_time(double timeout)
+{
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	m_fire_time = tv.tv_sec + timeout;
+}
+
+double ioremap::grape::chunk::get_time(void)
+{
+	return m_fire_time;
 }

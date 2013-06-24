@@ -88,7 +88,7 @@ queue_app_context::~queue_app_context()
 
 void queue_app_context::initialize()
 {
-	m_queue.reset(new ioremap::grape::queue(m_id, service_manager()->get_reactor_native()));
+	m_queue.reset(new ioremap::grape::queue(m_id));
 	m_queue->initialize("queue.conf");
 	COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured", m_id.c_str());
 

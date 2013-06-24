@@ -4,7 +4,6 @@
 #include <map>
 
 #include <msgpack.hpp>
-#include <ev++.h>
 
 #include <elliptics/session.hpp>
 
@@ -184,6 +183,10 @@ class chunk {
 		struct chunk_stat stat(void);
 		void add(struct chunk_stat *st);
 
+		int id() const;
+		void reset_time(double timeout);
+		double get_time(void);
+
 	private:
 		int m_chunk_id;
 		elliptics::key m_data_key;
@@ -201,6 +204,8 @@ class chunk {
 		elliptics::data_pointer m_data;
 
 		chunk_ctl m_meta;
+
+		double m_fire_time;
 
 		void write_meta();
 		void reset_iteration_mode();
@@ -229,7 +234,7 @@ class queue {
 	public:
 		ELLIPTICS_DISABLE_COPY(queue);
 
-		queue(const std::string &queue_id, ev::loop_ref &event_loop);
+		queue(const std::string &queue_id);
 
 		void initialize(const std::string &config);
 
@@ -254,7 +259,6 @@ class queue {
 
 	private:
 		int m_chunk_max;
-		ev::loop_ref &loop; // event loop for timers
 
 		std::string m_queue_id;
 		std::string m_queue_stat_id;
@@ -264,26 +268,13 @@ class queue {
 		queue_stat m_stat;
 
 		std::map<int, shared_chunk> m_chunks;
+		std::map<int, shared_chunk> m_wait_ack;
+		std::list<shared_chunk> m_in_flight;
 
-		struct wait_item {
-			queue *host;
-			int chunk_id;
-			shared_chunk chunk;
-			std::unique_ptr<ev::timer> timeout;
+		void rebalance_chunks(void);
+		void update_indexes(void);
 
-			wait_item(queue *host, int chunk_id, shared_chunk chunk)
-				: host(host), chunk_id(chunk_id), chunk(chunk)
-			{}
-
-			void on_timeout(ev::timer &, int revents) {
-				host->check_chunk_completion(chunk_id);
-			}
-		};
-		friend struct wait_item;
-		std::map<int, wait_item> m_wait_completion;
-
-		void check_chunk_completion(int chunk_id);
-		void update_indexes();
+		void update_in_flight(shared_chunk chunk);
 };
 
 }} /* namespace ioremap::grape */
