@@ -136,14 +136,14 @@ void app_context::process(const std::string &cocaine_event, const std::vector<st
 		//if (m_ack_on_success) {
 			client.set_exceptions_policy(session::no_exceptions);
 
-			ioremap::grape::data_array d = ioremap::grape::data_array::deserialize(context.data());
+			auto d = ioremap::grape::deserialize<ioremap::grape::data_array>(context.data());
 			size_t count = d.ids().size();
 
 			COCAINE_LOG_INFO(m_log, "%s, acking multi entry, size %ld, to queue %s",
 					action_id.c_str(), count, dnet_dump_id_str(context.src_id()->id));
 
-			//FIXME: drop data, leave in the reply only ids 
-			client.exec(context, _queue_ack_event, context.data()).connect(
+			// send back only a vector with ids
+			client.exec(context, _queue_ack_event, ioremap::grape::serialize(d.ids())).connect(
 					async_result<exec_result_entry>::result_function(),
 					[this, action_id, count] (const error_info &error) {
 						if (error) {

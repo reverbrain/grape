@@ -69,7 +69,7 @@ dnet_id key;
 ioremap::elliptics::exec_context context = session->exec(
         &key, "queue@peek-multi", ioremap::elliptics::data_pointer("100")
         ).get_one().context();
-ioremap::grape::data_array array = ioremap::grape::data_array::deserialize(context.data());
+auto array = ioremap::grape::deserialize<ioremap::grape::data_array>(context.data());
 ioremap::elliptics::data_pointer d = array.data();
 size_t offset = 0;
 for (size_t i = 0; i < array.sizes().size(); ++i) {
@@ -89,11 +89,9 @@ Returns serialized `ioremap::grape::data_array` structure which holds entries' d
 ##### queue.ack-multi
 ```
 ioremap::grape::data_array array = ...;
-session->exec(context, "queue@ack-multi", array.serialize()).wait();
+session->exec(context, "queue@ack-multi", ioremap::grape::serialize(array.ids())).wait();
 ```
 Acknowledges entries received by a previous `peek` (may be several).
-
-FIXME: ack-multi must take `std::vector<entry_id>` and not a `data_array`.
 
 ##### queue.pop and queue.pop-multi
 Short circuit methods `pop` and `pop-multi` has a combined effect of `peek` and `ack` called in one go. They are simple to use but also lose acking and replaying properties.

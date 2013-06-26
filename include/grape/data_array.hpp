@@ -12,10 +12,8 @@ namespace ioremap { namespace grape {
 
 class data_array {
 	public:
-		static data_array deserialize(const elliptics::data_pointer &d);
-
 		void append(const char *data, size_t size, const entry_id &id);
-		void append(const data_array &d);
+		void extend(const data_array &d);
 
 		const std::vector<entry_id> &ids() const;
 		const std::vector<int> &sizes() const;
@@ -23,14 +21,33 @@ class data_array {
 
 		bool empty() const;
 
-		elliptics::data_pointer serialize();
-
 		MSGPACK_DEFINE(m_id, m_size, m_data);
 	private:
 		std::vector<entry_id> m_id;
 		std::vector<int> m_size;
 		std::string m_data;
 };
+
+template <class T>
+elliptics::data_pointer serialize(const T &obj) {
+	msgpack::sbuffer sbuf;
+	msgpack::pack(sbuf, obj);
+
+	return elliptics::data_pointer::copy(sbuf.data(), sbuf.size());
+}
+
+template <class T>
+T deserialize(const elliptics::data_pointer &d) {
+	msgpack::unpacked msg;
+	msgpack::unpack(&msg, (const char *)d.data(), d.size());
+
+	msgpack::object obj = msg.get();
+
+	T result;
+	obj.convert(&result);
+
+	return result;
+}
 
 }}
 

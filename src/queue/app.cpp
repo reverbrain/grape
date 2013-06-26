@@ -60,6 +60,9 @@ class queue_app_context : public cocaine::framework::application<queue_app_conte
 		void process(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response);
 
 	private:
+		typedef ioremap::grape::data_array peek_multi_type;
+		typedef std::vector<ioremap::grape::entry_id> ack_multi_type;
+
 		std::string m_id;
 		std::shared_ptr<cocaine::framework::logger_t> m_log;
 		std::shared_ptr<ioremap::grape::queue> m_queue;
@@ -127,11 +130,11 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		m_queue->final(context, ioremap::elliptics::data_pointer());
 
 	} else if (event == "pop-multi" || event == "pop-multiple-string") {
-		int num = atoi(context.data().to_string().c_str());
+		int num = stoi(context.data().to_string());
 
-		ioremap::grape::data_array d = m_queue->pop(num);
+		peek_multi_type d = m_queue->pop(num);
 		if (!d.empty()) {
-			m_queue->final(context, d.serialize());
+			m_queue->final(context, ioremap::grape::serialize(d));
 			m_pop_rate.update(d.sizes().size());
 			m_ack_rate.update(d.sizes().size());
 		} else {
@@ -167,12 +170,12 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		m_pop_rate.update(1);
 
 	} else if (event == "peek-multi") {
-		int num = atoi(context.data().to_string().c_str());
+		int num = stoi(context.data().to_string());
 
-		ioremap::grape::data_array d = m_queue->peek(num);
+		peek_multi_type d = m_queue->peek(num);
 
 		if (!d.empty()) {
-			m_queue->final(context, d.serialize());
+			m_queue->final(context, ioremap::grape::serialize(d));
 			m_pop_rate.update(d.sizes().size());
 		} else {
 			m_queue->final(context, ioremap::elliptics::data_pointer());
@@ -198,16 +201,16 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 				);
 
 	} else if (event == "ack-multi") {
-		ioremap::grape::data_array d = ioremap::grape::data_array::deserialize(context.data());
+		auto d = ioremap::grape::deserialize<ack_multi_type>(context.data());
 
-		m_queue->ack(d.ids());
+		m_queue->ack(d);
 		m_queue->final(context, ioremap::elliptics::data_pointer());
 
-		m_ack_rate.update(d.ids().size());
+		m_ack_rate.update(d.size());
 
 		COCAINE_LOG_INFO(m_log, "%s, acked %ld entries",
 				action_id.c_str(),
-				d.ids().size()
+				d.size()
 				);
 
 	} else if (event == "stats") {

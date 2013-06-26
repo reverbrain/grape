@@ -267,7 +267,7 @@ ioremap::grape::data_array ioremap::grape::queue::peek(int num)
 		if (!d.empty()) {
 			m_stat.pop_count += d.sizes().size();
 
-			ret.append(d);
+			ret.extend(d);
 
 			// set or reset timeout timer for the chunk
 			{

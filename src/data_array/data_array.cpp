@@ -17,7 +17,7 @@ void data_array::append(const char *data, size_t size, const entry_id &id)
 	}
 }
 
-void data_array::append(const data_array &d)
+void data_array::extend(const data_array &d)
 {
 	size_t old_data_size = m_data.size();
 	size_t old_sizes_size = m_size.size();
@@ -53,25 +53,4 @@ const std::string &data_array::data(void) const
 bool data_array::empty(void) const
 {
 	return m_size.empty();
-}
-
-elliptics::data_pointer data_array::serialize(void)
-{
-	msgpack::sbuffer sbuf;
-	msgpack::pack(sbuf, *this);
-
-	return elliptics::data_pointer::copy(sbuf.data(), sbuf.size());
-}
-
-data_array data_array::deserialize(const elliptics::data_pointer &d)
-{
-	msgpack::unpacked msg;
-	msgpack::unpack(&msg, (const char *)d.data(), d.size());
-
-	msgpack::object obj = msg.get();
-	data_array array;
-
-	obj.convert(&array);
-
-	return array;	
 }
