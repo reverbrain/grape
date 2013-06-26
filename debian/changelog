@@ -1,3 +1,13 @@
+grape (0.6.21) unstable; urgency=low
+
+  * no separate configure event, this work is done by srw's
+    start-multiple-task now
+  * queue-starter is gone
+  * ack-multi takes just entry ids now instead of full data_array
+  * still requires cocaine-framework-native=0.10.5-1~1.gbp0311cf
+
+ -- Ivan Chelubeev <ijon@yandex-team.ru>  Wed, 26 Jun 2013 23:54:19 +0400
+
 grape (0.6.20) unstable; urgency=low
 
   * Merged acknowledgement mechanics, timeout retries, queue
@@ -8,7 +18,7 @@ grape (0.6.20) unstable; urgency=low
   * Use unapproved feature from cocaine-framework-native and so require
     specific version of it (0.10.5-1~1.gbp0311cf) at runtime)
 
- -- Ivan Chelyubeev <ijon@yandex-team.ru>  Mon, 17 Jun 2013 17:27:58 +0400
+ -- Ivan Chelubeev <ijon@yandex-team.ru>  Mon, 17 Jun 2013 17:27:58 +0400
 
 grape (0.6.19) unstable; urgency=low
 
