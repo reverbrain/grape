@@ -7,7 +7,7 @@ Build-Depends: debhelper (>= 7),
 		cdbs,
 		elliptics-dev (>> 2.24.8.1),
 		elliptics-client (>> 2.24.8.1),
-		cocaine-framework-native-dev (= 0.10.5-1~1.gbp0311cf),
+		cocaine-framework-native-dev (> 0.10.5),
 		libcocaine-dev (>= 0.10.5-4),
 		libboost-dev,
 		libboost-system-dev,
@@ -43,6 +43,6 @@ Description: Grape queue driver (cocaine plugin)
 
 Package: grape-components
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, grape (= ${binary:Version}), cocaine-framework-native (= 0.10.5-1~1.gbp0311cf)
+Depends: ${shlibs:Depends}, ${misc:Depends}, grape (= ${binary:Version}), cocaine-framework-native (> 0.10.5)
 Description: Grape queue and other components (cocaine apps)
  Grape queue and other component apps

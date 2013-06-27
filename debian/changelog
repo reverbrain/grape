@@ -1,3 +1,11 @@
+grape (0.6.22) unstable; urgency=low
+
+  * acking timeouts done by hand instead of libev
+  * hence no strict requirement on
+    cocaine-framework-native=0.10.5-1~1.gbp0311cf
+
+ -- Ivan Chelubeev <ijon@yandex-team.ru>  Thu, 27 Jun 2013 20:22:05 +0400
+
 grape (0.6.21) unstable; urgency=low
 
   * no separate configure event, this work is done by srw's
