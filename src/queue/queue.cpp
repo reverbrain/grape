@@ -31,6 +31,7 @@ ioremap::grape::queue::queue(const std::string &queue_id)
 	: m_chunk_max(DEFAULT_MAX_CHUNK_SIZE)
 	, m_queue_id(queue_id)
 	, m_queue_stat_id(queue_id + ".stat")
+	, m_last_timeout_check_time(0)
 {
 }
 
@@ -93,15 +94,19 @@ void ioremap::grape::queue::push(const ioremap::elliptics::data_pointer &d)
 	}
 
 	m_stat.push_count++;
+
+	check_timeouts();
 }
 
 ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
 {
+	check_timeouts();
+
 	ioremap::elliptics::data_pointer d;
 	*entry_id = {-1, -1};
 
 	while (true) {
-		auto found = m_chunks.find(entry_id->chunk);
+		auto found = m_chunks.begin();
 		if (found == m_chunks.end()) {
 			break;
 		}
@@ -116,7 +121,7 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
 		if (!d.empty()) {
 			m_stat.pop_count++;
 
-			update_in_flight(chunk);
+			update_chunk_timeout(chunk);
 			break;
 		}
 
@@ -140,53 +145,70 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
 	return d;
 }
 
-void ioremap::grape::queue::rebalance_chunks(void)
+void ioremap::grape::queue::update_chunk_timeout(ioremap::grape::shared_chunk chunk)
 {
-	auto last = m_in_flight.rbegin();
-	if (last == m_in_flight.rend()) {
-		return;
-	}
+	//TODO: make acking timeout value configurable
+	chunk->reset_time(5.0);	
+}
 
+void ioremap::grape::queue::check_timeouts()
+{
 	struct timeval tv;
-
 	gettimeofday(&tv, NULL);
 
-	if ((*last)->get_time() > tv.tv_sec)
+	// check no more then once in 1 second
+	//TODO: make timeout check interval configurable
+	if ((tv.tv_sec - m_last_timeout_check_time) < 1) {
 		return;
-
-	// Time passed but chunk still is not complete
-	// so we must replay unacked items from it.
-	LOG_ERROR("chunk %d timed out, returning back to the popping line, current time: %ld, chunk expiration time: %f",
-			(*last)->id(), tv.tv_sec, (*last)->get_time());
-
-	// There are two cases when chunk can still be in m_chunks
-	// while experiencing a timeout:
-	// 1) if it's a single chunk in the queue (and serves both
-	//    as a push and a pop/ack target)
-	// 2) if iteration of this chunk was preempted by other timed out chunk
-	//    and then later this chunk timed out in its turn
-	// Timeout requires switch chunk's iteration into the replay mode.
-
-	auto inserted = m_chunks.insert({(*last)->id(), *last});
-	auto chunk = inserted.first->second;
-	if (!inserted.second) {
-		LOG_INFO("chunk %d is already in popping line", (*last)->id());
-	} else {
-		LOG_INFO("chunk %d inserted back to the popping line anew", (*last)->id());
 	}
-	chunk->reset_iteration();
+	m_last_timeout_check_time = tv.tv_sec;
 
-	auto found = m_wait_ack.find((*last)->id());
-	if (found != m_wait_ack.end())
-		m_wait_ack.erase(found);
-	m_in_flight.pop_back();
+	LOG_INFO("checking timeouts: %ld waiting chunks", m_wait_ack.size());
 
-	// number of popped but still unacked entries
-	m_stat.timeout_count += (chunk->meta().low_mark() - chunk->meta().acked());
+	auto i = m_wait_ack.begin();
+	while (i != m_wait_ack.end()) {
+		int chunk_id = i->first;
+		auto chunk = i->second;
+
+		if (chunk->get_time() > tv.tv_sec) {
+			++i;
+			continue;
+		}
+
+		// Time passed but chunk still is not complete
+		// so we must replay unacked items from it.
+		LOG_ERROR("chunk %d timed out, returning back to the popping line, current time: %ld, chunk expiration time: %f",
+				chunk_id, tv.tv_sec, chunk->get_time());
+
+		// There are two cases when chunk can still be in m_chunks
+		// while experiencing a timeout:
+		// 1) if it's a single chunk in the queue (and serves both
+		//    as a push and a pop/ack target)
+		// 2) if iteration of this chunk was preempted by other timed out chunk
+		//    and then later this chunk timed out in its turn
+		// Timeout requires switch chunk's iteration into the replay mode.
+
+		auto inserted = m_chunks.insert({chunk_id, chunk});
+		if (!inserted.second) {
+			LOG_INFO("chunk %d is already in popping line", chunk_id);
+		} else {
+			LOG_INFO("chunk %d inserted back to the popping line anew", chunk_id);
+		}
+		chunk->reset_iteration();
+
+		auto hold = i;
+		++i;
+		m_wait_ack.erase(hold);
+
+		// number of popped but still unacked entries
+		m_stat.timeout_count += (chunk->meta().low_mark() - chunk->meta().acked());
+	}
 }
 
 void ioremap::grape::queue::ack(const entry_id id)
 {
+	check_timeouts();
+
 	auto found = m_wait_ack.find(id.chunk);
 	if (found == m_wait_ack.end()) {
 		return;
@@ -245,6 +267,8 @@ ioremap::grape::data_array ioremap::grape::queue::pop(int num)
 
 ioremap::grape::data_array ioremap::grape::queue::peek(int num)
 {
+	check_timeouts();
+
 	ioremap::grape::data_array ret;
 
 	while (num > 0) {
@@ -263,7 +287,7 @@ ioremap::grape::data_array ioremap::grape::queue::peek(int num)
 
 			ret.extend(d);
 
-			update_in_flight(chunk);
+			update_chunk_timeout(chunk);
 			break;
 		}
 
@@ -322,15 +346,4 @@ void ioremap::grape::queue::update_indexes()
 const std::string ioremap::grape::queue::queue_id(void) const
 {
 	return m_queue_id;
-}
-
-void ioremap::grape::queue::update_in_flight(ioremap::grape::shared_chunk chunk)
-{
-	auto last = m_in_flight.rbegin();
-	if ((last != m_in_flight.rend()) && ((*last)->id() == chunk->id())) {
-		(*last)->reset_time(5.0);
-	} else {
-		chunk->reset_time(5.0);
-		m_in_flight.push_back(chunk);
-	}
 }

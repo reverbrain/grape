@@ -269,12 +269,14 @@ class queue {
 
 		std::map<int, shared_chunk> m_chunks;
 		std::map<int, shared_chunk> m_wait_ack;
-		std::list<shared_chunk> m_in_flight;
+		//std::list<shared_chunk> m_in_flight;
+		double m_last_timeout_check_time;
 
-		void rebalance_chunks(void);
-		void update_indexes(void);
+		void update_indexes();
 
-		void update_in_flight(shared_chunk chunk);
+		void update_chunk_timeout(shared_chunk chunk);
+
+		void check_timeouts();
 };
 
 }} /* namespace ioremap::grape */
