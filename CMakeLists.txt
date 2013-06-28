@@ -36,8 +36,9 @@ install(DIRECTORY include/ DESTINATION include)
 include_directories(${PROJECT_SOURCE_DIR}/include ${elliptics_INCLUDE_DIRS} ${CocaineNative_INCLUDE_DIRS} ${LIBEV_INCLUDE_DIRS})
 
 add_subdirectory(src/data_array)
-add_subdirectory(src/queue)
 add_subdirectory(src/driver)
+add_subdirectory(src/queue)
+add_subdirectory(src/queue-pump)
 add_subdirectory(src/testerhead-cpp)
 
 #add_subdirectory(example)
