@@ -148,8 +148,8 @@ uint64_t ioremap::grape::chunk_ctl::byte_offset(int32_t pos) const
 
 ioremap::grape::chunk::chunk(ioremap::elliptics::session &session, const std::string &queue_id, int chunk_id, int max)
 	: m_chunk_id(chunk_id)
-	, m_data_key(queue_id + ".chunk." + lexical_cast(chunk_id))
-	, m_meta_key(queue_id + ".chunk." + lexical_cast(chunk_id) + ".meta")
+	, m_data_key(queue_id + ".chunk." + std::to_string(chunk_id))
+	, m_meta_key(queue_id + ".chunk." + std::to_string(chunk_id) + ".meta")
 	, m_session_data(session.clone())
 	, m_session_meta(session.clone())
 	, m_meta(max)

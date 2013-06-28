@@ -155,16 +155,15 @@ void queue_driver::get_more_data()
 
 		req->id.group_id = 0;
 
-		std::string random_data = m_queue_name + lexical_cast(req->src_key) + lexical_cast(rand());
+		std::string random_data = m_queue_name + std::to_string(req->src_key) + std::to_string(rand());
 		sess.transform(random_data, req->id);
 
 		sess.set_groups(m_queue_groups);
 
 		queue_inc(1);
 
-		std::string strnum = lexical_cast(req->num);
 		sess.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
-		sess.exec(&req->id, req->src_key, m_queue_pop_event, strnum).connect(
+		sess.exec(&req->id, req->src_key, m_queue_pop_event, std::to_string(req->num)).connect(
 			std::bind(&queue_driver::on_queue_request_data, this, req, std::placeholders::_1),
 			std::bind(&queue_driver::on_queue_request_complete, this, req, std::placeholders::_1)
 		);
