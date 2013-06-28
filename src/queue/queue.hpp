@@ -274,7 +274,7 @@ class queue {
 
 		void update_indexes();
 
-		void update_chunk_timeout(shared_chunk chunk);
+		void update_chunk_timeout(int chunk_id, shared_chunk chunk);
 
 		void check_timeouts();
 };

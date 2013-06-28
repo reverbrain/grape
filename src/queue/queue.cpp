@@ -94,8 +94,6 @@ void ioremap::grape::queue::push(const ioremap::elliptics::data_pointer &d)
 	}
 
 	m_stat.push_count++;
-
-	check_timeouts();
 }
 
 ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
@@ -121,7 +119,9 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
 		if (!d.empty()) {
 			m_stat.pop_count++;
 
-			update_chunk_timeout(chunk);
+			// set or reset timeout timer for the chunk
+			update_chunk_timeout(chunk_id, chunk);
+
 			break;
 		}
 
@@ -136,7 +136,6 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
 		LOG_INFO("chunk %d exhausted, dropped from the popping line", chunk_id);
 
 		// drop chunk from the pop list
-		m_wait_ack.insert(std::make_pair(chunk_id, chunk));
 		m_chunks.erase(found);
 
 		update_indexes();
@@ -145,8 +144,10 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
 	return d;
 }
 
-void ioremap::grape::queue::update_chunk_timeout(ioremap::grape::shared_chunk chunk)
+void ioremap::grape::queue::update_chunk_timeout(int chunk_id, ioremap::grape::shared_chunk chunk)
 {
+	// add chunk to the waiting list and postpone its deadline time
+	auto inserted = m_wait_ack.insert({chunk_id, chunk});
 	//TODO: make acking timeout value configurable
 	chunk->reset_time(5.0);	
 }
@@ -207,10 +208,9 @@ void ioremap::grape::queue::check_timeouts()
 
 void ioremap::grape::queue::ack(const entry_id id)
 {
-	check_timeouts();
-
 	auto found = m_wait_ack.find(id.chunk);
 	if (found == m_wait_ack.end()) {
+		LOG_ERROR("ack for chunk %d (pos %d) which is not in waiting list", id.chunk, id.pos);
 		return;
 	}
 
@@ -287,7 +287,9 @@ ioremap::grape::data_array ioremap::grape::queue::peek(int num)
 
 			ret.extend(d);
 
-			update_chunk_timeout(chunk);
+			// set or reset timeout timer for the chunk
+			update_chunk_timeout(chunk_id, chunk);
+
 			break;
 		}
 
