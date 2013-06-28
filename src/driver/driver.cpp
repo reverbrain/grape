@@ -88,11 +88,11 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 	}
 
 	if (m_queue_name.empty())
-		throw configuration_error_t("no queue name has been specified");
+		throw configuration_error("no queue name has been specified");
 
 	char *ptr = strchr((char *)m_worker_event.c_str(), '@');
 	if (!ptr)
-		throw configuration_error_t("invalid worker event ('emit' config entry), it must contain @ sign");
+		throw configuration_error("invalid worker event ('emit' config entry), it must contain @ sign");
 
 	std::string app_name(m_worker_event.c_str(), ptr - m_worker_event.c_str());
 	std::string event_name(ptr+1);

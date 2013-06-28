@@ -1,20 +1,27 @@
 #ifndef ELLIPTICS_CLIENT_STATE_HPP__
 #define ELLIPTICS_CLIENT_STATE_HPP__
 
+#include <algorithm>
+
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/filestream.h"
 
-#include <cocaine/common.hpp> // for configuration_error_t
-
-#include <elliptics/cppdef.h>
+#include <elliptics/error.hpp>
+#include <elliptics/session.hpp>
 
 #include <sstream>
 
 using namespace ioremap;
-using namespace cocaine;
 
+class configuration_error : public elliptics::error
+{
+public:
+    explicit configuration_error(const std::string &message) throw()
+        : error(EINVAL, message)
+    {}
+};
 
 static inline void read_groups_array(std::vector<int> *result, const char *name, const rapidjson::Value value) {
     if (const auto *m = value.FindMember(name)) {
@@ -26,7 +33,7 @@ static inline void read_groups_array(std::vector<int> *result, const char *name,
         } else {
 			std::ostringstream str;
 			str << name << "value must be of array type";
-            throw configuration_error_t(str.str().c_str());
+            throw configuration_error(str.str().c_str());
         }
     }
 }
@@ -81,7 +88,7 @@ struct elliptics_client_state {
 				std::bind(&rapidjson::Value::GetInt, std::placeholders::_1)
 				);
 		} catch (const std::exception &e) {
-			throw configuration_error_t(e.what());
+			throw configuration_error(e.what());
 		}
 
 		return create(remotes, groups, logfile, loglevel);
@@ -94,7 +101,7 @@ struct elliptics_client_state {
 		if (!cf) {
 			std::ostringstream str;
 			str << "failed to open config file '" << conf << "'";
-			throw configuration_error_t(str.str().c_str());
+			throw configuration_error(str.str().c_str());
 		}
 
 		try {
@@ -104,7 +111,7 @@ struct elliptics_client_state {
 			if (doc.HasParseError()) {
 				std::ostringstream str;
 				str << "can not parse config file '" << conf << "': " << doc.GetParseError();
-				throw configuration_error_t(str.str().c_str());
+				throw configuration_error(str.str().c_str());
 			}
 
 			fclose(cf);
@@ -122,10 +129,10 @@ struct elliptics_client_state {
 	static elliptics_client_state create(const std::vector<std::string> &remotes,
 			const std::vector<int> &groups, const std::string &logfile, int loglevel) {
 		if (remotes.size() == 0) {
-			throw configuration_error_t("no remotes have been specified");
+			throw configuration_error("no remotes have been specified");
 		}
 		if (groups.size() == 0) {
-			throw configuration_error_t("no groups have been specified");
+			throw configuration_error("no groups have been specified");
 		}
 
 		elliptics_client_state result;
@@ -158,7 +165,7 @@ struct elliptics_client_state {
 				}
 			}
 			if (added == 0) {
-				throw configuration_error_t("no remotes were added successfully");
+				throw configuration_error("no remotes were added successfully");
 			}
 		}
 
