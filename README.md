@@ -5,12 +5,12 @@ Its main goal is to provide an active example of elliptics data processing capab
 Grape, as for now, consist of 2 components:
 
 * fault-tolerant persistent queue
-* and a connector that allows to direct queue output into an user application running on elliptics cluster (see [TODO: driver concept]() in Cocaine docs)
+* and a connector that allows to direct queue output into user application running on elliptics cluster (see [TODO: driver concept]() in Cocaine docs)
 
 ### Queue
 Queue is a [cocaine](https://github.com/cocaine/cocaine-core) application running on elliptics node. Its deployment process follows [TODO: general scheme]() for cocaine applications.
 
-Once deployed and started queue accepts data entries pushed into it, stores them among nodes of elliptics cluster its working on, and gives data entries back on consumer's request, maintaining their original order.
+Once deployed and started queue accepts data entries pushed into it, stores them among nodes of elliptics cluster its working on, and gives data entries back on consumer request, maintaining entries original order.
 
 Queue supports fault-tolerance by using data replication and by implementing fault-replay mechanics: consumer must acknowledge processing status of every data entry that it retrieved from the queue - failing to do so will result in entry "replay", over and over again up until it'll be confirmed.
 
@@ -175,7 +175,7 @@ Now queue is deployed (on every node that this elliptics installation includes, 
 
 Activate the queue:
 ```
-$ dnet_ioclient -r localhost:1025:2 -g 2 -c "queue@ping"
+dnet_ioclient -r localhost:1025:2 -g 2 -c "queue@ping"
 ```
 Queue is up and running if reply would be:
 ```
