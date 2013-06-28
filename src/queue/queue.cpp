@@ -147,7 +147,7 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
 void ioremap::grape::queue::update_chunk_timeout(int chunk_id, ioremap::grape::shared_chunk chunk)
 {
 	// add chunk to the waiting list and postpone its deadline time
-	auto inserted = m_wait_ack.insert({chunk_id, chunk});
+	m_wait_ack.insert({chunk_id, chunk});
 	//TODO: make acking timeout value configurable
 	chunk->reset_time(5.0);	
 }
