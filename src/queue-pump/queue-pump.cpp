@@ -43,8 +43,8 @@ public:
 		: client(client)
 		, queue_name(queue_name)
 		, request_size(request_size)
-		, running_requests(0)
 		, next_request_id(0)
+		, running_requests(0)
 	{}
 
 	void run(processing_function func) {
@@ -264,6 +264,7 @@ int main(int argc, char** argv)
 	queue_pump pump(clientlib.create_session(), queue_name, request_size);
 	pump.run([] (ioremap::grape::entry_id entry_id, ioremap::elliptics::data_pointer data) -> bool {
 		fprintf(stderr, "entry %d-%d, byte size %ld\n", entry_id.chunk, entry_id.pos, data.size());
+		return true;
 	});
 
 	return 0;
