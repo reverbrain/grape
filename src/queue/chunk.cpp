@@ -25,7 +25,7 @@ bool ioremap::grape::chunk_meta::push(int size)
 	m_ptr->entries[m_ptr->high].size = size;
 	m_ptr->high++;
 
-	LOG_INFO("\tmeta.push: acked: %d, low: %d, high: %d, max: %d", m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
+	LOG_DEBUG("\tmeta.push: acked: %d, low: %d, high: %d, max: %d", m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
 
 	return full();
 }
@@ -46,7 +46,7 @@ void ioremap::grape::chunk_meta::pop()
 
 	m_ptr->low++;
 
-	LOG_INFO("\tmeta.pop: acked: %d, low: %d, high: %d, max: %d", m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
+	LOG_DEBUG("\tmeta.pop: acked: %d, low: %d, high: %d, max: %d", m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
 }
 
 bool ioremap::grape::chunk_meta::ack(int32_t pos, int state)
@@ -71,7 +71,7 @@ bool ioremap::grape::chunk_meta::ack(int32_t pos, int state)
 
 	m_ptr->entries[pos].state = state;
 	m_ptr->acked++;
-	LOG_INFO("\tmeta.ack: pos: %d, acked: %d, low: %d, high: %d, max: %d", pos, m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
+	LOG_DEBUG("\tmeta.ack: pos: %d, acked: %d, low: %d, high: %d, max: %d", pos, m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
 
 	return complete();
 }
@@ -177,12 +177,12 @@ void ioremap::grape::chunk::load_meta()
 
 	} catch (const ioremap::elliptics::not_found_error &e) {
 		// ignore not-found exception - create empty chunk
-		LOG_ERROR("chunk::ctor: chunk %d: meta not found: %s", m_chunk_id, e.what());
+		LOG_ERROR("chunk %d, load_meta, ERROR: meta not found: %s", m_chunk_id, e.what());
 
 	} catch (const ioremap::elliptics::error &e) {
 		// special case to ignore bad chunk meta format error
 		// (raised by chunk_clt::assign())
-		LOG_ERROR("chunk::ctor: chunk %d: error reading meta: %s", m_chunk_id, e.what());
+		LOG_ERROR("chunk %d, load_meta, ERROR: error reading meta: %s", m_chunk_id, e.what());
 		if (e.error_code() != -ERANGE) {
 			throw;
 		}
@@ -197,23 +197,23 @@ void ioremap::grape::chunk::prepare_iteration()
 		// Metadata is read only at start (as it resides in memory and properly updated by push).
 		//
 		if (iteration_state.byte_offset >= m_data.size()) {
-			LOG_INFO("chunk::pop(): chunk %d, (re)reading data, iteration.byte_offset %lld, m_data.size() %ld", m_chunk_id, iteration_state.byte_offset, m_data.size());
+			LOG_INFO("chunk %d, prepare_iteration, (re)reading data, iteration.byte_offset %lld, m_data.size() %ld", m_chunk_id, iteration_state.byte_offset, m_data.size());
 			
 			m_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
 		}
 
 		if (!iter) {
-			LOG_INFO("chunk::pop(): chunk %d, initializing iterator", m_chunk_id);
+			LOG_INFO("chunk %d, prepare_iteration, initializing iterator", m_chunk_id);
 			reset_iteration_mode();
 		}
 
 	} catch (const ioremap::elliptics::not_found_error &e) {
 		// Do not explode on not-found-error, return empty data pointer
-		LOG_ERROR("chunk::pop(): chunk %d, ERROR: %s", m_chunk_id, e.what());
+		LOG_ERROR("chunk %d, prepare_iteration, ERROR: %s", m_chunk_id, e.what());
 
 	} catch (const ioremap::elliptics::timeout_error &e) {
 		// Do not explode on timeout-error, return empty data pointer
-		LOG_ERROR("chunk::pop(): chunk %d, ERROR: %s", m_chunk_id, e.what());
+		LOG_ERROR("chunk %d, prepare_iteration, ERROR: %s", m_chunk_id, e.what());
 
 		//XXX: this means we silently ignore unreachable data,
 		// and it can't be good
@@ -221,7 +221,7 @@ void ioremap::grape::chunk::prepare_iteration()
 	} catch (const ioremap::elliptics::error &e) {
 		// Special case to ignore bad chunk meta format error
 		// (raised by chunk_clt::assign())
-		LOG_ERROR("chunk::pop(): chunk %d, ERROR: %s", m_chunk_id, e.what());
+		LOG_ERROR("chunk %d, prepare_iteration, ERROR: %s", m_chunk_id, e.what());
 		if (e.error_code() != -ERANGE) {
 			throw;
 		}
@@ -236,16 +236,16 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(int *pos)
 	// Fast track for the case when chunk is empty (not exist).
 	// It valid to check only metadata as push() updates metadata in memory
 	if (m_meta.high_mark() == 0) {
-		LOG_INFO("chunk::pop(): empty");
+		LOG_INFO("chunk %d, pop-single, empty", m_chunk_id);
 		return d;
 	}
 
 	prepare_iteration();
 
-	LOG_INFO("chunk::pop(): iter: mode %d, index %d, offset %lld", iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
+	LOG_INFO("chunk %d, pop-single, iter: mode %d, index %d, offset %lld", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
 
 	if (iter->mode == iterator::REPLAY && iter->at_end()) {
-		LOG_INFO("chunk::pop(): iter: mode %d, index %d, offset %lld, switching to mode %d", iter->mode, iteration_state.entry_index, iteration_state.byte_offset, iterator::FORWARD);
+		LOG_INFO("chunk %d, pop-single, iter: mode %d, index %d, offset %lld, switching to mode %d", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset, iterator::FORWARD);
 
 		iter.reset(new forward_iterator(iteration_state, m_meta));
 		iter->begin();
@@ -259,7 +259,7 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(int *pos)
 		iter->advance();
 
 	} else {
-		LOG_INFO("chunk::pop(): iter: mode %d, index %d, offset %lld, is at end", iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
+		LOG_INFO("chunk %d, pop-single, iter: mode %d, index %d, offset %lld, is at end", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
 	}
 
 	++m_stat.pop;
@@ -273,7 +273,7 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 	// Fast track for the case when chunk is empty (not exist).
 	// Its valid to check only metadata as push() updates metadata in memory
 	if (m_meta.high_mark() == 0) {
-		LOG_INFO("chunk::pop(num): empty");
+		LOG_INFO("chunk %d, pop, empty", m_chunk_id);
 		return ret;
 	}
 
@@ -285,14 +285,14 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 	while(num > 0) {
 		if (iter->mode == iterator::REPLAY && iter->at_end()) {
 			
-			LOG_INFO("chunk::pop(): iter: mode %d, index %d, offset %lld, switching to mode %d", iter->mode, iteration_state.entry_index, iteration_state.byte_offset, iterator::FORWARD);
+			LOG_INFO("chunk %d, pop, iter: mode %d, index %d, offset %lld, switching to mode %d", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset, iterator::FORWARD);
 
 			iter.reset(new forward_iterator(iteration_state, m_meta));
 			iter->begin();
 		}
 
 		if (iter->at_end()) {
-			LOG_INFO("chunk::pop(): iter: mode %d, index %d, offset %lld, is at end", iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
+			LOG_INFO("chunk %d, pop, iter: mode %d, index %d, offset %lld, is at end", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
 			break;
 		}
 
