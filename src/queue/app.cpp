@@ -1,19 +1,24 @@
-#include "queue.hpp"
+#include <fstream>
 
 #include <cocaine/format.hpp>
 #include <cocaine/framework/logging.hpp>
 #include <cocaine/framework/application.hpp>
 #include <cocaine/framework/worker.hpp>
 
-#include <fstream>
+#include "queue.hpp"
 
 namespace {
 
+uint64_t microseconds_now() {
+	timespec t;
+	clock_gettime(CLOCK_MONOTONIC_RAW, &t);
+	return t.tv_sec * 1000000 + t.tv_nsec / 1000;
+}
 
 template <unsigned N>
-double approx_moving_average(double avg, double input) {
-	avg -= avg/N;
-	avg += input/N;
+double modified_moving_average(double avg, double input) {
+	avg -= avg / N;
+	avg += input / N;
 	return avg;
 }
 
@@ -27,12 +32,6 @@ struct rate_stat
 	double avg;
 
 	rate_stat() : last_update(microseconds_now()), avg(0.0) {}
-
-	uint64_t microseconds_now() {
-		timespec t;
-		clock_gettime(CLOCK_MONOTONIC_RAW, &t);
-		return t.tv_sec * 1000000 + t.tv_nsec / 1000;
-	}
 
 	void update(size_t num) {
 		uint64_t now = microseconds_now();
@@ -238,16 +237,16 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		root.AddMember("timeout.count", st.timeout_count, root.GetAllocator());
 		root.AddMember("update_indexes", st.update_indexes, root.GetAllocator());
 
-		root.AddMember("chunks_popped.write_data_async", st.chunks_popped.write_data_async, root.GetAllocator());
-		root.AddMember("chunks_popped.write_ctl_async", st.chunks_popped.write_ctl_async, root.GetAllocator());
+		root.AddMember("chunks_popped.write_data", st.chunks_popped.write_data, root.GetAllocator());
+		root.AddMember("chunks_popped.write_meta", st.chunks_popped.write_meta, root.GetAllocator());
 		root.AddMember("chunks_popped.read", st.chunks_popped.read, root.GetAllocator());
 		root.AddMember("chunks_popped.remove", st.chunks_popped.remove, root.GetAllocator());
 		root.AddMember("chunks_popped.push", st.chunks_popped.push, root.GetAllocator());
 		root.AddMember("chunks_popped.pop", st.chunks_popped.pop, root.GetAllocator());
 		root.AddMember("chunks_popped.ack", st.chunks_popped.ack, root.GetAllocator());
 
-		root.AddMember("chunks_pushed.write_data_async", st.chunks_pushed.write_data_async, root.GetAllocator());
-		root.AddMember("chunks_pushed.write_ctl_async", st.chunks_pushed.write_ctl_async, root.GetAllocator());
+		root.AddMember("chunks_pushed.write_data", st.chunks_pushed.write_data, root.GetAllocator());
+		root.AddMember("chunks_pushed.write_meta", st.chunks_pushed.write_meta, root.GetAllocator());
 		root.AddMember("chunks_pushed.read", st.chunks_pushed.read, root.GetAllocator());
 		root.AddMember("chunks_pushed.remove", st.chunks_pushed.remove, root.GetAllocator());
 		root.AddMember("chunks_pushed.push", st.chunks_pushed.push, root.GetAllocator());

@@ -25,9 +25,11 @@ std::shared_ptr<cocaine::framework::logger_t> grape_queue_module_get_logger() {
 	return __grape_queue_private_log;
 }
 
+namespace ioremap { namespace grape {
+
 const int DEFAULT_MAX_CHUNK_SIZE = 10000;
 
-ioremap::grape::queue::queue(const std::string &queue_id)
+queue::queue(const std::string &queue_id)
 	: m_chunk_max(DEFAULT_MAX_CHUNK_SIZE)
 	, m_queue_id(queue_id)
 	, m_queue_stat_id(queue_id + ".stat")
@@ -35,7 +37,7 @@ ioremap::grape::queue::queue(const std::string &queue_id)
 {
 }
 
-void ioremap::grape::queue::initialize(const std::string &config)
+void queue::initialize(const std::string &config)
 {
 	rapidjson::Document doc;
 	m_client = elliptics_client_state::create(config, doc);
@@ -48,14 +50,16 @@ void ioremap::grape::queue::initialize(const std::string &config)
 	memset(&m_stat, 0, sizeof(struct queue_stat));
 
 	try {
-		ioremap::elliptics::data_pointer stat = m_client.create_session().read_data(m_queue_stat_id, 0, 0).get_one().file();
-		ioremap::grape::queue_stat *st = stat.data<ioremap::grape::queue_stat>();
+		ioremap::elliptics::data_pointer d = m_client.create_session().read_data(m_queue_state_id, 0, 0).get_one().file();
+		auto *stat = d.data<queue_stat>();
+	
+		m_stat.chunk_id_push = stat->chunk_id_push;
+		m_stat.chunk_id_ack = stat->chunk_id_ack;
 
-		m_stat.chunk_id_push = st->chunk_id_push;
-		m_stat.chunk_id_ack = st->chunk_id_ack;
 		LOG_INFO("init: queue meta found: chunk_id_ack %d, chunk_id_push %d",
 				m_stat.chunk_id_ack, m_stat.chunk_id_push
 				);
+
 	} catch (const ioremap::elliptics::not_found_error &) {
 		LOG_INFO("init: no queue meta found, starting in pristine state");
 	}
@@ -71,7 +75,7 @@ void ioremap::grape::queue::initialize(const std::string &config)
 	LOG_INFO("init: queue started");
 }
 
-void ioremap::grape::queue::push(const ioremap::elliptics::data_pointer &d)
+void queue::push(const ioremap::elliptics::data_pointer &d)
 {
 	auto found = m_chunks.find(m_stat.chunk_id_push);
 	if (found == m_chunks.end()) {
@@ -93,10 +97,10 @@ void ioremap::grape::queue::push(const ioremap::elliptics::data_pointer &d)
 		LOG_INFO("chunk %d filled", chunk_id);
 	}
 
-	m_stat.push_count++;
+	++m_stat.push_count;
 }
 
-ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
+ioremap::elliptics::data_pointer queue::peek(entry_id *entry_id)
 {
 	check_timeouts();
 
@@ -144,7 +148,7 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::peek(entry_id *entry_id)
 	return d;
 }
 
-void ioremap::grape::queue::update_chunk_timeout(int chunk_id, ioremap::grape::shared_chunk chunk)
+void queue::update_chunk_timeout(int chunk_id, shared_chunk chunk)
 {
 	// add chunk to the waiting list and postpone its deadline time
 	m_wait_ack.insert({chunk_id, chunk});
@@ -152,7 +156,7 @@ void ioremap::grape::queue::update_chunk_timeout(int chunk_id, ioremap::grape::s
 	chunk->reset_time(5.0);	
 }
 
-void ioremap::grape::queue::check_timeouts()
+void queue::check_timeouts()
 {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
@@ -206,7 +210,7 @@ void ioremap::grape::queue::check_timeouts()
 	}
 }
 
-void ioremap::grape::queue::ack(const entry_id id)
+void queue::ack(const entry_id id)
 {
 	auto found = m_wait_ack.find(id.chunk);
 	if (found == m_wait_ack.end()) {
@@ -246,7 +250,7 @@ void ioremap::grape::queue::ack(const entry_id id)
 	++m_stat.ack_count;
 }
 
-ioremap::elliptics::data_pointer ioremap::grape::queue::pop()
+ioremap::elliptics::data_pointer queue::pop()
 {
 	entry_id id;
 	ioremap::elliptics::data_pointer d = peek(&id);
@@ -256,20 +260,20 @@ ioremap::elliptics::data_pointer ioremap::grape::queue::pop()
 	return d;
 }
 
-ioremap::grape::data_array ioremap::grape::queue::pop(int num)
+data_array queue::pop(int num)
 {
-	ioremap::grape::data_array d = peek(num);
+	data_array d = peek(num);
 	if (!d.empty()) {
 		ack(d.ids());
 	}
 	return d;
 }
 
-ioremap::grape::data_array ioremap::grape::queue::peek(int num)
+data_array queue::peek(int num)
 {
 	check_timeouts();
 
-	ioremap::grape::data_array ret;
+	data_array ret;
 
 	while (num > 0) {
 		auto found = m_chunks.begin();
@@ -280,7 +284,7 @@ ioremap::grape::data_array ioremap::grape::queue::peek(int num)
 		int chunk_id = found->first;
 		auto chunk = found->second;
 
-		ioremap::grape::data_array d = chunk->pop(num);
+		data_array d = chunk->pop(num);
 		LOG_INFO("chunk %d, popping %d entries", chunk_id, d.sizes().size());
 		if (!d.empty()) {
 			m_stat.pop_count += d.sizes().size();
@@ -312,7 +316,7 @@ ioremap::grape::data_array ioremap::grape::queue::peek(int num)
 	return ret;
 }
 
-void ioremap::grape::queue::ack(const std::vector<entry_id> &ids)
+void queue::ack(const std::vector<entry_id> &ids)
 {
 	for (auto i = ids.begin(); i != ids.end(); ++i) {
 		const entry_id &id = *i;
@@ -325,13 +329,13 @@ ioremap::grape::queue_stat ioremap::grape::queue::stat()
 	return m_stat;
 }
 
-void ioremap::grape::queue::reply(const ioremap::elliptics::exec_context &context,
+void queue::reply(const ioremap::elliptics::exec_context &context,
 		const ioremap::elliptics::data_pointer &d, ioremap::elliptics::exec_context::final_state state)
 {
 	m_client.create_session().reply(context, d, state);
 }
 
-void ioremap::grape::queue::final(const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d)
+void queue::final(const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d)
 {
 	reply(context, d, ioremap::elliptics::exec_context::final);
 }
@@ -349,3 +353,5 @@ const std::string ioremap::grape::queue::queue_id(void) const
 {
 	return m_queue_id;
 }
+
+}} // namespace ioremap::grape

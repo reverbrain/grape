@@ -15,7 +15,6 @@
 
 namespace ioremap { namespace grape {
 
-
 struct chunk_entry {
 	int		size;
 	int		state;
@@ -29,11 +28,11 @@ struct chunk_disk {
 	struct chunk_entry entries[];
 };
 
-class chunk_ctl {
+class chunk_meta {
 	public:
-		ELLIPTICS_DISABLE_COPY(chunk_ctl);
+		ELLIPTICS_DISABLE_COPY(chunk_meta);
 
-		chunk_ctl(int max);
+		chunk_meta(int max);
 
 		// Increases high mark.
 		// Returns true when given chunk is full
@@ -79,9 +78,9 @@ struct iterator {
 	};
 	const iteration_mode mode;
 	iteration &state;
-	chunk_ctl &meta;
+	chunk_meta &meta;
 
-	iterator(iteration_mode mode, iteration &state, chunk_ctl &meta)
+	iterator(iteration_mode mode, iteration &state, chunk_meta &meta)
 		: mode(mode), state(state), meta(meta)
 	{}
 
@@ -92,7 +91,7 @@ struct iterator {
 
 struct forward_iterator : public iterator {
 
-	forward_iterator(iteration &state, chunk_ctl &meta)
+	forward_iterator(iteration &state, chunk_meta &meta)
 		: iterator(FORWARD, state, meta)
 	{}
 
@@ -114,7 +113,7 @@ struct forward_iterator : public iterator {
 
 struct replay_iterator : public iterator {
 
-	replay_iterator(iteration &state, chunk_ctl &meta)
+	replay_iterator(iteration &state, chunk_meta &meta)
 		: iterator(REPLAY, state, meta)
 	{}
 
@@ -149,13 +148,13 @@ struct replay_iterator : public iterator {
 };
 
 struct chunk_stat {
-	uint64_t		write_data_async;
-	uint64_t		write_ctl_async;
-	uint64_t		read;
-	uint64_t		remove;
-	uint64_t		push;
-	uint64_t		pop;
-	uint64_t		ack;
+	uint64_t write_data;
+	uint64_t write_meta;
+	uint64_t read;
+	uint64_t remove;
+	uint64_t push;
+	uint64_t pop;
+	uint64_t ack;
 };
 
 class chunk {
@@ -166,7 +165,7 @@ class chunk {
 		~chunk();
 
 		void load_meta();
-		const chunk_ctl &meta();
+		const chunk_meta &meta();
 
 		// single entry methods
 		bool push(const elliptics::data_pointer &d); // returns true if chunk is full
@@ -203,7 +202,7 @@ class chunk {
 		// cache is being filled when ::pop is invoked and @m_pop_offset is >= than cache size
 		elliptics::data_pointer m_data;
 
-		chunk_ctl m_meta;
+		chunk_meta m_meta;
 
 		double m_fire_time;
 
@@ -218,11 +217,11 @@ typedef std::shared_ptr<chunk> shared_chunk;
 struct queue_stat {
 	uint64_t push_count;
 	uint64_t pop_count;
-	uint64_t timeout_count;
 	uint64_t ack_count;
 	int      chunk_id_push;
 	int      chunk_id_pop; // unused for now
 	int      chunk_id_ack;
+	uint64_t timeout_count;
 
 	uint64_t update_indexes;
 
@@ -269,7 +268,6 @@ class queue {
 
 		std::map<int, shared_chunk> m_chunks;
 		std::map<int, shared_chunk> m_wait_ack;
-		//std::list<shared_chunk> m_in_flight;
 		double m_last_timeout_check_time;
 
 		void update_indexes();
@@ -279,6 +277,6 @@ class queue {
 		void check_timeouts();
 };
 
-}} /* namespace ioremap::grape */
+}} // namespace ioremap::grape
 
 #endif /* __QUEUE_HPP */

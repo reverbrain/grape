@@ -7,7 +7,7 @@ extern std::shared_ptr<cocaine::framework::logger_t> grape_queue_module_get_logg
 #define LOG_ERROR(...) COCAINE_LOG_ERROR(grape_queue_module_get_logger(), __VA_ARGS__)
 #define LOG_DEBUG(...) COCAINE_LOG_DEBUG(grape_queue_module_get_logger(), __VA_ARGS__)
 
-ioremap::grape::chunk_ctl::chunk_ctl(int max)
+ioremap::grape::chunk_meta::chunk_meta(int max)
 	: m_ptr(NULL)
 {
 	m_data.resize(sizeof(struct chunk_disk) + max * sizeof(struct chunk_entry));
@@ -17,7 +17,7 @@ ioremap::grape::chunk_ctl::chunk_ctl(int max)
 
 }
 
-bool ioremap::grape::chunk_ctl::push(int size)
+bool ioremap::grape::chunk_meta::push(int size)
 {
 	if (m_ptr->high >= m_ptr->max)
 		ioremap::elliptics::throw_error(-ERANGE, "chunk is full: high: %d, max: %d", m_ptr->high, m_ptr->max);
@@ -30,7 +30,7 @@ bool ioremap::grape::chunk_ctl::push(int size)
 	return full();
 }
 
-void ioremap::grape::chunk_ctl::pop()
+void ioremap::grape::chunk_meta::pop()
 {
 	if (m_ptr->high > m_ptr->max) {
 		ioremap::elliptics::throw_error(-ERANGE, "invalid pop: high mark can not be more than maximum chunk size: "
@@ -49,7 +49,7 @@ void ioremap::grape::chunk_ctl::pop()
 	LOG_INFO("\tmeta.pop: acked: %d, low: %d, high: %d, max: %d", m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
 }
 
-bool ioremap::grape::chunk_ctl::ack(int32_t pos, int state)
+bool ioremap::grape::chunk_meta::ack(int32_t pos, int state)
 {
 	if (pos >= m_ptr->high) {
 		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: position can not be more than high mark: "
@@ -76,41 +76,41 @@ bool ioremap::grape::chunk_ctl::ack(int32_t pos, int state)
 	return complete();
 }
 
-std::string &ioremap::grape::chunk_ctl::data()
+std::string &ioremap::grape::chunk_meta::data()
 {
 	return m_data;
 }
 
-int ioremap::grape::chunk_ctl::low_mark() const
+int ioremap::grape::chunk_meta::low_mark() const
 {
 	return m_ptr->low;
 }
 
-int ioremap::grape::chunk_ctl::high_mark() const
+int ioremap::grape::chunk_meta::high_mark() const
 {
 	return m_ptr->high;
 }
 
-int ioremap::grape::chunk_ctl::acked() const
+int ioremap::grape::chunk_meta::acked() const
 {
 	return m_ptr->acked;
 }
 
-bool ioremap::grape::chunk_ctl::full() const
+bool ioremap::grape::chunk_meta::full() const
 {
 	return m_ptr->high == m_ptr->max;
 }
 
-bool ioremap::grape::chunk_ctl::exhausted() const
+bool ioremap::grape::chunk_meta::exhausted() const
 {
 	return m_ptr->low == m_ptr->max;
 }
 
-bool ioremap::grape::chunk_ctl::complete() const
+bool ioremap::grape::chunk_meta::complete() const
 {
 	return m_ptr->acked == m_ptr->max;
 }
-void ioremap::grape::chunk_ctl::assign(char *data, size_t size)
+void ioremap::grape::chunk_meta::assign(char *data, size_t size)
 {
 	if (size != m_data.size()) {
 		ioremap::elliptics::throw_error(-ERANGE, "chunk meta assignment with invalid size: current: %ld, want-to-assign: %ld",
@@ -121,7 +121,7 @@ void ioremap::grape::chunk_ctl::assign(char *data, size_t size)
 	m_ptr = (struct chunk_disk *)m_data.data();
 }
 
-ioremap::grape::chunk_entry ioremap::grape::chunk_ctl::operator[] (int32_t pos) const
+ioremap::grape::chunk_entry ioremap::grape::chunk_meta::operator[] (int32_t pos) const
 {
 	if (pos > m_ptr->high) {
 		ioremap::elliptics::throw_error(-ERANGE, "invalid entry access: pos: %d, high: %d, max: %d",
@@ -131,7 +131,7 @@ ioremap::grape::chunk_entry ioremap::grape::chunk_ctl::operator[] (int32_t pos) 
 	return m_ptr->entries[pos];
 }
 
-uint64_t ioremap::grape::chunk_ctl::byte_offset(int32_t pos) const
+uint64_t ioremap::grape::chunk_meta::byte_offset(int32_t pos) const
 {
 	if (pos > m_ptr->high) {
 		ioremap::elliptics::throw_error(-ERANGE, "invalid entry access: pos: %d, high: %d, max: %d",
@@ -172,7 +172,7 @@ void ioremap::grape::chunk::load_meta()
 	try {
 		ioremap::elliptics::data_pointer d = m_session_meta.read_data(m_meta_key, 0, 0).get_one().file();
 		m_meta.assign((char *)d.data(), d.size());
-		m_stat.read++;
+		++m_stat.read;
 		reset_iteration_mode();
 
 	} catch (const ioremap::elliptics::not_found_error &e) {
@@ -262,7 +262,7 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(int *pos)
 		LOG_INFO("chunk::pop(): iter: mode %d, index %d, offset %lld, is at end", iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
 	}
 
-	m_stat.pop++;
+	++m_stat.pop;
 	return d;
 }
 
@@ -309,22 +309,22 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 	return ret;
 }
 
-const ioremap::grape::chunk_ctl &ioremap::grape::chunk::meta()
+const ioremap::grape::chunk_meta &ioremap::grape::chunk::meta()
 {
 	return m_meta;
 }
 
-void ioremap::grape::chunk::write_meta(void)
+void ioremap::grape::chunk::write_meta()
 {
 	m_session_meta.write_data(m_meta_key, ioremap::elliptics::data_pointer::from_raw(m_meta.data()), 0);
-	m_stat.write_ctl_async++;
+	++m_stat.write_meta;
 }
 
 void ioremap::grape::chunk::remove()
 {
 	m_session_meta.remove(m_meta_key);
-	m_stat.remove++;
 	//FIXME: only meta? leave actual data chunk undeleted? 
+	++m_stat.remove;
 }
 
 bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
@@ -338,7 +338,7 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 	}
 
 	m_session_data.write_data(m_data_key, d, 0);
-	m_stat.write_data_async++;
+	++m_stat.write_data;
 	//XXX: not going to wait for completion? what if write happen to be unsuccessfull?
 
 	m_meta.push(d.size());
@@ -347,7 +347,7 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 		write_meta();
 	}
 
-	m_stat.push++;
+	++m_stat.push;
 	return m_meta.full();
 }
 
@@ -357,7 +357,7 @@ bool ioremap::grape::chunk::ack(int pos)
 	m_meta.ack(pos, 1);
 	write_meta();
 
-	m_stat.ack++;
+	++m_stat.ack;
 
 	return m_meta.complete();
 }
@@ -386,8 +386,8 @@ struct ioremap::grape::chunk_stat ioremap::grape::chunk::stat(void)
 void ioremap::grape::chunk::add(struct ioremap::grape::chunk_stat *st)
 {
 #define SUM(member)	st->member += m_stat.member
-	SUM(write_data_async);
-	SUM(write_ctl_async);
+	SUM(write_data);
+	SUM(write_meta);
 	SUM(read);
 	SUM(remove);
 	SUM(push);
