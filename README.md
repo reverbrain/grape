@@ -5,10 +5,10 @@ Its main goal is to provide an active example of elliptics data processing capab
 Grape, as for now, consist of 2 components:
 
 * fault-tolerant persistent queue
-* and a connector that allows to direct queue output into user application running on elliptics cluster (see [TODO: driver concept]() in Cocaine docs)
+* and a connector that allows to direct queue output into user application running on elliptics cluster (see [event driver concept](http://doc.reverbrain.com/stub:cocaine-event-driver) in Cocaine docs)
 
 ### Queue
-Queue is a [cocaine](https://github.com/cocaine/cocaine-core) application running on elliptics node. Its deployment process follows [TODO: general scheme]() for cocaine applications.
+Queue is a [cocaine](https://github.com/cocaine/cocaine-core) application running on elliptics node. Its deployment process follows [general process](http://doc.reverbrain.com/stub:cocaine-app-deployment-process) for cocaine applications.
 
 Once deployed and started queue accepts data entries pushed into it, stores them among nodes of elliptics cluster its working on, and gives data entries back on consumer request, maintaining entries original order.
 
@@ -113,7 +113,7 @@ There is only one configuration option for now:
  * `chunk-max-size` (int) - specifies how many entries will contain single chunk in the queue (default value: 10000)
 
 #### Deployment
-Deployment process of the queue follows [TODO: general scheme]() for cocaine applications. For launching the queue user needs three files:
+Deployment process of the queue follows [general process](http://doc.reverbrain.com/stub:cocaine-app-deployment-process) for cocaine applications. For launching the queue user needs three files:
 
  * `queue` application file (which is an executable)
  * `queue.conf` config file (which is also a manifest file)
