@@ -164,7 +164,7 @@ ioremap::grape::chunk::chunk(ioremap::elliptics::session &session, const std::st
 ioremap::grape::chunk::~chunk()
 {
 	//XXX: is it really needed?
-	write_meta();
+	//write_meta();
 }
 
 void ioremap::grape::chunk::load_meta()
@@ -323,7 +323,7 @@ void ioremap::grape::chunk::write_meta()
 void ioremap::grape::chunk::remove()
 {
 	m_session_meta.remove(m_meta_key);
-	//FIXME: only meta? leave actual data chunk undeleted? 
+	m_session_data.remove(m_data_key);
 	++m_stat.remove;
 }
 

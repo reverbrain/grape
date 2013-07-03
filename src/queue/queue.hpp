@@ -213,17 +213,18 @@ class chunk {
 
 typedef std::shared_ptr<chunk> shared_chunk;
 
-//FIXME: divide this into 2 structures: persistent state and runtime statistics
-struct queue_stat {
+struct queue_state {
+	int chunk_id_push;
+	int chunk_id_ack;
+};
+
+struct queue_statistics {
 	uint64_t push_count;
 	uint64_t pop_count;
 	uint64_t ack_count;
-	int      chunk_id_push;
-	int      chunk_id_pop; // unused for now
-	int      chunk_id_ack;
 	uint64_t timeout_count;
 
-	uint64_t update_indexes;
+	uint64_t state_write_count;
 
 	chunk_stat chunks_popped;
 	chunk_stat chunks_pushed;
@@ -248,29 +249,35 @@ class queue {
 		void ack(const std::vector<entry_id> &ids);
 		data_array pop(int num);
 
+		// content manipulation
+		void clear();
+
 		void reply(const ioremap::elliptics::exec_context &context,
 				const ioremap::elliptics::data_pointer &d,
 				ioremap::elliptics::exec_context::final_state state);
 		void final(const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d);
 
-		queue_stat stat(void);
-		const std::string queue_id(void) const;
+		const std::string &queue_id() const;
+		const queue_state &state();
+		const queue_statistics &statistics();
+		void clear_counters();
 
 	private:
 		int m_chunk_max;
 
 		std::string m_queue_id;
-		std::string m_queue_stat_id;
+		std::string m_queue_state_id;
 
 		elliptics_client_state m_client;
 
-		queue_stat m_stat;
+		queue_state m_state;
+		queue_statistics m_statistics;
 
 		std::map<int, shared_chunk> m_chunks;
 		std::map<int, shared_chunk> m_wait_ack;
 		double m_last_timeout_check_time;
 
-		void update_indexes();
+		void write_state();
 
 		void update_chunk_timeout(int chunk_id, shared_chunk chunk);
 

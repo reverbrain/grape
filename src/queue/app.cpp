@@ -212,6 +212,15 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 				d.size()
 				);
 
+	} else if (event == "clear") {
+		// clear queue content
+		m_queue->clear();
+		m_queue->final(context, ioremap::elliptics::data_pointer("ok"));
+
+	} else if (event == "stats-clear") {
+		m_queue->clear_counters();
+		m_queue->final(context, ioremap::elliptics::data_pointer("ok"));
+
 	} else if (event == "stats") {
 		rapidjson::StringBuffer stream;
 		rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(stream);
@@ -223,19 +232,25 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		std::string qname = m_queue->queue_id();
 		name.SetString(qname.c_str(), qname.size());
 
-		struct ioremap::grape::queue_stat st = m_queue->stat();
+		ioremap::grape::queue_state state = m_queue->state();
+		ioremap::grape::queue_statistics st = m_queue->statistics();
 
 		root.AddMember("queue_id", name, root.GetAllocator());
-		root.AddMember("high-id", st.chunk_id_push, root.GetAllocator());
-		root.AddMember("low-id", st.chunk_id_ack, root.GetAllocator());
+
+		root.AddMember("high-id", state.chunk_id_push, root.GetAllocator());
+		root.AddMember("low-id", state.chunk_id_ack, root.GetAllocator());
+
 		root.AddMember("push.count", st.push_count, root.GetAllocator());
 		root.AddMember("push.rate", m_push_rate.get(), root.GetAllocator());
+		root.AddMember("push.time", m_push_time.get(), root.GetAllocator());
 		root.AddMember("pop.count", st.pop_count, root.GetAllocator());
 		root.AddMember("pop.rate", m_pop_rate.get(), root.GetAllocator());
+		root.AddMember("pop.time", m_pop_time.get(), root.GetAllocator());
 		root.AddMember("ack.count", st.ack_count, root.GetAllocator());
 		root.AddMember("ack.rate", m_ack_rate.get(), root.GetAllocator());
+		root.AddMember("ack.time", m_ack_time.get(), root.GetAllocator());
 		root.AddMember("timeout.count", st.timeout_count, root.GetAllocator());
-		root.AddMember("update_indexes", st.update_indexes, root.GetAllocator());
+		root.AddMember("state.write_count", st.state_write_count, root.GetAllocator());
 
 		root.AddMember("chunks_popped.write_data", st.chunks_popped.write_data, root.GetAllocator());
 		root.AddMember("chunks_popped.write_meta", st.chunks_popped.write_meta, root.GetAllocator());

@@ -32,13 +32,15 @@ const int DEFAULT_MAX_CHUNK_SIZE = 10000;
 queue::queue(const std::string &queue_id)
 	: m_chunk_max(DEFAULT_MAX_CHUNK_SIZE)
 	, m_queue_id(queue_id)
-	, m_queue_stat_id(queue_id + ".stat")
+	, m_queue_state_id(m_queue_id + ".state")
 	, m_last_timeout_check_time(0)
 {
 }
 
 void queue::initialize(const std::string &config)
 {
+	memset(&m_statistics, 0, sizeof(m_statistics));
+
 	rapidjson::Document doc;
 	m_client = elliptics_client_state::create(config, doc);
 
@@ -47,17 +49,17 @@ void queue::initialize(const std::string &config)
 	if (doc.HasMember("chunk-max-size"))
 		m_chunk_max = doc["chunk-max-size"].GetInt();
 
-	memset(&m_stat, 0, sizeof(struct queue_stat));
+	memset(&m_state, 0, sizeof(m_state));
 
 	try {
 		ioremap::elliptics::data_pointer d = m_client.create_session().read_data(m_queue_state_id, 0, 0).get_one().file();
-		auto *stat = d.data<queue_stat>();
+		auto *state = d.data<queue_state>();
 	
-		m_stat.chunk_id_push = stat->chunk_id_push;
-		m_stat.chunk_id_ack = stat->chunk_id_ack;
+		m_state.chunk_id_push = state->chunk_id_push;
+		m_state.chunk_id_ack = state->chunk_id_ack;
 
 		LOG_INFO("init: queue meta found: chunk_id_ack %d, chunk_id_push %d",
-				m_stat.chunk_id_ack, m_stat.chunk_id_push
+				m_state.chunk_id_ack, m_state.chunk_id_push
 				);
 
 	} catch (const ioremap::elliptics::not_found_error &) {
@@ -66,7 +68,7 @@ void queue::initialize(const std::string &config)
 
 	// load metadata of existing chunk into memory
 	ioremap::elliptics::session tmp = m_client.create_session();
-	for (int i = m_stat.chunk_id_ack; i <= m_stat.chunk_id_push; ++i) {
+	for (int i = m_state.chunk_id_ack; i <= m_state.chunk_id_push; ++i) {
 		auto p = std::make_shared<chunk>(tmp, m_queue_id, i, m_chunk_max);
 		m_chunks.insert(std::make_pair(i, p));
 		p->load_meta();
@@ -75,14 +77,52 @@ void queue::initialize(const std::string &config)
 	LOG_INFO("init: queue started");
 }
 
+void queue::write_state()
+{
+	m_client.create_session().write_data(m_queue_state_id,
+			ioremap::elliptics::data_pointer::from_raw(&m_state, sizeof(queue_state)),
+			0);
+
+	m_statistics.state_write_count++;
+}
+
+void queue::clear()
+{
+	LOG_INFO("clearing queue");
+
+	LOG_INFO("erasing state");
+	queue_state state = m_state;
+	memset(&m_state, 0, sizeof(m_state));
+	write_state();
+
+	LOG_INFO("removing chunks, from %d to %d", state.chunk_id_ack, state.chunk_id_push);
+	std::map<int, shared_chunk> remove_list;
+	remove_list.swap(m_chunks);
+	remove_list.insert(m_wait_ack.cbegin(), m_wait_ack.cend());
+	m_wait_ack.clear();
+
+	for (auto i = remove_list.cbegin(); i != remove_list.cend(); ++i) {
+		int chunk_id = i->first;
+		auto chunk = i->second;
+		chunk->remove();
+	}
+
+	remove_list.clear();
+
+	LOG_INFO("dropping statistics");
+	clear_counters();
+
+	LOG_INFO("queue cleared");
+}
+
 void queue::push(const ioremap::elliptics::data_pointer &d)
 {
-	auto found = m_chunks.find(m_stat.chunk_id_push);
+	auto found = m_chunks.find(m_state.chunk_id_push);
 	if (found == m_chunks.end()) {
 		// create new empty chunk
 		ioremap::elliptics::session tmp = m_client.create_session();
-		auto p = std::make_shared<chunk>(tmp, m_queue_id, m_stat.chunk_id_push, m_chunk_max);
-		auto inserted = m_chunks.insert(std::make_pair(m_stat.chunk_id_push, p));
+		auto p = std::make_shared<chunk>(tmp, m_queue_id, m_state.chunk_id_push, m_chunk_max);
+		auto inserted = m_chunks.insert(std::make_pair(m_state.chunk_id_push, p));
 
 		found = inserted.first;
 	}
@@ -91,13 +131,15 @@ void queue::push(const ioremap::elliptics::data_pointer &d)
 	auto chunk = found->second;
 
 	if (chunk->push(d)) {
-		m_stat.chunk_id_push++;
-		chunk->add(&m_stat.chunks_pushed);
-		update_indexes();
 		LOG_INFO("chunk %d filled", chunk_id);
+
+		++m_state.chunk_id_push;
+		write_state();
+
+		chunk->add(&m_statistics.chunks_pushed);
 	}
 
-	++m_stat.push_count;
+	++m_statistics.push_count;
 }
 
 ioremap::elliptics::data_pointer queue::peek(entry_id *entry_id)
@@ -121,7 +163,7 @@ ioremap::elliptics::data_pointer queue::peek(entry_id *entry_id)
 
 		LOG_INFO("popping entry %d-%d (%ld)'%s'", entry_id->chunk, entry_id->pos, d.size(), d.to_string());
 		if (!d.empty()) {
-			m_stat.pop_count++;
+			m_statistics.pop_count++;
 
 			// set or reset timeout timer for the chunk
 			update_chunk_timeout(chunk_id, chunk);
@@ -129,20 +171,20 @@ ioremap::elliptics::data_pointer queue::peek(entry_id *entry_id)
 			break;
 		}
 
-		if (chunk_id == m_stat.chunk_id_push) {
+		if (chunk_id == m_state.chunk_id_push) {
 			break;
 		}
 
 		//FIXME: this could happen to be called many times for the same chunk
 		// (between queue restarts or because of chunk replaying)
-		chunk->add(&m_stat.chunks_popped);
+		chunk->add(&m_statistics.chunks_popped);
 
 		LOG_INFO("chunk %d exhausted, dropped from the popping line", chunk_id);
 
 		// drop chunk from the pop list
 		m_chunks.erase(found);
 
-		update_indexes();
+       write_state();
 	}
 
 	return d;
@@ -206,7 +248,7 @@ void queue::check_timeouts()
 		m_wait_ack.erase(hold);
 
 		// number of popped but still unacked entries
-		m_stat.timeout_count += (chunk->meta().low_mark() - chunk->meta().acked());
+		m_statistics.timeout_count += (chunk->meta().low_mark() - chunk->meta().acked());
 	}
 }
 
@@ -225,7 +267,7 @@ void queue::ack(const entry_id id)
 
 		m_wait_ack.erase(found);
 
-		chunk->add(&m_stat.chunks_popped);
+		chunk->add(&m_statistics.chunks_popped);
 
 		// Chunk would be uncomplete here only if its the only chunk in the queue
 		// (filled partially and serving both as a push and a pop/ack target)
@@ -236,18 +278,18 @@ void queue::ack(const entry_id id)
 
 		// Set chunk_id_ack to the lowest active chunk
 		//NOTE: its important to have m_chunks and m_wait_ack both sorted
-		m_stat.chunk_id_ack = m_stat.chunk_id_push;
+		m_state.chunk_id_ack = m_state.chunk_id_push;
 		if (!m_chunks.empty()) {
-			m_stat.chunk_id_ack = std::min(m_stat.chunk_id_ack, m_chunks.begin()->first);
+			m_state.chunk_id_ack = std::min(m_state.chunk_id_ack, m_chunks.begin()->first);
 		}
 		if (!m_wait_ack.empty()) {
-			m_stat.chunk_id_ack = std::min(m_stat.chunk_id_ack, m_wait_ack.begin()->first);	
+			m_state.chunk_id_ack = std::min(m_state.chunk_id_ack, m_wait_ack.begin()->first);	
 		}
 
-		update_indexes();
+		write_state();
 	}
 
-	++m_stat.ack_count;
+	++m_statistics.ack_count;
 }
 
 ioremap::elliptics::data_pointer queue::pop()
@@ -287,7 +329,7 @@ data_array queue::peek(int num)
 		data_array d = chunk->pop(num);
 		LOG_INFO("chunk %d, popping %d entries", chunk_id, d.sizes().size());
 		if (!d.empty()) {
-			m_stat.pop_count += d.sizes().size();
+			m_statistics.pop_count += d.sizes().size();
 
 			ret.extend(d);
 
@@ -297,20 +339,20 @@ data_array queue::peek(int num)
 			break;
 		}
 
-		if (chunk_id == m_stat.chunk_id_push) {
+		if (chunk_id == m_state.chunk_id_push) {
 			break;
 		}
 
 		//FIXME: this could happen to be called many times for the same chunk
 		// (between queue restarts or because of chunk replaying)
-		chunk->add(&m_stat.chunks_popped);
+		chunk->add(&m_statistics.chunks_popped);
 
 		LOG_INFO("chunk %d exhausted, dropped from the popping line", chunk_id);
 
 		// drop chunk from the pop list
 		m_chunks.erase(found);
 
-		update_indexes();
+       write_state();
 	}
 
 	return ret;
@@ -324,11 +366,6 @@ void queue::ack(const std::vector<entry_id> &ids)
 	}
 }
 
-ioremap::grape::queue_stat ioremap::grape::queue::stat()
-{
-	return m_stat;
-}
-
 void queue::reply(const ioremap::elliptics::exec_context &context,
 		const ioremap::elliptics::data_pointer &d, ioremap::elliptics::exec_context::final_state state)
 {
@@ -340,18 +377,24 @@ void queue::final(const ioremap::elliptics::exec_context &context, const ioremap
 	reply(context, d, ioremap::elliptics::exec_context::final);
 }
 
-void ioremap::grape::queue::update_indexes()
-{
-	m_client.create_session().write_data(m_queue_stat_id,
-			ioremap::elliptics::data_pointer::from_raw(&m_stat, sizeof(struct ioremap::grape::queue_stat)),
-			0);
-
-	m_stat.update_indexes++;
-}
-
-const std::string ioremap::grape::queue::queue_id(void) const
+const std::string &queue::queue_id() const
 {
 	return m_queue_id;
+}
+
+const queue_state &queue::state()
+{
+	return m_state;
+}
+
+const queue_statistics &queue::statistics()
+{
+	return m_statistics;
+}
+
+void queue::clear_counters()
+{
+	memset(&m_statistics, 0, sizeof(m_statistics));
 }
 
 }} // namespace ioremap::grape
