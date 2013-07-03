@@ -183,8 +183,6 @@ ioremap::elliptics::data_pointer queue::peek(entry_id *entry_id)
 
 		// drop chunk from the pop list
 		m_chunks.erase(found);
-
-       write_state();
 	}
 
 	return d;
@@ -351,8 +349,6 @@ data_array queue::peek(int num)
 
 		// drop chunk from the pop list
 		m_chunks.erase(found);
-
-       write_state();
 	}
 
 	return ret;
