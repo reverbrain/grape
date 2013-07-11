@@ -176,6 +176,7 @@ class chunk {
 		data_array pop(int num);
 
 		void reset_iteration();
+		bool expect_no_more();
 
 		void remove();
 

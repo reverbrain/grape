@@ -189,6 +189,11 @@ void ioremap::grape::chunk::load_meta()
 	}
 }
 
+bool ioremap::grape::chunk::expect_no_more()
+{
+	return m_meta.full() && iter->at_end();
+}
+
 void ioremap::grape::chunk::prepare_iteration()
 {
 	try {
@@ -329,6 +334,8 @@ void ioremap::grape::chunk::remove()
 
 bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 {
+	LOG_INFO("chunk %d, push-single, index %d", m_chunk_id, m_meta.high_mark());
+
 	// if given chunk already has some cached data, update it too
 	if (m_data.size()) {
 		std::string tmp = m_data.to_string();

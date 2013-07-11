@@ -168,21 +168,24 @@ ioremap::elliptics::data_pointer queue::peek(entry_id *entry_id)
 			// set or reset timeout timer for the chunk
 			update_chunk_timeout(chunk_id, chunk);
 
-			break;
 		}
 
 		if (chunk_id == m_state.chunk_id_push) {
 			break;
 		}
 
-		//FIXME: this could happen to be called many times for the same chunk
-		// (between queue restarts or because of chunk replaying)
-		chunk->add(&m_statistics.chunks_popped);
+		if (chunk->expect_no_more()) {
+			//FIXME: this could happen to be called many times for the same chunk
+			// (between queue restarts or because of chunk replaying)
+			chunk->add(&m_statistics.chunks_popped);
 
-		LOG_INFO("chunk %d exhausted, dropped from the popping line", chunk_id);
+			LOG_INFO("chunk %d exhausted, dropped from the popping line", chunk_id);
 
-		// drop chunk from the pop list
-		m_chunks.erase(found);
+			// drop chunk from the pop list
+			m_chunks.erase(found);
+		}
+
+		break;
 	}
 
 	return d;
@@ -334,21 +337,24 @@ data_array queue::peek(int num)
 			// set or reset timeout timer for the chunk
 			update_chunk_timeout(chunk_id, chunk);
 
-			break;
 		}
 
 		if (chunk_id == m_state.chunk_id_push) {
 			break;
 		}
 
-		//FIXME: this could happen to be called many times for the same chunk
-		// (between queue restarts or because of chunk replaying)
-		chunk->add(&m_statistics.chunks_popped);
+		if (chunk->expect_no_more()) {
+			//FIXME: this could happen to be called many times for the same chunk
+			// (between queue restarts or because of chunk replaying)
+			chunk->add(&m_statistics.chunks_popped);
 
-		LOG_INFO("chunk %d exhausted, dropped from the popping line", chunk_id);
+			LOG_INFO("chunk %d exhausted, dropped from the popping line", chunk_id);
 
-		// drop chunk from the pop list
-		m_chunks.erase(found);
+			// drop chunk from the pop list
+			m_chunks.erase(found);
+		}
+
+		num -= d.sizes().size();
 	}
 
 	return ret;
