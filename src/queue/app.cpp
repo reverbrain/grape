@@ -46,6 +46,25 @@ struct rate_stat
 	}
 };
 
+struct time_stat
+{
+	uint64_t start_time; // in microseconds
+	double avg;
+
+	time_stat() : avg(0.0) {}
+
+	void start() {
+		start_time = microseconds_now();
+	}
+	void stop() {
+		avg = modified_moving_average<19>(avg, microseconds_now() - start_time);
+	}
+
+	double get() {
+		return avg;
+	}
+};
+
 }
 
 class queue_app_context : public cocaine::framework::application<queue_app_context>
@@ -69,6 +88,10 @@ class queue_app_context : public cocaine::framework::application<queue_app_conte
 		rate_stat m_push_rate;
 		rate_stat m_pop_rate;
 		rate_stat m_ack_rate;
+
+		time_stat m_push_time;
+		time_stat m_pop_time;
+		time_stat m_ack_time;
 };
 
 queue_app_context::queue_app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager)
@@ -123,7 +146,10 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		// queue has no method to request size and we can use zero reply in pop
 		// to indicate queue emptiness
 		if (!d.empty()) {
+			m_push_time.start();
 			m_queue->push(d);
+			m_push_time.stop();
+			COCAINE_LOG_INFO(m_log, "push time %ld", microseconds_now() - m_push_time.start_time);
 			m_push_rate.update(1);
 		}
 		m_queue->final(context, ioremap::elliptics::data_pointer());
@@ -131,7 +157,11 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 	} else if (event == "pop-multi" || event == "pop-multiple-string") {
 		int num = stoi(context.data().to_string());
 
+		m_pop_time.start();
+		m_ack_time.start();
 		peek_multi_type d = m_queue->pop(num);
+		m_ack_time.stop();
+		m_pop_time.stop();
 		if (!d.empty()) {
 			m_queue->final(context, ioremap::grape::serialize(d));
 			m_pop_rate.update(d.sizes().size());
@@ -147,11 +177,16 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 				);
 
 	} else if (event == "pop") {
+		m_pop_time.start();
+		m_ack_time.start();
 		m_queue->final(context, m_queue->pop());
+		m_ack_time.stop();
+		m_pop_time.stop();
 		m_pop_rate.update(1);
 		m_ack_rate.update(1);
 
 	} else if (event == "peek") {
+		m_pop_time.start();
 		ioremap::grape::entry_id entry_id;
 		ioremap::elliptics::data_pointer d = m_queue->peek(&entry_id);
 
@@ -166,9 +201,11 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 
 		m_queue->final(context, d);
 
+		m_pop_time.stop();
 		m_pop_rate.update(1);
 
 	} else if (event == "peek-multi") {
+		m_pop_time.start();
 		int num = stoi(context.data().to_string());
 
 		peek_multi_type d = m_queue->peek(num);
@@ -180,18 +217,22 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 			m_queue->final(context, ioremap::elliptics::data_pointer());
 		}
 
+		m_pop_time.stop();
+
 		COCAINE_LOG_INFO(m_log, "%s, peeked %ld entries (asked %d)",
 				action_id.c_str(),
 				d.sizes().size(), num
 				);
 
 	} else if (event == "ack") {
+		m_ack_time.start();
 		ioremap::elliptics::data_pointer d = context.data();
 		ioremap::grape::entry_id entry_id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
 
 		m_queue->ack(entry_id);
 		m_queue->final(context, ioremap::elliptics::data_pointer());
 
+		m_ack_time.stop();
 		m_ack_rate.update(1);
 
 		COCAINE_LOG_INFO(m_log, "%s, acked entry %d-%d",
@@ -200,11 +241,13 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 				);
 
 	} else if (event == "ack-multi") {
+		m_ack_time.start();
 		auto d = ioremap::grape::deserialize<ack_multi_type>(context.data());
 
 		m_queue->ack(d);
 		m_queue->final(context, ioremap::elliptics::data_pointer());
 
+		m_ack_time.stop();
 		m_ack_rate.update(d.size());
 
 		COCAINE_LOG_INFO(m_log, "%s, acked %ld entries",
