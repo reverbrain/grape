@@ -247,6 +247,14 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(int *pos)
 
 	prepare_iteration();
 
+	// Iterator could still not be initialized here,
+	// if there was data read error inside prepare_iteration().
+	// Meta and data are inconsistent for now but next data reread could fix that. 
+	if (!iter) {
+		LOG_INFO("chunk %d, pop-single, chunk temporarily exhausted", m_chunk_id);
+		return d;
+	}
+
 	LOG_INFO("chunk %d, pop-single, iter: mode %d, index %d, offset %lld", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
 
 	if (iter->mode == iterator::REPLAY && iter->at_end()) {
@@ -283,6 +291,14 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 	}
 
 	prepare_iteration();
+
+	// Iterator could still not be initialized here,
+	// if there was data read error inside prepare_iteration().
+	// Meta and data are inconsistent for now but next data reread could fix that. 
+	if (!iter) {
+		LOG_INFO("chunk %d, pop, chunk temporarily exhausted", m_chunk_id);
+		return ret;
+	}
 
 	entry_id entry_id;
 	entry_id.chunk = m_chunk_id;
