@@ -1,3 +1,10 @@
+grape (0.6.24) unstable; urgency=low
+
+  * New queue methods: clear and stats-clear
+  * Fewer elliptics reads and writes
+
+ -- Ivan Chelubeev <ijon@yandex-team.ru>  Thu, 11 Jul 2013 21:17:44 +0400
+
 grape (0.6.23) unstable; urgency=low
 
   * Compatibiity with cocaine 0.10.5-5
