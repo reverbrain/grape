@@ -1,6 +1,5 @@
+#include <cocaine/framework/dispatch.hpp>
 #include <cocaine/framework/logging.hpp>
-#include <cocaine/framework/application.hpp>
-#include <cocaine/framework/worker.hpp>
 
 #include <grape/elliptics_client_state.hpp>
 #include <grape/entry_id.hpp>
@@ -8,8 +7,7 @@
 
 using namespace ioremap::elliptics;
 
-class app_context : public cocaine::framework::application<app_context>
-{
+class app_context {
 public:
 	// proxy to the logging service
 	std::shared_ptr<cocaine::framework::logger_t> m_log;
@@ -21,28 +19,22 @@ public:
 	int _delay;
 	std::string _queue_ack_event;
 
-	app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
-	void initialize();
+	app_context(cocaine::framework::dispatch_t& dispatch);
 
 	// void single_entry(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response);
 	// void multi_entry(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response);
 	void process(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response);
 };
 
-app_context::app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager)
-	: application<app_context>(id, service_manager)
-{
+app_context::app_context(cocaine::framework::dispatch_t& dispatch) {
 	// obtain logging facility
-	m_log = service_manager->get_system_logger();
-	COCAINE_LOG_INFO(m_log, "application start: %s", id.c_str());
+	m_log = dispatch.service_manager()->get_system_logger();
+	COCAINE_LOG_INFO(m_log, "application start: %s", dispatch.id().c_str());
 
 	_delay = 0;
 	_queue_ack_event = "queue@ack";
-}
 
-void app_context::initialize()
-{
-	// configure
+    // configure
 	//FIXME: replace this with config storage service when it's done
 	{
 		rapidjson::Document doc;
@@ -65,7 +57,8 @@ void app_context::initialize()
 
 	// on("single-entry", &app_context::single_entry);
 	// on("multi-entry", &app_context::multi_entry);
-	on_unregistered(&app_context::process);
+	dispatch.on("testerhead-cpp@single-entry", this, &app_context::process);
+	dispatch.on("testerhead-cpp@multi-entry", this, &app_context::process);
 }
 
 void app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response)
@@ -262,5 +255,5 @@ void app_context::multi_entry(const std::string &cocaine_event, const std::vecto
 */
 int main(int argc, char **argv)
 {
-	return cocaine::framework::worker_t::run<app_context>(argc, argv);
+	return cocaine::framework::run<app_context>(argc, argv);
 }

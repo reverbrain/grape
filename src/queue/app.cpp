@@ -2,8 +2,7 @@
 
 #include <cocaine/format.hpp>
 #include <cocaine/framework/logging.hpp>
-#include <cocaine/framework/application.hpp>
-#include <cocaine/framework/worker.hpp>
+#include <cocaine/framework/dispatch.hpp>
 
 #include "queue.hpp"
 
@@ -67,13 +66,10 @@ struct time_stat
 
 }
 
-class queue_app_context : public cocaine::framework::application<queue_app_context>
-{
+class queue_app_context {
 	public:
-		queue_app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager);
+		queue_app_context(cocaine::framework::dispatch_t& dispatch);
 		virtual ~queue_app_context();
-
-		void initialize();
 
 		void process(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response);
 
@@ -94,28 +90,35 @@ class queue_app_context : public cocaine::framework::application<queue_app_conte
 		time_stat m_ack_time;
 };
 
-queue_app_context::queue_app_context(const std::string &id, std::shared_ptr<cocaine::framework::service_manager_t> service_manager)
-	: application<queue_app_context>(id, service_manager)
-	, m_id(id)
-	, m_log(service_manager->get_system_logger())
+queue_app_context::queue_app_context(cocaine::framework::dispatch_t& dispatch)
+    : m_id(dispatch.id())
+	, m_log(dispatch.service_manager()->get_system_logger())
 {
 	//FIXME: pass logger explicitly everywhere
 	extern void grape_queue_module_set_logger(std::shared_ptr<cocaine::framework::logger_t>);
 	grape_queue_module_set_logger(m_log);
-}
-
-queue_app_context::~queue_app_context()
-{
-}
-
-void queue_app_context::initialize()
-{
-	m_queue.reset(new ioremap::grape::queue(m_id));
+	
+    m_queue.reset(new ioremap::grape::queue(m_id));
 	m_queue->initialize("queue.conf");
 	COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured", m_id.c_str());
 
 	// register event handlers
-	on_unregistered(&queue_app_context::process);
+	dispatch.on("queue@ping", this, &queue_app_context::process);
+	dispatch.on("queue@push", this, &queue_app_context::process);
+	dispatch.on("queue@pop-multi", this, &queue_app_context::process);
+	dispatch.on("queue@pop-multiple-string", this, &queue_app_context::process);
+	dispatch.on("queue@pop", this, &queue_app_context::process);
+	dispatch.on("queue@peek", this, &queue_app_context::process);
+	dispatch.on("queue@peek-multi", this, &queue_app_context::process);
+	dispatch.on("queue@ack", this, &queue_app_context::process);
+	dispatch.on("queue@ack-multi", this, &queue_app_context::process);
+	dispatch.on("queue@clear", this, &queue_app_context::process);
+	dispatch.on("queue@stats-clear", this, &queue_app_context::process);
+	dispatch.on("queue@stats", this, &queue_app_context::process);
+}
+
+queue_app_context::~queue_app_context()
+{
 }
 
 void queue_app_context::process(const std::string &cocaine_event, const std::vector<std::string> &chunks, cocaine::framework::response_ptr response)
@@ -332,7 +335,7 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 int main(int argc, char **argv)
 {
 	try {
-		return cocaine::framework::worker_t::run<queue_app_context>(argc, argv);
+		return cocaine::framework::run<queue_app_context>(argc, argv);
 	} catch (const std::exception &e) {
 		std::ofstream tmp("/tmp/queue.out");
 
