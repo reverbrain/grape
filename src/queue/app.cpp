@@ -284,13 +284,13 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		root.AddMember("low-id", state.chunk_id_ack, root.GetAllocator());
 
 		root.AddMember("push.count", st.push_count, root.GetAllocator());
-		root.AddMember("push.rate", m_push_rate.get(), root.GetAllocator());
-		root.AddMember("push.time", m_push_time.get(), root.GetAllocator());
 		root.AddMember("pop.count", st.pop_count, root.GetAllocator());
-		root.AddMember("pop.rate", m_pop_rate.get(), root.GetAllocator());
-		root.AddMember("pop.time", m_pop_time.get(), root.GetAllocator());
 		root.AddMember("ack.count", st.ack_count, root.GetAllocator());
+		root.AddMember("push.rate", m_push_rate.get(), root.GetAllocator());
+		root.AddMember("pop.rate", m_pop_rate.get(), root.GetAllocator());
 		root.AddMember("ack.rate", m_ack_rate.get(), root.GetAllocator());
+		root.AddMember("push.time", m_push_time.get(), root.GetAllocator());
+		root.AddMember("pop.time", m_pop_time.get(), root.GetAllocator());
 		root.AddMember("ack.time", m_ack_time.get(), root.GetAllocator());
 		root.AddMember("timeout.count", st.timeout_count, root.GetAllocator());
 		root.AddMember("state.write_count", st.state_write_count, root.GetAllocator());
