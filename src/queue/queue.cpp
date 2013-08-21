@@ -84,7 +84,7 @@ void queue::write_state()
 {
 	m_client.create_session().write_data(m_queue_state_id,
 			ioremap::elliptics::data_pointer::from_raw(&m_state, sizeof(queue_state)),
-			0).wait();
+			0);
 
 	m_statistics.state_write_count++;
 }

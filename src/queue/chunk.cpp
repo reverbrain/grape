@@ -350,7 +350,7 @@ const ioremap::grape::chunk_meta &ioremap::grape::chunk::meta()
 
 void ioremap::grape::chunk::write_meta()
 {
-	m_session_meta.write_data(m_meta_key, ioremap::elliptics::data_pointer::from_raw(m_meta.data()), 0).wait();
+	m_session_meta.write_data(m_meta_key, ioremap::elliptics::data_pointer::from_raw(m_meta.data()), 0);
 	++m_stat.write_meta;
 }
 
@@ -373,7 +373,7 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 		m_data = ioremap::elliptics::data_pointer::copy(tmp.data(), tmp.size());
 	}
 
-	m_session_data.write_data(m_data_key, d, 0).wait();
+	m_session_data.write_data(m_data_key, d, 0);
 	++m_stat.write_data;
 	//XXX: not going to wait for completion? what if write happen to be unsuccessfull?
 
