@@ -20,8 +20,6 @@
 #ifndef __GRAPE_QUEUE_DRIVER_HPP
 #define __GRAPE_QUEUE_DRIVER_HPP
 
-#include "grape/elliptics_client_state.hpp"
-
 #include <queue>
 #include <mutex>
 #include <atomic>
@@ -33,6 +31,8 @@
 #include <cocaine/app.hpp>
 #include <cocaine/api/storage.hpp>
 
+#include "grape/elliptics_client_state.hpp"
+
 namespace cocaine { namespace driver {
 
 class queue_driver: public api::driver_t {
@@ -41,17 +41,15 @@ class queue_driver: public api::driver_t {
 
 	public:
 		struct downstream_t: public cocaine::api::stream_t {
-			downstream_t(queue_driver *queue, const ioremap::elliptics::data_pointer &d);
+			downstream_t(queue_driver *parent);
 			~downstream_t();
 
 			virtual void write(const char *data, size_t size);
 			virtual void error(int code, const std::string &message);
 			virtual void close();
 
-			queue_driver *m_queue;
-			const ioremap::elliptics::data_pointer &m_data;
-
-			int m_attempts;
+			queue_driver *parent;
+			uint64_t start_time;
 		};
 
 		struct queue_request {
@@ -82,14 +80,19 @@ class queue_driver: public api::driver_t {
 
 		elliptics_client_state m_client;
 		std::vector<int> m_queue_groups;
+		int m_wait_timeout;
+		int m_request_size;
 
-		void on_idle_timer_event(ev::timer&, int);
+		void on_request_timer_event(ev::timer&, int);
+		void on_rate_control_timer_event(ev::timer&, int);
 
-		// requests to the queue callbacks
+		// request queue and callbacks
+		void send_request();
 		void on_queue_request_data(std::shared_ptr<queue_request> req, const ioremap::elliptics::exec_result_entry &result);
 		void on_queue_request_complete(std::shared_ptr<queue_request> req, const ioremap::elliptics::error_info &error);
 
-		bool process_data(const ioremap::elliptics::exec_context &context);
+		bool enqueue_data(const ioremap::elliptics::exec_context &context);
+		void on_worker_complete(uint64_t start_time, bool success);
 
 	private:
 		struct data_pointer_comparator_t {
@@ -97,8 +100,6 @@ class queue_driver: public api::driver_t {
 				return a.data() < b.data();
 			}
 		};
-
-		ev::timer m_idle_timer;
 
 		// std::queue<ioremap::elliptics::data_pointer> m_local_queue;
 		// std::mutex m_local_queue_mutex;
@@ -113,7 +114,20 @@ class queue_driver: public api::driver_t {
 
 		std::atomic_int m_queue_length;
 		std::atomic_int m_queue_length_max;
-		std::atomic_int m_factor;
+
+		ev::timer m_request_timer;
+		ev::timer m_rate_control_timer;
+
+		std::atomic<uint64_t> last_process_done_time; // in microseconds
+		std::atomic<uint64_t> processed_time; // in microseconds
+		std::atomic<int> process_count;
+		std::atomic<int> receive_count;
+		std::atomic<int> request_count;
+		double rate_focus;
+		int growth_step;
+		double growth_time;
+
+		uint64_t last_request_time; // in microseconds
 
 		std::atomic_int m_queue_src_key;
 
