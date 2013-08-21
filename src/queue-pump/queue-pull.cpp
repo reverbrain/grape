@@ -1,7 +1,7 @@
 #include <boost/program_options.hpp>
 
 #include <grape/elliptics_client_state.hpp>
-#include "concurrent-pump.hpp"
+#include <grape/concurrent-pump.hpp>
 
 using namespace boost::program_options;
 using namespace ioremap::grape;
