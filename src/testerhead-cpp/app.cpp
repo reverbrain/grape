@@ -108,7 +108,7 @@ void app_context::process(const std::string &cocaine_event, const std::vector<st
 		COCAINE_LOG_INFO(m_log, "received entry: %d-%d", id.chunk, id.pos);
 
 		// acking success
-		//if (m_ack_on_success) {
+		if (_queue_ack_event != "none") {
 			client.set_exceptions_policy(session::no_exceptions);
 
 			// dnet_id queue_id;
@@ -129,11 +129,11 @@ void app_context::process(const std::string &cocaine_event, const std::vector<st
 						}
 					}
 			);
-		//}
+		}
 
 	} else if (event == "multi-entry") {
 		// acking success
-		//if (m_ack_on_success) {
+		if (_queue_ack_event != "none") {
 			client.set_exceptions_policy(session::no_exceptions);
 
 			auto d = ioremap::grape::deserialize<ioremap::grape::data_array>(context.data());
@@ -154,7 +154,9 @@ void app_context::process(const std::string &cocaine_event, const std::vector<st
 						}
 					}
 			);
-		//}
+		}
+	} else if (event == "ping") {
+		client.reply(context, std::string("ok"), ioremap::elliptics::exec_context::final);
 	}
 }
 /*
