@@ -208,6 +208,8 @@ void ioremap::grape::chunk::prepare_iteration()
 			LOG_INFO("chunk %d, prepare_iteration, (re)reading data, iteration.byte_offset %lld, m_data.size() %ld", m_chunk_id, iteration_state.byte_offset, m_data.size());
 			
 			m_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
+
+			LOG_INFO("chunk %d, prepare_iteration, read m_data, size %ld", m_chunk_id, m_data.size());
 		}
 
 		if (!iter) {
@@ -333,6 +335,8 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 		int size = m_meta[iteration_state.entry_index].size;
 		entry_id.pos = iteration_state.entry_index;
 		ret.append((char *)m_data.data() + iteration_state.byte_offset, size, entry_id);
+
+		//LOG_INFO("chunk %d, pop, iter: mode %d, index %d, offset %lld", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset));
 		
 		iter->advance();
 
@@ -363,7 +367,7 @@ void ioremap::grape::chunk::remove()
 
 bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 {
-	LOG_INFO("chunk %d, push-single, index %d", m_chunk_id, m_meta.high_mark());
+	LOG_INFO("chunk %d, push-single, index %d, offset %ld", m_chunk_id, m_meta.high_mark(), m_data.size());
 
 	// if given chunk already has some cached data, update it too
 	if (m_data.size()) {

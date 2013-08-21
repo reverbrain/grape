@@ -109,6 +109,9 @@ void queue::clear()
 {
 	LOG_INFO("clearing queue");
 
+	LOG_INFO("dropping statistics");
+	clear_counters();
+
 	LOG_INFO("erasing state");
 	queue_state state = m_state;
 	memset(&m_state, 0, sizeof(m_state));
@@ -121,15 +124,11 @@ void queue::clear()
 	m_wait_ack.clear();
 
 	for (auto i = remove_list.cbegin(); i != remove_list.cend(); ++i) {
-		int chunk_id = i->first;
 		auto chunk = i->second;
 		chunk->remove();
 	}
 
 	remove_list.clear();
-
-	LOG_INFO("dropping statistics");
-	clear_counters();
 
 	LOG_INFO("queue cleared");
 }

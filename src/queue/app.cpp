@@ -24,6 +24,7 @@ double modified_moving_average(double avg, double input) {
 
 double exponential_moving_average(double avg, double input, double alpha) {
 	return alpha * input + (1.0 - alpha) * avg;
+	//return avg + alpha * (input - avg);
 }
 
 struct rate_stat
