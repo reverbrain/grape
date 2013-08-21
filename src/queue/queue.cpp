@@ -42,17 +42,34 @@ void queue::initialize(const std::string &config)
 	memset(&m_statistics, 0, sizeof(m_statistics));
 
 	rapidjson::Document doc;
-	m_client = elliptics_client_state::create(config, doc);
+	auto client_factory = elliptics_client_state::create(config, doc);
+
+	m_reply_client = std::make_shared<elliptics::session>(client_factory.create_session());
+	m_data_client = std::make_shared<elliptics::session>(m_reply_client->clone());
+	m_data_client->set_ioflags(DNET_IO_FLAGS_NOCSUM | DNET_IO_FLAGS_OVERWRITE);
+
+	std::vector<int> storage_groups;
+	read_groups_array(&storage_groups, "storage-groups", doc);
+	if (!storage_groups.empty()) {
+		m_data_client->set_groups(storage_groups);
+	}
+
+	if (doc.HasMember("wait-timeout")) {
+		int timeout = doc["wait-timeout"].GetInt();
+		m_reply_client->set_timeout(timeout);
+		m_data_client->set_timeout(timeout);
+	}
 
 	LOG_INFO("init: elliptics client created");
 
-	if (doc.HasMember("chunk-max-size"))
+	if (doc.HasMember("chunk-max-size")) {
 		m_chunk_max = doc["chunk-max-size"].GetInt();
+	}
 
 	memset(&m_state, 0, sizeof(m_state));
 
 	try {
-		ioremap::elliptics::data_pointer d = m_client.create_session().read_data(m_queue_state_id, 0, 0).get_one().file();
+		ioremap::elliptics::data_pointer d = m_data_client->read_data(m_queue_state_id, 0, 0).get_one().file();
 		auto *state = d.data<queue_state>();
 	
 		m_state.chunk_id_push = state->chunk_id_push;
@@ -67,9 +84,8 @@ void queue::initialize(const std::string &config)
 	}
 
 	// load metadata of existing chunk into memory
-	ioremap::elliptics::session tmp = m_client.create_session();
 	for (int i = m_state.chunk_id_ack; i <= m_state.chunk_id_push; ++i) {
-		auto p = std::make_shared<chunk>(tmp, m_queue_id, i, m_chunk_max);
+		auto p = std::make_shared<chunk>(*m_data_client.get(), m_queue_id, i, m_chunk_max);
 		m_chunks.insert(std::make_pair(i, p));
 		if (!p->load_meta() && i < m_state.chunk_id_push) {
 			LOG_ERROR("init: failed to read middle chunk meta data, can't proceed, exiting");
@@ -82,7 +98,7 @@ void queue::initialize(const std::string &config)
 
 void queue::write_state()
 {
-	m_client.create_session().write_data(m_queue_state_id,
+	m_data_client->write_data(m_queue_state_id,
 			ioremap::elliptics::data_pointer::from_raw(&m_state, sizeof(queue_state)),
 			0);
 
@@ -123,8 +139,7 @@ void queue::push(const ioremap::elliptics::data_pointer &d)
 	auto found = m_chunks.find(m_state.chunk_id_push);
 	if (found == m_chunks.end()) {
 		// create new empty chunk
-		ioremap::elliptics::session tmp = m_client.create_session();
-		auto p = std::make_shared<chunk>(tmp, m_queue_id, m_state.chunk_id_push, m_chunk_max);
+		auto p = std::make_shared<chunk>(*m_data_client.get(), m_queue_id, m_state.chunk_id_push, m_chunk_max);
 		auto inserted = m_chunks.insert(std::make_pair(m_state.chunk_id_push, p));
 
 		found = inserted.first;
@@ -374,7 +389,7 @@ void queue::ack(const std::vector<entry_id> &ids)
 void queue::reply(const ioremap::elliptics::exec_context &context,
 		const ioremap::elliptics::data_pointer &d, ioremap::elliptics::exec_context::final_state state)
 {
-	m_client.create_session().reply(context, d, state);
+	m_reply_client->reply(context, d, state);
 }
 
 void queue::final(const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d)

@@ -270,6 +270,8 @@ class queue {
 		std::string m_queue_state_id;
 
 		elliptics_client_state m_client;
+		std::shared_ptr<elliptics::session> m_reply_client;
+		std::shared_ptr<elliptics::session> m_data_client;
 
 		queue_state m_state;
 		queue_statistics m_statistics;
