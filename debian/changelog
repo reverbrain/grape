@@ -1,3 +1,19 @@
+grape (0.7.0) unstable; urgency=low
+
+  * Adaptive flow control in the queue driver
+  * Configurable request size in driver (request-size setting)
+  * Fixed queue crash on chunk data unavailability
+  * Check chunks metadata availability on start, refuse to start if its not
+  * Queue now can run in one group and store data in the other(s)
+    (storage-groups setting)
+  * Added wait timeouts everywhere (wait-timeout setting) 
+  * Write waits removed again (we'll see what would happen)
+  * Concurrent runloop isolated into concurrent_pump.hpp [Ivan Chelubeev]
+  * ping command and way to disable queue item acking for testerhead-cpp
+  * libdata_array was placed incorrectly in grape-components, moved to grape
+
+ -- Ivan Chelubeev <ijon@yandex-team.ru>  Wed, 21 Aug 2013 18:46:12 +0400
+
 grape (0.6.25) unstable; urgency=low
 
   * Fixed garbage read results that could occur under stress
