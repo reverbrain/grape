@@ -23,7 +23,7 @@ public:
     {}
 };
 
-static inline void read_groups_array(std::vector<int> *result, const char *name, const rapidjson::Value value) {
+static inline void read_groups_array(std::vector<int> *result, const char *name, const rapidjson::Value &value) {
     if (const auto *m = value.FindMember(name)) {
         if (m->value.IsArray()) {
             std::transform(m->value.Begin(), m->value.End(),
