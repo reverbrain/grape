@@ -255,6 +255,11 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(int *pos)
 		return d;
 	}
 
+	if (m_data.empty()) {
+		LOG_INFO("chunk %d, pop, chunk temporarily not available", m_chunk_id);
+		return d;
+	}
+
 	LOG_INFO("chunk %d, pop-single, iter: mode %d, index %d, offset %lld", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
 
 	if (iter->mode == iterator::REPLAY && iter->at_end()) {
@@ -297,6 +302,11 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 	// Meta and data are inconsistent for now but next data reread could fix that. 
 	if (!iter) {
 		LOG_INFO("chunk %d, pop, chunk temporarily exhausted", m_chunk_id);
+		return ret;
+	}
+
+	if (m_data.empty()) {
+		LOG_INFO("chunk %d, pop, chunk temporarily not available", m_chunk_id);
 		return ret;
 	}
 
