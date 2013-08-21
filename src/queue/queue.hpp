@@ -164,7 +164,7 @@ class chunk {
 		chunk(elliptics::session &session, const std::string &queue_id, int chunk_id, int max);
 		~chunk();
 
-		void load_meta();
+		bool load_meta();
 		const chunk_meta &meta();
 
 		// single entry methods

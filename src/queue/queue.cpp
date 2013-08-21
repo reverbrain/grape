@@ -71,7 +71,10 @@ void queue::initialize(const std::string &config)
 	for (int i = m_state.chunk_id_ack; i <= m_state.chunk_id_push; ++i) {
 		auto p = std::make_shared<chunk>(tmp, m_queue_id, i, m_chunk_max);
 		m_chunks.insert(std::make_pair(i, p));
-		p->load_meta();
+		if (!p->load_meta() && i < m_state.chunk_id_push) {
+			LOG_ERROR("init: failed to read middle chunk meta data, can't proceed, exiting");
+			ioremap::elliptics::throw_error(-ENODATA, "middle chunk %d meta data is missing", i);
+		}
 	}
 
 	LOG_INFO("init: queue started");

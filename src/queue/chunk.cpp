@@ -167,13 +167,14 @@ ioremap::grape::chunk::~chunk()
 	//write_meta();
 }
 
-void ioremap::grape::chunk::load_meta()
+bool ioremap::grape::chunk::load_meta()
 {
 	try {
 		ioremap::elliptics::data_pointer d = m_session_meta.read_data(m_meta_key, 0, 0).get_one().file();
 		m_meta.assign((char *)d.data(), d.size());
 		++m_stat.read;
 		reset_iteration_mode();
+		return true;
 
 	} catch (const ioremap::elliptics::not_found_error &e) {
 		// ignore not-found exception - create empty chunk
@@ -187,6 +188,8 @@ void ioremap::grape::chunk::load_meta()
 			throw;
 		}
 	}
+
+	return false;
 }
 
 bool ioremap::grape::chunk::expect_no_more()
