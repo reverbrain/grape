@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.6)
 project (grape)
 
-add_definitions("-std=c++0x -Wreorder -Wreturn-type")
+add_definitions("-std=c++0x -Wreorder -Wreturn-type -Wunused-variable")
 
 # The version number.
 FILE (READ "${CMAKE_CURRENT_SOURCE_DIR}/debian/changelog" DEBCHANGELOG)
