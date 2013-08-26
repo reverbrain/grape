@@ -97,12 +97,6 @@ class queue_driver: public api::driver_t {
 		void on_worker_complete(uint64_t start_time, bool success);
 
 	private:
-		struct data_pointer_comparator_t {
-			bool operator() (const ioremap::elliptics::data_pointer &a, const ioremap::elliptics::data_pointer &b) const {
-				return a.data() < b.data();
-			}
-		};
-
 		// std::queue<ioremap::elliptics::data_pointer> m_local_queue;
 		// std::mutex m_local_queue_mutex;
 		// std::mutex m_local_queue_processing_mutex;
