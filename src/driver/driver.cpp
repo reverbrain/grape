@@ -161,6 +161,7 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 queue_driver::~queue_driver()
 {
 	m_request_timer.stop();
+	m_rate_control_timer.stop();
 }
 
 Json::Value queue_driver::info() const
@@ -366,6 +367,11 @@ void queue_driver::on_queue_request_complete(std::shared_ptr<queue_request> req,
 	if (error) {
 		COCAINE_LOG_ERROR(m_log, "%s: %s: queue request completion error: %s",
 				m_queue_name.c_str(), dnet_dump_id(&req->id), error.message().c_str());
+
+		// Normally queue counter decremented when worker completes item processing.
+		// But if there is no data for the worker, we decrement counter here.
+		queue_dec(1);
+
 	} else {
 		COCAINE_LOG_INFO(m_log, "%s: %s: queue request completed",
 				m_queue_name.c_str(), dnet_dump_id(&req->id));
