@@ -150,12 +150,15 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 			m_push_time.start();
 			m_queue->push(d);
 			m_push_time.stop();
-			COCAINE_LOG_INFO(m_log, "push time %ld", microseconds_now() - m_push_time.start_time);
+			COCAINE_LOG_INFO(m_log, "%s, push time %ld",
+					action_id.c_str(),
+					microseconds_now() - m_push_time.start_time
+					);
 			m_push_rate.update(1);
 		}
 		m_queue->final(context, ioremap::elliptics::data_pointer());
 
-	} else if (event == "pop-multi" || event == "pop-multiple-string") {
+	} else if (event == "pop-multi") {
 		int num = stoi(context.data().to_string());
 
 		m_pop_time.start();
