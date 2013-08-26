@@ -200,6 +200,9 @@ ioremap::elliptics::data_pointer queue::peek(entry_id *entry_id)
 
 			// drop chunk from the pop list
 			m_chunks.erase(found);
+		} else if (d.empty()) {
+			// this is error condition: middle chunk must give some data but gives none
+			break;
 		}
 
 		break;
@@ -369,6 +372,9 @@ data_array queue::peek(int num)
 
 			// drop chunk from the pop list
 			m_chunks.erase(found);
+		} else if (d.empty()) {
+			// this is error condition: middle chunk must give some data but gives none
+			break;
 		}
 
 		num -= d.sizes().size();
