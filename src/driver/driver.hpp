@@ -81,7 +81,9 @@ class queue_driver: public api::driver_t {
 		elliptics_client_state m_client;
 		std::vector<int> m_queue_groups;
 		int m_wait_timeout;
+		int m_check_timeout;
 		int m_request_size;
+		double m_high_rate_limit;
 
 		void on_request_timer_event(ev::timer&, int);
 		void on_rate_control_timer_event(ev::timer&, int);

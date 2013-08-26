@@ -72,7 +72,9 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 	, m_log(new cocaine::logging::log_t(context, cocaine::format("driver/%s", name)))
 	// configuration
 	, m_wait_timeout(args.get("wait-timeout", 60).asInt())
+	, m_check_timeout(args.get("check-timeout", 30).asInt())
 	, m_request_size(args.get("request-size", 100).asInt())
+	, m_high_rate_limit(args.get("high-rate-limit", 0.0f).asDouble())
 	, m_queue_name(args.get("source-queue-app", "queue").asString())
 	, m_worker_event(args.get("worker-emit-event", "emit").asString())
 	, m_queue_pop_event(m_queue_name + "@" + args.get("source-queue-pop-event", "pop-multiple-string").asString())
@@ -226,6 +228,9 @@ void queue_driver::on_rate_control_timer_event(ev::timer &, int)
 	}
 
 	projected_request_speed = std::max(1.0, projected_request_speed);
+	if (m_high_rate_limit > 0.0) {
+		projected_request_speed = std::min(projected_request_speed, m_high_rate_limit);
+	}
 
 	COCAINE_LOG_INFO(m_log, "%s: rate: delta: %.3f, focus: %.3f, growth_step: %d, growth_time: %.3f",
 			m_queue_name.c_str(), delta, rate_focus, growth_step, growth_time

@@ -62,6 +62,8 @@ struct elliptics_client_state {
 		uint loglevel = DNET_LOG_ERROR;
 		std::vector<std::string> remotes;
 		std::vector<int> groups;
+		int wait_timeout = 0;
+		int check_timeout = 0;
 
 		try {
 			{
@@ -74,6 +76,18 @@ struct elliptics_client_state {
 				const auto *m = args.FindMember("loglevel");
 				if (m && m->value.IsInt()) {
 					loglevel = m->value.GetInt();
+				}
+			}
+			{
+				const auto *m = args.FindMember("wait-timeout");
+				if (m && m->value.IsInt()) {
+					wait_timeout = m->value.GetInt();
+				}
+			}
+			{
+				const auto *m = args.FindMember("check-timeout");
+				if (m && m->value.IsInt()) {
+					check_timeout = m->value.GetInt();
 				}
 			}
 
@@ -91,7 +105,7 @@ struct elliptics_client_state {
 			throw configuration_error(e.what());
 		}
 
-		return create(remotes, groups, logfile, loglevel);
+		return create(remotes, groups, logfile, loglevel, wait_timeout, check_timeout);
 	}
 
 	static elliptics_client_state create(const std::string &conf, rapidjson::Document &doc) {
@@ -127,7 +141,8 @@ struct elliptics_client_state {
 	}
 
 	static elliptics_client_state create(const std::vector<std::string> &remotes,
-			const std::vector<int> &groups, const std::string &logfile, int loglevel) {
+			const std::vector<int> &groups, const std::string &logfile, int loglevel,
+			int wait_timeout = 0, int check_timeout = 0) {
 		if (remotes.size() == 0) {
 			throw configuration_error("no remotes have been specified");
 		}
@@ -139,6 +154,13 @@ struct elliptics_client_state {
 		result.logger.reset(new elliptics::file_logger(logfile.c_str(), loglevel));
 		result.node.reset(new elliptics::node(*result.logger));
 		result.groups = groups;
+
+		if (wait_timeout != 0 || check_timeout != 0) {
+			// if unset, use default values as in node.c:dnet_node_create()
+			wait_timeout = wait_timeout ? wait_timeout : 5;
+			check_timeout = check_timeout ? check_timeout : DNET_DEFAULT_CHECK_TIMEOUT_SEC;
+			result.node->set_timeouts(wait_timeout, check_timeout);
+		}
 
 		if (remotes.size() == 1) {
 			// any error is fatal if there is a single remote address
