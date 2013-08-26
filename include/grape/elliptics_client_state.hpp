@@ -18,24 +18,24 @@ using namespace ioremap;
 class configuration_error : public elliptics::error
 {
 public:
-    explicit configuration_error(const std::string &message) throw()
-        : error(EINVAL, message)
-    {}
+	explicit configuration_error(const std::string &message) throw()
+		: error(EINVAL, message)
+	{}
 };
 
 static inline void read_groups_array(std::vector<int> *result, const char *name, const rapidjson::Value &value) {
-    if (const auto *m = value.FindMember(name)) {
-        if (m->value.IsArray()) {
-            std::transform(m->value.Begin(), m->value.End(),
-                std::back_inserter(*result),
-                std::bind(&rapidjson::Value::GetInt, std::placeholders::_1)
-                );
-        } else {
+	if (const auto *m = value.FindMember(name)) {
+		if (m->value.IsArray()) {
+			std::transform(m->value.Begin(), m->value.End(),
+				std::back_inserter(*result),
+				std::bind(&rapidjson::Value::GetInt, std::placeholders::_1)
+				);
+		} else {
 			std::ostringstream str;
 			str << name << "value must be of array type";
-            throw configuration_error(str.str().c_str());
-        }
-    }
+			throw configuration_error(str.str().c_str());
+		}
+	}
 }
 
 struct elliptics_client_state {
