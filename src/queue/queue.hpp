@@ -209,7 +209,7 @@ class chunk {
 
 		void write_meta();
 		void reset_iteration_mode();
-		void prepare_iteration();
+		bool update_data_cache();
 };
 
 typedef std::shared_ptr<chunk> shared_chunk;

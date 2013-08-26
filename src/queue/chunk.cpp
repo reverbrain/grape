@@ -197,7 +197,7 @@ bool ioremap::grape::chunk::expect_no_more()
 	return m_meta.full() && iter->at_end();
 }
 
-void ioremap::grape::chunk::prepare_iteration()
+bool ioremap::grape::chunk::update_data_cache()
 {
 	try {
 		// Actual data is read on first pop() and also reread on chunk's exhaustion
@@ -205,25 +205,22 @@ void ioremap::grape::chunk::prepare_iteration()
 		// Metadata is read only at start (as it resides in memory and properly updated by push).
 		//
 		if (iteration_state.byte_offset >= m_data.size()) {
-			LOG_INFO("chunk %d, prepare_iteration, (re)reading data, iteration.byte_offset %lld, m_data.size() %ld", m_chunk_id, iteration_state.byte_offset, m_data.size());
+			LOG_INFO("chunk %d, update_data_cache, (re)reading data, iteration.byte_offset %lld, m_data.size() %ld", m_chunk_id, iteration_state.byte_offset, m_data.size());
 			
 			m_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
 
-			LOG_INFO("chunk %d, prepare_iteration, read m_data, size %ld", m_chunk_id, m_data.size());
+			LOG_INFO("chunk %d, update_data_cache, read m_data, size %ld", m_chunk_id, m_data.size());
 		}
 
-		if (!iter) {
-			LOG_INFO("chunk %d, prepare_iteration, initializing iterator", m_chunk_id);
-			reset_iteration_mode();
-		}
+		return true;
 
 	} catch (const ioremap::elliptics::not_found_error &e) {
 		// Do not explode on not-found-error, return empty data pointer
-		LOG_ERROR("chunk %d, prepare_iteration, ERROR: %s", m_chunk_id, e.what());
+		LOG_ERROR("chunk %d, update_data_cache, ERROR: %s", m_chunk_id, e.what());
 
 	} catch (const ioremap::elliptics::timeout_error &e) {
 		// Do not explode on timeout-error, return empty data pointer
-		LOG_ERROR("chunk %d, prepare_iteration, ERROR: %s", m_chunk_id, e.what());
+		LOG_ERROR("chunk %d, update_data_cache, ERROR: %s", m_chunk_id, e.what());
 
 		//XXX: this means we silently ignore unreachable data,
 		// and it can't be good
@@ -231,11 +228,13 @@ void ioremap::grape::chunk::prepare_iteration()
 	} catch (const ioremap::elliptics::error &e) {
 		// Special case to ignore bad chunk meta format error
 		// (raised by chunk_clt::assign())
-		LOG_ERROR("chunk %d, prepare_iteration, ERROR: %s", m_chunk_id, e.what());
+		LOG_ERROR("chunk %d, update_data_cache, ERROR: %s", m_chunk_id, e.what());
 		if (e.error_code() != -ERANGE) {
 			throw;
 		}
 	}
+
+	return false;
 }
 
 ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(int *pos)
@@ -244,25 +243,15 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(int *pos)
 	*pos = -1;
 
 	// Fast track for the case when chunk is empty (not exist).
-	// It valid to check only metadata as push() updates metadata in memory
+	// Its valid to check only metadata as push() updates metadata in memory
 	if (m_meta.high_mark() == 0) {
 		LOG_INFO("chunk %d, pop-single, empty", m_chunk_id);
 		return d;
 	}
 
-	prepare_iteration();
-
-	// Iterator could still not be initialized here,
-	// if there was data read error inside prepare_iteration().
-	// Meta and data are inconsistent for now but next data reread could fix that. 
 	if (!iter) {
-		LOG_INFO("chunk %d, pop-single, chunk temporarily exhausted", m_chunk_id);
-		return d;
-	}
-
-	if (m_data.empty()) {
-		LOG_INFO("chunk %d, pop, chunk temporarily not available", m_chunk_id);
-		return d;
+		LOG_INFO("chunk %d, pop, initializing iterator", m_chunk_id);
+		reset_iteration_mode();
 	}
 
 	LOG_INFO("chunk %d, pop-single, iter: mode %d, index %d, offset %lld", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
@@ -274,18 +263,32 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(int *pos)
 		iter->begin();
 	}
 
-	if (!iter->at_end()) {
-		int size = m_meta[iteration_state.entry_index].size;
-		d = ioremap::elliptics::data_pointer::copy((char *)m_data.data() + iteration_state.byte_offset, size);
-		*pos = iteration_state.entry_index;
-
-		iter->advance();
-
-	} else {
+	if (iter->at_end()) {
 		LOG_INFO("chunk %d, pop-single, iter: mode %d, index %d, offset %lld, is at end", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
+		return d;
 	}
 
+	// reread data if its too much out of sync with meta
+	if (!update_data_cache()) {
+		// There was data read error, so for now meta and data are inconsistent,
+		// but next try could fix that.
+		LOG_INFO("chunk %d, pop, chunk temporarily exhausted", m_chunk_id);
+		return d;
+	}
+
+	if (m_data.empty()) {
+		LOG_INFO("chunk %d, pop, chunk temporarily unavailable", m_chunk_id);
+		return d;
+	}
+
+	int size = m_meta[iteration_state.entry_index].size;
+	d = ioremap::elliptics::data_pointer::copy((char *)m_data.data() + iteration_state.byte_offset, size);
+	*pos = iteration_state.entry_index;
+
+	iter->advance();
+
 	++m_stat.pop;
+
 	return d;
 }
 
@@ -300,19 +303,9 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 		return ret;
 	}
 
-	prepare_iteration();
-
-	// Iterator could still not be initialized here,
-	// if there was data read error inside prepare_iteration().
-	// Meta and data are inconsistent for now but next data reread could fix that. 
 	if (!iter) {
-		LOG_INFO("chunk %d, pop, chunk temporarily exhausted", m_chunk_id);
-		return ret;
-	}
-
-	if (m_data.empty()) {
-		LOG_INFO("chunk %d, pop, chunk temporarily not available", m_chunk_id);
-		return ret;
+		LOG_INFO("chunk %d, pop, initializing iterator", m_chunk_id);
+		reset_iteration_mode();
 	}
 
 	entry_id entry_id;
@@ -320,7 +313,6 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 
 	while(num > 0) {
 		if (iter->mode == iterator::REPLAY && iter->at_end()) {
-			
 			LOG_INFO("chunk %d, pop, iter: mode %d, index %d, offset %lld, switching to mode %d", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset, iterator::FORWARD);
 
 			iter.reset(new forward_iterator(iteration_state, m_meta));
@@ -329,6 +321,19 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 
 		if (iter->at_end()) {
 			LOG_INFO("chunk %d, pop, iter: mode %d, index %d, offset %lld, is at end", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
+			break;
+		}
+
+		// reread data if its too much out of sync with meta
+		if (!update_data_cache()) {
+			// There was data read error, so for now meta and data are inconsistent,
+			// but next try could fix that.
+			LOG_INFO("chunk %d, pop, chunk temporarily exhausted", m_chunk_id);
+			break;
+		}
+
+		if (m_data.empty()) {
+			LOG_INFO("chunk %d, pop, chunk temporarily unavailable", m_chunk_id);
 			break;
 		}
 
@@ -341,6 +346,7 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 		iter->advance();
 
 		++m_stat.pop;
+
 		--num;
 	}
 
