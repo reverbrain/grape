@@ -83,7 +83,8 @@ class queue_driver: public api::driver_t {
 		int m_wait_timeout;
 		int m_check_timeout;
 		int m_request_size;
-		double m_high_rate_limit;
+		double m_rate_upper_limit;
+		double m_initial_rate_boost;
 
 		void on_request_timer_event(ev::timer&, int);
 		void on_rate_control_timer_event(ev::timer&, int);
