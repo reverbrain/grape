@@ -24,6 +24,7 @@ int main(int argc, char** argv)
 	options_description other("Options");
 	elliptics.add_options()
 		("concurrency,n", value<int>()->default_value(1), "concurrency limit")
+		("limit,l", value<int>()->default_value(0), "upper limit")
 		;
 
 	options_description opts;
@@ -60,6 +61,7 @@ int main(int argc, char** argv)
 	int loglevel = args["loglevel"].as<int>();
 
 	int concurrency = args["concurrency"].as<int>();
+	int limit = args["limit"].as<int>();
 
 	auto clientlib = elliptics_client_state::create(remotes, groups, logfile, loglevel);
 
@@ -68,7 +70,10 @@ int main(int argc, char** argv)
 	// write queue indefinitely, with ever increasing number
 	concurrent_queue_writer pump(clientlib.create_session(), queue_name, concurrency);
 	int counter = 0;
-	pump.run([&counter] () {
+	pump.run([&counter, &limit] () {
+		if (limit > 0 && counter >= limit) {
+			return ioremap::elliptics::data_pointer();
+		}
 		return ioremap::elliptics::data_pointer(std::to_string(counter++));
 	});
 
