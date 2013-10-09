@@ -188,9 +188,12 @@ class chunk {
 		double get_time(void);
 
 	private:
+		std::string m_traceid;
 		int m_chunk_id;
 		elliptics::key m_data_key;
+		dnet_io_attr m_data_io;
 		elliptics::key m_meta_key;
+		dnet_io_attr m_meta_io;
 		elliptics::session m_session_data;
 		elliptics::session m_session_meta;
 
