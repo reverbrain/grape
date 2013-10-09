@@ -13,6 +13,14 @@
 #include <grape/data_array.hpp>
 #include <grape/entry_id.hpp>
 
+namespace {
+	inline uint64_t microseconds_now() {
+		timespec t;
+		clock_gettime(CLOCK_MONOTONIC_RAW, &t);
+		return t.tv_sec * 1000000 + t.tv_nsec / 1000;
+	}
+}
+
 namespace ioremap { namespace grape {
 
 struct chunk_entry {
@@ -185,8 +193,8 @@ class chunk {
 		void add(struct chunk_stat *st);
 
 		int id() const;
-		void reset_time(double timeout);
-		double get_time(void);
+		void reset_time(uint64_t timeout);
+		uint64_t get_time(void);
 
 	private:
 		std::string m_traceid;
@@ -269,6 +277,8 @@ class queue {
 
 	private:
 		int m_chunk_max;
+		uint64_t m_ack_wait_timeout;
+		uint64_t m_timeout_check_period;
 
 		std::string m_queue_id;
 		std::string m_queue_state_id;
@@ -282,7 +292,7 @@ class queue {
 
 		std::map<int, shared_chunk> m_chunks;
 		std::map<int, shared_chunk> m_wait_ack;
-		double m_last_timeout_check_time;
+		uint64_t m_last_timeout_check_time;
 
 		void write_state();
 

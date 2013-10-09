@@ -27,10 +27,16 @@ std::shared_ptr<cocaine::framework::logger_t> grape_queue_module_get_logger() {
 
 namespace ioremap { namespace grape {
 
-const int DEFAULT_MAX_CHUNK_SIZE = 10000;
+namespace defaults {
+	const int MAX_CHUNK_SIZE = 10000;
+	const uint64_t ACK_WAIT_TIMEOUT = 5 * 1000000; // microseconds
+	const uint64_t TIMEOUT_CHECK_PERIOD = 1 * 1000000; // microseconds
+}
 
 queue::queue(const std::string &queue_id)
-	: m_chunk_max(DEFAULT_MAX_CHUNK_SIZE)
+	: m_chunk_max(defaults::MAX_CHUNK_SIZE)
+	, m_ack_wait_timeout(defaults::ACK_WAIT_TIMEOUT)
+	, m_timeout_check_period(defaults::TIMEOUT_CHECK_PERIOD)
 	, m_queue_id(queue_id)
 	, m_queue_state_id(m_queue_id + ".state")
 	, m_last_timeout_check_time(0)
@@ -64,6 +70,16 @@ void queue::initialize(const std::string &config)
 
 	if (doc.HasMember("chunk-max-size")) {
 		m_chunk_max = doc["chunk-max-size"].GetInt();
+	}
+
+	if (doc.HasMember("ack-wait-timeout")) {
+		// config value in seconds
+		m_ack_wait_timeout = 1000000 * doc["ack-wait-timeout"].GetInt();
+	}
+
+	if (doc.HasMember("timeout-check-period")) {
+		// config value in seconds
+		m_timeout_check_period = 1000000 * doc["timeout-check-period"].GetInt();
 	}
 
 	memset(&m_state, 0, sizeof(m_state));
@@ -217,20 +233,19 @@ void queue::update_chunk_timeout(int chunk_id, shared_chunk chunk)
 	// add chunk to the waiting list and postpone its deadline time
 	m_wait_ack.insert({chunk_id, chunk});
 	//TODO: make acking timeout value configurable
-	chunk->reset_time(5.0);	
+	chunk->reset_time(m_ack_wait_timeout);	
 }
 
 void queue::check_timeouts()
 {
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
+	uint64_t now = microseconds_now();
 
 	// check no more then once in 1 second
 	//TODO: make timeout check interval configurable
-	if ((tv.tv_sec - m_last_timeout_check_time) < 1) {
+	if ((now - m_last_timeout_check_time) < m_timeout_check_period) {
 		return;
 	}
-	m_last_timeout_check_time = tv.tv_sec;
+	m_last_timeout_check_time = now;
 
 	LOG_INFO("%s, checking timeouts: %ld waiting chunks", m_queue_id.c_str(), m_wait_ack.size());
 
@@ -239,15 +254,18 @@ void queue::check_timeouts()
 		int chunk_id = i->first;
 		auto chunk = i->second;
 
-		if (chunk->get_time() > tv.tv_sec) {
+		if (now < chunk->get_time()) {
 			++i;
 			continue;
 		}
 
 		// Time passed but chunk still is not complete
 		// so we must replay unacked items from it.
-		LOG_ERROR("chunk %d timed out, returning back to the popping line, current time: %ld, chunk expiration time: %f",
-				chunk_id, tv.tv_sec, chunk->get_time());
+		LOG_ERROR("%s, chunk %d timed out, returning back to the popping line (due time was %ldus ago)",
+				m_queue_id.c_str(),
+				chunk_id,
+				now - chunk->get_time()
+				);
 
 		// There are two cases when chunk can still be in m_chunks
 		// while experiencing a timeout:
@@ -255,7 +273,7 @@ void queue::check_timeouts()
 		//    as a push and a pop/ack target)
 		// 2) if iteration of this chunk was preempted by other timed out chunk
 		//    and then later this chunk timed out in its turn
-		// Timeout requires switch chunk's iteration into the replay mode.
+		// Timeout require switching chunk's iteration into the replay mode.
 
 		auto inserted = m_chunks.insert({chunk_id, chunk});
 		if (!inserted.second) {

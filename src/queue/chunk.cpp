@@ -467,15 +467,13 @@ int ioremap::grape::chunk::id(void) const
 	return m_chunk_id;
 }
 
-void ioremap::grape::chunk::reset_time(double timeout)
+void ioremap::grape::chunk::reset_time(uint64_t timeout)
 {
-	struct timeval tv;
-
-	gettimeofday(&tv, NULL);
-	m_fire_time = tv.tv_sec + timeout;
+	uint64_t now = microseconds_now();
+	m_fire_time = now + timeout;
 }
 
-double ioremap::grape::chunk::get_time(void)
+uint64_t ioremap::grape::chunk::get_time(void)
 {
 	return m_fire_time;
 }
