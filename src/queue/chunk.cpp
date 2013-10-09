@@ -16,7 +16,6 @@ ioremap::grape::chunk_meta::chunk_meta(int max)
 	m_ptr = (struct chunk_disk *)m_data.data();
 	
 	m_ptr->max = max;
-
 }
 
 bool ioremap::grape::chunk_meta::push(int size)
@@ -53,6 +52,12 @@ void ioremap::grape::chunk_meta::pop()
 
 bool ioremap::grape::chunk_meta::ack(int32_t pos, int state)
 {
+	if (pos >= m_ptr->low) {
+		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: position can not be more than low mark: "
+				"pos: %d, acked: %d, low: %d, high: %d, max: %d",
+				pos, m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
+	}
+
 	if (pos >= m_ptr->high) {
 		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: position can not be more than high mark: "
 				"pos: %d, acked: %d, high: %d, max: %d",
@@ -71,8 +76,19 @@ bool ioremap::grape::chunk_meta::ack(int32_t pos, int state)
 				pos, m_ptr->acked, m_ptr->high, m_ptr->max);
 	}
 
-	m_ptr->entries[pos].state = state;
-	m_ptr->acked++;
+	if (m_ptr->acked >= m_ptr->low) {
+		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: acked can not be more than low mark: "
+				"pos: %d, acked: %d, low: %d, high: %d, max: %d",
+				pos, m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
+	}
+
+	chunk_entry &entry = m_ptr->entries[pos];
+	if (entry.state != state && state == STATE_ACKED) {
+		m_ptr->acked++;
+	} else {
+		LOG_INFO("\tmeta.ack: pos: %d, was already acked", pos, entry.state);
+	}
+	entry.state = state;
 	LOG_DEBUG("\tmeta.ack: pos: %d, acked: %d, low: %d, high: %d, max: %d", pos, m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
 
 	return complete();
@@ -121,6 +137,17 @@ void ioremap::grape::chunk_meta::assign(char *data, size_t size)
 
 	m_data.assign(data, size);
 	m_ptr = (struct chunk_disk *)m_data.data();
+
+	// // acked count validation
+	// int acked = 0;
+	// for (int i = 0; i < m_ptr->high; ++i) {
+	// 	if (m_ptr->entries[i].state == 1) {
+	// 		++acked;
+	// 	}
+	// }
+	// if (acked != m_ptr->acked) {
+	// 	LOG_ERROR("invalid acked count: read %d, actual %d", m_ptr->acked, acked);
+	// }
 }
 
 ioremap::grape::chunk_entry ioremap::grape::chunk_meta::operator[] (int32_t pos) const
