@@ -1,3 +1,5 @@
+#include <unordered_set>
+
 #include <cocaine/framework/logging.hpp>
 
 #include "grape/rapidjson/document.h"
@@ -301,7 +303,7 @@ void queue::ack(const entry_id id)
 	}
 
 	auto chunk = found->second;
-	chunk->ack(id.pos);
+	chunk->ack(id.pos, true);
 	if (chunk->meta().acked() == chunk->meta().low_mark()) {
 		// Real end of the chunk's lifespan, all popped entries are acked
 
@@ -405,9 +407,66 @@ data_array queue::peek(int num)
 
 void queue::ack(const std::vector<entry_id> &ids)
 {
-	for (auto i = ids.begin(); i != ids.end(); ++i) {
-		const entry_id &id = *i;
-		ack(id);
+	// Collect affected chunk set
+	std::unordered_set<shared_chunk> affected_chunks;
+	auto found = m_wait_ack.end();
+
+	for (const auto &id : ids) {
+		// sequential case optimization
+		if (found == m_wait_ack.end() || found->second->id() != id.chunk) {
+			found = m_wait_ack.find(id.chunk);
+			if (found == m_wait_ack.end()) {
+				LOG_ERROR("%s, ack for chunk %d (pos %d) which is not in waiting list", m_queue_id.c_str(), id.chunk, id.pos);
+				continue;
+			}
+		}
+		auto chunk = found->second;
+
+		affected_chunks.insert(chunk);
+
+		// ack without saving meta
+		LOG_INFO("%s, ack, chunk %d, pos %d, state %d", m_queue_id.c_str(), id.chunk, id.pos, chunk->meta()[id.pos].state);
+		chunk->ack(id.pos, false);
+
+		if (chunk->meta().acked() == chunk->meta().low_mark()) {
+			// Real end of the chunk's lifespan, all popped entries are acked
+
+			m_wait_ack.erase(found);
+			found = m_wait_ack.end();
+
+			// Set chunk_id_ack to the lowest active chunk
+			//NOTE: its important to have m_chunks and m_wait_ack both sorted
+			m_state.chunk_id_ack = m_state.chunk_id_push;
+			if (!m_chunks.empty()) {
+				m_state.chunk_id_ack = std::min(m_state.chunk_id_ack, m_chunks.begin()->first);
+			}
+			if (!m_wait_ack.empty()) {
+				m_state.chunk_id_ack = std::min(m_state.chunk_id_ack, m_wait_ack.begin()->first);
+			}
+
+			// writing state before any other external actions to ensure state correctness
+			write_state();
+
+			// Chunk would be uncomplete here only if its the only chunk in the queue
+			// (filled partially and serving both as a push and a pop/ack target)
+			if (chunk->meta().complete()) {
+				chunk->remove();
+				affected_chunks.erase(chunk);
+				LOG_INFO("%s, ack, chunk %d complete", m_queue_id.c_str(), id.chunk);
+			}
+
+			chunk->add(&m_statistics.chunks_popped);
+		}
+
+		affected_chunks.insert(chunk);
+
+		++m_statistics.ack_count;
+	}
+
+	// then save meta for all affected chunks
+	for (const auto &chunk : affected_chunks) {
+		LOG_INFO("%s, ack, chunk %d, write meta, acked %d, low %d", m_queue_id.c_str(), chunk->id(), chunk->meta().acked(), chunk->meta().low_mark());
+		chunk->write_meta();
 	}
 }
 

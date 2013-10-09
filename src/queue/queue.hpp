@@ -179,7 +179,7 @@ class chunk {
 		// single entry methods
 		bool push(const elliptics::data_pointer &d); // returns true if chunk is full
 		elliptics::data_pointer pop(int32_t *pos);
-		bool ack(int32_t pos);
+		bool ack(int32_t pos, bool write);
 
 		// multiple entries methods
 		data_array pop(int num);

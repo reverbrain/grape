@@ -7,6 +7,8 @@ extern std::shared_ptr<cocaine::framework::logger_t> grape_queue_module_get_logg
 #define LOG_ERROR(...) COCAINE_LOG_ERROR(grape_queue_module_get_logger(), __VA_ARGS__)
 #define LOG_DEBUG(...) COCAINE_LOG_DEBUG(grape_queue_module_get_logger(), __VA_ARGS__)
 
+const int STATE_ACKED = 1;
+
 ioremap::grape::chunk_meta::chunk_meta(int max)
 	: m_ptr(NULL)
 {
@@ -417,11 +419,13 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 	return m_meta.full();
 }
 
-bool ioremap::grape::chunk::ack(int pos)
+bool ioremap::grape::chunk::ack(int pos, bool write)
 {
 	//FIXME: check if pos < low < high 
-	m_meta.ack(pos, 1);
-	write_meta();
+	m_meta.ack(pos, STATE_ACKED);
+	if (write) {
+		write_meta();
+	}
 
 	++m_stat.ack;
 
