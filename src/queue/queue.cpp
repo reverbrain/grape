@@ -60,7 +60,7 @@ void queue::initialize(const std::string &config)
 		m_data_client->set_timeout(timeout);
 	}
 
-	LOG_INFO("init: elliptics client created");
+	LOG_INFO("%s, init: elliptics client created", m_queue_id.c_str());
 
 	if (doc.HasMember("chunk-max-size")) {
 		m_chunk_max = doc["chunk-max-size"].GetInt();
@@ -75,12 +75,13 @@ void queue::initialize(const std::string &config)
 		m_state.chunk_id_push = state->chunk_id_push;
 		m_state.chunk_id_ack = state->chunk_id_ack;
 
-		LOG_INFO("init: queue meta found: chunk_id_ack %d, chunk_id_push %d",
+		LOG_INFO("%s, init: queue meta found: chunk_id_ack %d, chunk_id_push %d",
+				m_queue_id.c_str(),
 				m_state.chunk_id_ack, m_state.chunk_id_push
 				);
 
 	} catch (const ioremap::elliptics::not_found_error &) {
-		LOG_INFO("init: no queue meta found, starting in pristine state");
+		LOG_INFO("%s, init: no queue meta found, starting in pristine state", m_queue_id.c_str());
 	}
 
 	// load metadata of existing chunk into memory
@@ -88,12 +89,12 @@ void queue::initialize(const std::string &config)
 		auto p = std::make_shared<chunk>(*m_data_client.get(), m_queue_id, i, m_chunk_max);
 		m_chunks.insert(std::make_pair(i, p));
 		if (!p->load_meta() && i < m_state.chunk_id_push) {
-			LOG_ERROR("init: failed to read middle chunk meta data, can't proceed, exiting");
+			LOG_ERROR("%s, init: failed to read middle chunk meta data, can't proceed, exiting", m_queue_id.c_str());
 			ioremap::elliptics::throw_error(-ENODATA, "middle chunk %d meta data is missing", i);
 		}
 	}
 
-	LOG_INFO("init: queue started");
+	LOG_INFO("%s, init: queue started", m_queue_id.c_str());
 }
 
 void queue::write_state()
@@ -107,17 +108,17 @@ void queue::write_state()
 
 void queue::clear()
 {
-	LOG_INFO("clearing queue");
+	LOG_INFO("%s, clearing queue", m_queue_id.c_str());
 
-	LOG_INFO("dropping statistics");
+	LOG_INFO("%s, dropping statistics", m_queue_id.c_str());
 	clear_counters();
 
-	LOG_INFO("erasing state");
+	LOG_INFO("%s, erasing state", m_queue_id.c_str());
 	queue_state state = m_state;
 	memset(&m_state, 0, sizeof(m_state));
 	write_state();
 
-	LOG_INFO("removing chunks, from %d to %d", state.chunk_id_ack, state.chunk_id_push);
+	LOG_INFO("%s, removing chunks, from %d to %d", m_queue_id.c_str(), state.chunk_id_ack, state.chunk_id_push);
 	std::map<int, shared_chunk> remove_list;
 	remove_list.swap(m_chunks);
 	remove_list.insert(m_wait_ack.cbegin(), m_wait_ack.cend());
@@ -130,7 +131,7 @@ void queue::clear()
 
 	remove_list.clear();
 
-	LOG_INFO("queue cleared");
+	LOG_INFO("%s, queue cleared", m_queue_id.c_str());
 }
 
 void queue::push(const ioremap::elliptics::data_pointer &d)
@@ -148,7 +149,7 @@ void queue::push(const ioremap::elliptics::data_pointer &d)
 	auto chunk = found->second;
 
 	if (chunk->push(d)) {
-		LOG_INFO("chunk %d filled", chunk_id);
+		LOG_INFO("%s, chunk %d filled", m_queue_id.c_str(), chunk_id);
 
 		++m_state.chunk_id_push;
 		write_state();
@@ -178,7 +179,7 @@ ioremap::elliptics::data_pointer queue::peek(entry_id *entry_id)
 		entry_id->chunk = chunk_id;
 		d = chunk->pop(&entry_id->pos);
 
-		LOG_INFO("popping entry %d-%d (%ld)'%s'", entry_id->chunk, entry_id->pos, d.size(), d.to_string());
+		LOG_INFO("%s, popping entry %d-%d (%ld)'%s'", m_queue_id.c_str(), entry_id->chunk, entry_id->pos, d.size(), d.to_string());
 		if (!d.empty()) {
 			m_statistics.pop_count++;
 
@@ -196,7 +197,7 @@ ioremap::elliptics::data_pointer queue::peek(entry_id *entry_id)
 			// (between queue restarts or because of chunk replaying)
 			chunk->add(&m_statistics.chunks_popped);
 
-			LOG_INFO("chunk %d exhausted, dropped from the popping line", chunk_id);
+			LOG_INFO("%s, chunk %d exhausted, dropped from the popping line", m_queue_id.c_str(), chunk_id);
 
 			// drop chunk from the pop list
 			m_chunks.erase(found);
@@ -231,7 +232,7 @@ void queue::check_timeouts()
 	}
 	m_last_timeout_check_time = tv.tv_sec;
 
-	LOG_INFO("checking timeouts: %ld waiting chunks", m_wait_ack.size());
+	LOG_INFO("%s, checking timeouts: %ld waiting chunks", m_queue_id.c_str(), m_wait_ack.size());
 
 	auto i = m_wait_ack.begin();
 	while (i != m_wait_ack.end()) {
@@ -258,9 +259,9 @@ void queue::check_timeouts()
 
 		auto inserted = m_chunks.insert({chunk_id, chunk});
 		if (!inserted.second) {
-			LOG_INFO("chunk %d is already in popping line", chunk_id);
+			LOG_INFO("%s, chunk %d is already in popping line", m_queue_id.c_str(), chunk_id);
 		} else {
-			LOG_INFO("chunk %d inserted back to the popping line anew", chunk_id);
+			LOG_INFO("%s, chunk %d inserted back to the popping line anew", m_queue_id.c_str(), chunk_id);
 		}
 		chunk->reset_iteration();
 
@@ -277,7 +278,7 @@ void queue::ack(const entry_id id)
 {
 	auto found = m_wait_ack.find(id.chunk);
 	if (found == m_wait_ack.end()) {
-		LOG_ERROR("ack for chunk %d (pos %d) which is not in waiting list", id.chunk, id.pos);
+		LOG_ERROR("%s, ack for chunk %d (pos %d) which is not in waiting list", m_queue_id.c_str(), id.chunk, id.pos);
 		return;
 	}
 
@@ -294,7 +295,7 @@ void queue::ack(const entry_id id)
 		// (filled partially and serving both as a push and a pop/ack target)
 		if (chunk->meta().complete()) {
 			chunk->remove();
-			LOG_INFO("chunk %d complete", id.chunk);
+			LOG_INFO("%s, ack, chunk %d complete", m_queue_id.c_str(), id.chunk);
 		}
 
 		// Set chunk_id_ack to the lowest active chunk
@@ -368,10 +369,11 @@ data_array queue::peek(int num)
 			// (between queue restarts or because of chunk replaying)
 			chunk->add(&m_statistics.chunks_popped);
 
-			LOG_INFO("chunk %d exhausted, dropped from the popping line", chunk_id);
+			LOG_INFO("%s, chunk %d exhausted, dropped from the popping line", m_queue_id.c_str(), chunk_id);
 
 			// drop chunk from the pop list
 			m_chunks.erase(found);
+
 		} else if (d.empty()) {
 			// this is error condition: middle chunk must give some data but gives none
 			break;
