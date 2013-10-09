@@ -174,6 +174,7 @@ class chunk {
 		~chunk();
 
 		bool load_meta();
+		void write_meta();
 		const chunk_meta &meta();
 
 		// single entry methods
@@ -219,7 +220,6 @@ class chunk {
 
 		double m_fire_time;
 
-		void write_meta();
 		void reset_iteration_mode();
 		bool update_data_cache();
 };

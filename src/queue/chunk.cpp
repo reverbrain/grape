@@ -236,6 +236,15 @@ bool ioremap::grape::chunk::load_meta()
 	return false;
 }
 
+void ioremap::grape::chunk::write_meta()
+{
+	//DEBUG
+	LOG_INFO("%s, write_meta, writing %s - %s", m_traceid.c_str(), dnet_dump_id_str(m_meta_io.id), m_meta_key.remote().c_str());
+
+	m_session_meta.write_data(m_meta_key, ioremap::elliptics::data_pointer::from_raw(m_meta.data()), 0);
+	++m_stat.write_meta;
+}
+
 bool ioremap::grape::chunk::expect_no_more()
 {
 	return m_meta.full() && iter->at_end();
@@ -403,12 +412,6 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 const ioremap::grape::chunk_meta &ioremap::grape::chunk::meta()
 {
 	return m_meta;
-}
-
-void ioremap::grape::chunk::write_meta()
-{
-	m_session_meta.write_data(m_meta_key, ioremap::elliptics::data_pointer::from_raw(m_meta.data()), 0);
-	++m_stat.write_meta;
 }
 
 void ioremap::grape::chunk::remove()

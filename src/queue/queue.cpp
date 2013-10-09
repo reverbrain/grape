@@ -369,7 +369,12 @@ data_array queue::peek(int num)
 		auto chunk = found->second;
 
 		data_array d = chunk->pop(num);
-		LOG_INFO("chunk %d, popping %d entries", chunk_id, d.sizes().size());
+		LOG_INFO("%s, chunk %d, popping %d entries", m_queue_id.c_str(), chunk_id, d.sizes().size());
+		//DEBUG
+		for (const auto &i : d.ids()) {
+			LOG_INFO("%s, chunk %d, pos %d, state %d", m_queue_id.c_str(), i.chunk, i.pos, chunk->meta()[i.pos].state);
+		}
+
 		if (!d.empty()) {
 			m_statistics.pop_count += d.sizes().size();
 
