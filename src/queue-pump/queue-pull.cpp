@@ -21,8 +21,9 @@ int main(int argc, char** argv)
 		;
 
 	options_description other("Options");
-	elliptics.add_options()
+	other.add_options()
 		("concurrency,n", value<int>()->default_value(1), "concurrency limit")
+		("request-size,s", value<int>()->default_value(100), "request size")
 		;
 
 	options_description opts;
@@ -60,12 +61,11 @@ int main(int argc, char** argv)
 	int loglevel = args["loglevel"].as<int>();
 
 	int concurrency = args["concurrency"].as<int>();
+	int request_size = args["request-size"].as<int>();;
 
 	auto clientlib = elliptics_client_state::create(remotes, groups, logfile, loglevel);
 
 	const std::string queue_name("queue");
-
-	const int request_size = 100;
 
 	// read queue indefinitely
 	concurrent_queue_reader pump(clientlib.create_session(), queue_name, request_size, concurrency);
