@@ -137,10 +137,11 @@ struct replay_iterator : public iterator {
 		skip_acked();
 	}
 	virtual void advance() {
-		skip_acked();
+		//XXX: at_end() guard could be removed?
 		if (!at_end()) {
 			step();
 		}
+		skip_acked();
 	}
 	virtual bool at_end() {
 		return (state.entry_index >= meta.low_mark());
