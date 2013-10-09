@@ -442,7 +442,7 @@ void queue_driver::queue_inc(int num)
 }
 
 queue_driver::downstream_t::downstream_t(queue_driver *parent)
-	: parent(parent)
+	: parent(parent), success(true)
 {
 	start_time = microseconds_now();
 }
@@ -462,11 +462,11 @@ void queue_driver::downstream_t::error(int code, const std::string &msg)
 {
 	COCAINE_LOG_ERROR(parent->m_log, "%s: from worker: error: %s [%d]",
 			parent->m_queue_name.c_str(), msg.c_str(), code);
-	parent->on_worker_complete(start_time, false);
+	success = false;
 }
 
 void queue_driver::downstream_t::close()
 {
-	//COCAINE_LOG_INFO(parent->m_log, "%s: downstream: close", parent->m_queue_name.c_str());
-	parent->on_worker_complete(start_time, true);
+	COCAINE_LOG_INFO(parent->m_log, "%s: from worker: %s", parent->m_queue_name.c_str(), (success ? "done" : "failed"));
+	parent->on_worker_complete(start_time, success);
 }
