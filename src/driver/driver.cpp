@@ -133,7 +133,7 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 	{
 		char *ptr = strchr((char *)m_worker_event.c_str(), '@');
 		if (!ptr)
-			throw configuration_error("invalid worker event ('emit' config entry), it must contain '@' character");
+			throw configuration_error("worker-emit-event: must contain '@' character");
 
 		std::string app_name(m_worker_event.c_str(), ptr - m_worker_event.c_str());
 		std::string event_name(ptr+1);
@@ -191,7 +191,7 @@ void queue_driver::on_rate_control_timer_event(ev::timer &, int)
 //		COCAINE_LOG_INFO(m_log, "values: process count %d, time %ld", process_count, processed_time);
 		int count = std::atomic_exchange<int>(&process_count, 0);
 		uint64_t time = std::atomic_exchange<uint64_t>(&processed_time, 0);
-//		COCAINE_LOG_INFO(m_log, "swapped: process count %d, time %ld (%d, %ld)", count, time, process_count, processed_time);
+		COCAINE_LOG_INFO(m_log, "swapped: process count %d, time %ld (%d, %ld)", count, time, process_count, processed_time);
 		if (count > 0) {
 			process_speed = STAT_INTERVAL * count / seconds(time);
 		}
@@ -419,15 +419,16 @@ void queue_driver::on_worker_complete(uint64_t start_time, bool success)
 		++process_count;
 
 		uint64_t now = microseconds_now();
+		uint64_t time_spent = now - start_time;
+
 		uint64_t last_time = std::atomic_exchange<uint64_t>(&last_process_done_time, now);
 		// skip it on the first run
 		if (last_time != 0) {
 			uint64_t time_from_previous = now - last_time;
-			uint64_t time_spent = now - start_time;
-			processed_time += std::min(time_spent, time_from_previous);
+			time_spent = std::min(time_spent, time_from_previous);
 		}
 
-//		get_more_data();
+		processed_time += time_spent;
 	}
 }
 
