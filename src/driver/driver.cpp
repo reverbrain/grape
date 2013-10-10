@@ -148,8 +148,18 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 
 	// Request timer will fire immediately
 	m_request_timer.set<queue_driver, &queue_driver::on_request_timer_event>(this);
-	last_request_time = microseconds_now();
-	m_request_timer.set(0.0, (STAT_INTERVAL / 100));
+	{
+		double initial_rate = (m_initial_rate_boost > 0.0 ? m_initial_rate_boost : 5.0);
+		initial_rate = std::max(1.0, std::min(initial_rate, m_rate_upper_limit));
+		double request_interval_seconds = STAT_INTERVAL / initial_rate;
+
+		m_request_timer.set(0.0, request_interval_seconds);
+
+		//XXX: this repeats and disables rate_focus initialize clause in on_rate_control_timer_event
+		rate_focus = initial_rate;
+		growth_time = 5.0;
+		last_request_time = microseconds_now();
+	}
 	m_request_timer.start();
 
 	// Rate control timer will fire after stat collection interval allowing
