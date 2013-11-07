@@ -35,7 +35,7 @@ class concurrent_pump
 		void run(std::function<void ()> make_request) 
 		{
 			cont = true;
-			while(true) {
+			while (true) {
 				std::unique_lock<std::mutex> lock(mutex);
 				condition.wait(lock, [this]{return running_requests < concurrency_limit;});
 
@@ -99,10 +99,10 @@ class concurrent_queue_reader
 	public:
 		concurrent_queue_reader(ioremap::elliptics::session client, const std::string &queue_name, int request_size, int concurrency_limit)
 			: client(client)
-			  , queue_name(queue_name)
-			  , request_size(request_size)
-			  , next_request_id(0)
-			  , concurrency_limit(concurrency_limit)
+			, queue_name(queue_name)
+			, request_size(request_size)
+			, next_request_id(0)
+			, concurrency_limit(concurrency_limit)
 	{
 		srand(time(NULL));
 	}
@@ -112,7 +112,7 @@ class concurrent_queue_reader
 			proc = func;
 			runloop.concurrency_limit = concurrency_limit;
 			runloop.run([this] () {
-					queue_peek(client, next_request_id++, request_size);
+						queue_peek(client, next_request_id++, request_size);
 					});
 		}
 
@@ -126,7 +126,7 @@ class concurrent_queue_reader
 			client.transform(queue_key, req->id);
 
 			client.exec(&req->id, req->src_key, queue_name + "@peek-multi", std::to_string(arg))
-				.connect(
+					.connect(
 						std::bind(&concurrent_queue_reader::data_received, this, req, std::placeholders::_1),
 						std::bind(&concurrent_queue_reader::request_complete, this, req, std::placeholders::_1)
 					);
@@ -141,14 +141,13 @@ class concurrent_queue_reader
 
 			size_t count = ids.size();
 			client.exec(context, queue_name + "@ack-multi", ioremap::grape::serialize(ids))
-				.connect(
-						ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
+					.connect(ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
 						[req, count] (const ioremap::elliptics::error_info &error) {
-						if (error) {
-						fprintf(stderr, "%s %d, %ld entries not acked: %s\n", dnet_dump_id(&req->id), req->src_key, count, error.message().c_str());
-						} else {
-						fprintf(stderr, "%s %d, %ld entries acked\n", dnet_dump_id(&req->id), req->src_key, count);
-						}
+							if (error) {
+								fprintf(stderr, "%s %d, %ld entries not acked: %s\n", dnet_dump_id(&req->id), req->src_key, count, error.message().c_str());
+							} else {
+								fprintf(stderr, "%s %d, %ld entries acked\n", dnet_dump_id(&req->id), req->src_key, count);
+							}
 						}
 					);
 		}
@@ -200,7 +199,7 @@ class concurrent_queue_reader
 			fprintf(stderr, "%s %d, received data, byte size %ld\n",
 					dnet_dump_id_str(context.src_id()->id), context.src_key(),
 					context.data().size()
-			       );
+					);
 
 			auto array = ioremap::grape::deserialize<ioremap::grape::data_array>(context.data());
 			ioremap::elliptics::data_pointer d = array.data();
@@ -210,7 +209,7 @@ class concurrent_queue_reader
 			fprintf(stderr, "%s %d, processing %ld entries\n",
 					dnet_dump_id_str(context.src_id()->id), context.src_key(),
 					count
-			       );
+					);
 
 			fprintf(stderr, "array %p\n", d.data());
 			for (const auto &i : array) {
@@ -233,7 +232,7 @@ class concurrent_queue_reader
 			fprintf(stderr, "%s %d, acking %ld entries\n",
 					dnet_dump_id_str(context.src_id()->id), context.src_key(),
 					count
-			       );
+					);
 
 			queue_ack(client, req, context, array.ids());
 		}
@@ -260,26 +259,27 @@ class concurrent_queue_writer
 	public:
 		concurrent_queue_writer(ioremap::elliptics::session client, const std::string &queue_name, int concurrency_limit = 1)
 			: client(client)
-			  , queue_name(queue_name)
-			  , next_request_id(0)
-			  , concurrency_limit(concurrency_limit)
-	{
-		srand(time(NULL));
-	}
+			, queue_name(queue_name)
+			, next_request_id(0)
+			, concurrency_limit(concurrency_limit)
+		{
+			srand(time(NULL));
+		}
 
 		void run(generation_function func) 
 		{
 			gen = func;
 			runloop.concurrency_limit = concurrency_limit;
 			runloop.run([this] () {
-					generator_result_type d = gen();
-					if (!d.empty()) {
-					queue_push(client, next_request_id++, d);
-                    } else {
-                    runloop.stop();
-                    runloop.complete_request();
-                    }
-					});
+							generator_result_type d = gen();
+							if (!d.empty()) {
+								queue_push(client, next_request_id++, d);
+							} else {
+								runloop.stop();
+								runloop.complete_request();
+							}
+						}
+					);
 		}
 
 		void queue_push(ioremap::elliptics::session client, int req_unique_id, ioremap::elliptics::data_pointer d)
@@ -293,7 +293,7 @@ class concurrent_queue_writer
 
 			fprintf(stderr, "data '%s'\n", d.to_string().c_str());
 			client.exec(&req->id, req->src_key, queue_name + "@push", d)
-				.connect(
+					.connect(
 						ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
 						std::bind(&concurrent_queue_writer::request_complete, this, req, std::placeholders::_1)
 					);
