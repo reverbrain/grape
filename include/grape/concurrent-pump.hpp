@@ -125,7 +125,7 @@ class concurrent_queue_reader
 			auto req = std::make_shared<request>(req_unique_id);
 			client.transform(queue_key, req->id);
 
-			client.exec(&req->id, req->src_key, "queue@peek-multi", std::to_string(arg))
+			client.exec(&req->id, req->src_key, queue_name + "@peek-multi", std::to_string(arg))
 				.connect(
 						std::bind(&concurrent_queue_reader::data_received, this, req, std::placeholders::_1),
 						std::bind(&concurrent_queue_reader::request_complete, this, req, std::placeholders::_1)
@@ -140,7 +140,7 @@ class concurrent_queue_reader
 			client.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
 
 			size_t count = ids.size();
-			client.exec(context, "queue@ack-multi", ioremap::grape::serialize(ids))
+			client.exec(context, queue_name + "@ack-multi", ioremap::grape::serialize(ids))
 				.connect(
 						ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
 						[req, count] (const ioremap::elliptics::error_info &error) {
@@ -275,10 +275,10 @@ class concurrent_queue_writer
 					generator_result_type d = gen();
 					if (!d.empty()) {
 					queue_push(client, next_request_id++, d);
-					} else {
-					runloop.stop();
-					runloop.complete_request();
-					}
+                    } else {
+                    runloop.stop();
+                    runloop.complete_request();
+                    }
 					});
 		}
 
@@ -292,7 +292,7 @@ class concurrent_queue_writer
 			client.transform(queue_key, req->id);
 
 			fprintf(stderr, "data '%s'\n", d.to_string().c_str());
-			client.exec(&req->id, req->src_key, "queue@push", d)
+			client.exec(&req->id, req->src_key, queue_name + "@push", d)
 				.connect(
 						ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
 						std::bind(&concurrent_queue_writer::request_complete, this, req, std::placeholders::_1)
