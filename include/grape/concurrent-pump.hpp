@@ -30,7 +30,7 @@ class concurrent_pump
 			, cont(true)
 			, concurrency_limit(1)
 			, block_while_has_running(true)
-	{}
+		{}
 
 		void run(std::function<void ()> make_request) 
 		{
@@ -128,7 +128,7 @@ class concurrent_queue_reader
 			client.exec(&req->id, req->src_key, queue_name + "@peek-multi", std::to_string(arg))
 					.connect(
 						std::bind(&concurrent_queue_reader::data_received, this, req, std::placeholders::_1),
-						std::bind(&concurrent_queue_reader::request_complete, this, req, std::placeholders::_1)
+						std::bind(&concurrent_queue_reader::complete_request, this, req, std::placeholders::_1)
 					);
 		}
 
@@ -181,7 +181,7 @@ class concurrent_queue_reader
 			process_block(req, context);
 		}
 
-		void request_complete(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error)
+		void complete_request(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error)
 		{
 			//TODO: add reaction to hard errors like No such device or address: -6
 
@@ -295,11 +295,11 @@ class concurrent_queue_writer
 			client.exec(&req->id, req->src_key, queue_name + "@push", d)
 					.connect(
 						ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
-						std::bind(&concurrent_queue_writer::request_complete, this, req, std::placeholders::_1)
+						std::bind(&concurrent_queue_writer::complete_request, this, req, std::placeholders::_1)
 					);
 		}
 
-		void request_complete(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error)
+		void complete_request(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error)
 		{
 			if (error) {
 				fprintf(stderr, "%s %d: queue request completion error: %s\n", dnet_dump_id(&req->id), req->src_key, error.message().c_str());
