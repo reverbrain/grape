@@ -89,7 +89,6 @@ class ya_concurrent_queue_reader
 		static const int FORCE_ACK = 0x2;
 
 		static const int STOP = 0x10;
-		static const int FORCE_STOP = 0x20;
 
 	private:
 		concurrent_pump runloop;
@@ -214,10 +213,8 @@ class ya_concurrent_queue_reader
 				
 				// check result of processing entry
 				// TODO: move this in separate function
-				if (proc_result & (STOP | FORCE_STOP)) {
+				if (proc_result & STOP) {
 					runloop.stop();
-					if (proc_result & FORCE_STOP)
-						break;
 				}
 				if (proc_result & ACK) {
 					ack_ids.push_back(entry.entry_id);
