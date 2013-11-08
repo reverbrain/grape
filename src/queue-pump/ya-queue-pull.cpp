@@ -75,7 +75,7 @@ int main(int argc, char** argv)
 	// read queue indefinitely
 	int data_counter = 0;
 	ya_concurrent_queue_reader pump(clientlib.create_session(), queue_name, request_size, concurrency);
-	pump.run([] (ioremap::grape::entry_id entry_id, ioremap::elliptics::data_pointer data) -> int {
+	pump.run([&limit, &data_counter] (ioremap::grape::entry_id entry_id, ioremap::elliptics::data_pointer data) -> int {
 		fprintf(stderr, "entry %d-%d, byte size %ld\n", entry_id.chunk, entry_id.pos, data.size());
 		data_counter++;
 		int result = 0;
