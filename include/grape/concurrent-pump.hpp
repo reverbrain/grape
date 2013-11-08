@@ -39,7 +39,7 @@ class concurrent_pump
 				std::unique_lock<std::mutex> lock(mutex);
 				condition.wait(lock, [this]{return running_requests < concurrency_limit;});
 
-				if(!cont) break;
+				if (!cont) break;
 
 				++running_requests;
 
@@ -85,8 +85,11 @@ class ya_concurrent_queue_reader
 	public:
 		typedef std::function<int (ioremap::grape::entry_id, ioremap::elliptics::data_pointer data)> processing_function;
 
-		static const int SKIP_THIS = 100;
-		static const int ACK_THIS = 200;
+		static const int ACK = 0x1;
+		static const int FORCE_ACK = 0x2;
+
+		static const int STOP = 0x10;
+		static const int FORCE_STOP = 0x20;
 
 	private:
 		concurrent_pump runloop;
@@ -204,12 +207,22 @@ class ya_concurrent_queue_reader
 			// collect entry_ids for future ack
 			std::vector<ioremap::grape::entry_id> ack_ids;
 
-			for (const auto &i : array) {
-				fprintf(stderr, "entry %p\n", i.data);
+			for (const auto &entry : array) {
+				fprintf(stderr, "entry %p\n", entry.data);
 
-				auto proc_result = proc(i.entry_id, ioremap::elliptics::data_pointer::from_raw((void*)i.data, i.size));
-				if(proc_result == ACK_THIS) {
-					ack_ids.push_back(i.entry_id);
+				auto proc_result = proc(entry.entry_id, ioremap::elliptics::data_pointer::from_raw((void*)entry.data, entry.size));
+				
+				// check result of processing entry
+				// TODO: move this in separate function
+				if (proc_result & (STOP | FORCE_STOP)) {
+					runloop.stop();
+					if (proc_result & FORCE_STOP)
+						break;
+				}
+				if (proc_result & ACK) {
+					ack_ids.push_back(entry.entry_id);
+				} else if (proc_result & FORCE_ACK) {
+					queue_ack(client, queue_name, req, context, std::vector<ioremap::grape::entry_id> {entry.entry_id});
 				}
 			}
 
