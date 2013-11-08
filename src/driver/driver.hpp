@@ -50,6 +50,7 @@ class queue_driver: public api::driver_t {
 
 			queue_driver *parent;
 			uint64_t start_time;
+			bool success;
 		};
 
 		struct queue_request {

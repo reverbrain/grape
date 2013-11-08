@@ -9,11 +9,11 @@
 
 namespace {
 
-uint64_t microseconds_now() {
-	timespec t;
-	clock_gettime(CLOCK_MONOTONIC_RAW, &t);
-	return t.tv_sec * 1000000 + t.tv_nsec / 1000;
-}
+// inline uint64_t microseconds_now() {
+// 	timespec t;
+// 	clock_gettime(CLOCK_MONOTONIC_RAW, &t);
+// 	return t.tv_sec * 1000000 + t.tv_nsec / 1000;
+// }
 
 template <unsigned N>
 double modified_moving_average(double avg, double input) {

@@ -13,6 +13,14 @@
 #include <grape/data_array.hpp>
 #include <grape/entry_id.hpp>
 
+namespace {
+	inline uint64_t microseconds_now() {
+		timespec t;
+		clock_gettime(CLOCK_MONOTONIC_RAW, &t);
+		return t.tv_sec * 1000000 + t.tv_nsec / 1000;
+	}
+}
+
 namespace ioremap { namespace grape {
 
 struct chunk_entry {
@@ -137,10 +145,11 @@ struct replay_iterator : public iterator {
 		skip_acked();
 	}
 	virtual void advance() {
-		skip_acked();
+		//XXX: at_end() guard could be removed?
 		if (!at_end()) {
 			step();
 		}
+		skip_acked();
 	}
 	virtual bool at_end() {
 		return (state.entry_index >= meta.low_mark());
@@ -165,12 +174,13 @@ class chunk {
 		~chunk();
 
 		bool load_meta();
+		void write_meta();
 		const chunk_meta &meta();
 
 		// single entry methods
 		bool push(const elliptics::data_pointer &d); // returns true if chunk is full
 		elliptics::data_pointer pop(int32_t *pos);
-		bool ack(int32_t pos);
+		bool ack(int32_t pos, bool write);
 
 		// multiple entries methods
 		data_array pop(int num);
@@ -184,13 +194,16 @@ class chunk {
 		void add(struct chunk_stat *st);
 
 		int id() const;
-		void reset_time(double timeout);
-		double get_time(void);
+		void reset_time(uint64_t timeout);
+		uint64_t get_time(void);
 
 	private:
+		std::string m_traceid;
 		int m_chunk_id;
 		elliptics::key m_data_key;
+		dnet_io_attr m_data_io;
 		elliptics::key m_meta_key;
+		dnet_io_attr m_meta_io;
 		elliptics::session m_session_data;
 		elliptics::session m_session_meta;
 
@@ -207,7 +220,6 @@ class chunk {
 
 		double m_fire_time;
 
-		void write_meta();
 		void reset_iteration_mode();
 		bool update_data_cache();
 };
@@ -265,6 +277,8 @@ class queue {
 
 	private:
 		int m_chunk_max;
+		uint64_t m_ack_wait_timeout;
+		uint64_t m_timeout_check_period;
 
 		std::string m_queue_id;
 		std::string m_queue_state_id;
@@ -278,7 +292,7 @@ class queue {
 
 		std::map<int, shared_chunk> m_chunks;
 		std::map<int, shared_chunk> m_wait_ack;
-		double m_last_timeout_check_time;
+		uint64_t m_last_timeout_check_time;
 
 		void write_state();
 
