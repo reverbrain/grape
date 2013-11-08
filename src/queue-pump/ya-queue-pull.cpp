@@ -23,6 +23,7 @@ int main(int argc, char** argv)
 	options_description other("Options");
 	other.add_options()
 		("concurrency,n", value<int>()->default_value(1), "concurrency limit")
+		("limit,l", value<int>(), "process data limit")
 		("request-size,s", value<int>()->default_value(100), "request size")
 		;
 
@@ -62,17 +63,29 @@ int main(int argc, char** argv)
 
 	int concurrency = args["concurrency"].as<int>();
 	int request_size = args["request-size"].as<int>();;
+	int limit = -1;
+	if (args.count("limit")) {
+		limit = args["limit"].as<int>();
+	}
 
 	auto clientlib = elliptics_client_state::create(remotes, groups, logfile, loglevel);
 
 	const std::string queue_name("queue");
 
 	// read queue indefinitely
+	int data_counter = 0;
 	ya_concurrent_queue_reader pump(clientlib.create_session(), queue_name, request_size, concurrency);
 	pump.run([] (ioremap::grape::entry_id entry_id, ioremap::elliptics::data_pointer data) -> int {
 		fprintf(stderr, "entry %d-%d, byte size %ld\n", entry_id.chunk, entry_id.pos, data.size());
-		return ya_concurrent_queue_reader::ACK_THIS;
+		data_counter++;
+		int result = 0;
+		if (limit > 0 && data_counter >= limit)
+			result |= ya_concurrent_queue_reader::STOP;
+		result |= ya_concurrent_queue_reader::FORCE_ACK;
+		return result;
 	});
+
+	fprintf(stderr, "data limit = %d read data = %d\n", limit, data_counter);
 
 	return 0;
 }
