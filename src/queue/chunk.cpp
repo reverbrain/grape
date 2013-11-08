@@ -7,6 +7,8 @@ extern std::shared_ptr<cocaine::framework::logger_t> grape_queue_module_get_logg
 #define LOG_ERROR(...) COCAINE_LOG_ERROR(grape_queue_module_get_logger(), __VA_ARGS__)
 #define LOG_DEBUG(...) COCAINE_LOG_DEBUG(grape_queue_module_get_logger(), __VA_ARGS__)
 
+const int STATE_ACKED = 1;
+
 ioremap::grape::chunk_meta::chunk_meta(int max)
 	: m_ptr(NULL)
 {
@@ -14,7 +16,6 @@ ioremap::grape::chunk_meta::chunk_meta(int max)
 	m_ptr = (struct chunk_disk *)m_data.data();
 	
 	m_ptr->max = max;
-
 }
 
 bool ioremap::grape::chunk_meta::push(int size)
@@ -51,6 +52,12 @@ void ioremap::grape::chunk_meta::pop()
 
 bool ioremap::grape::chunk_meta::ack(int32_t pos, int state)
 {
+	if (pos >= m_ptr->low) {
+		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: position can not be more than low mark: "
+				"pos: %d, acked: %d, low: %d, high: %d, max: %d",
+				pos, m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
+	}
+
 	if (pos >= m_ptr->high) {
 		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: position can not be more than high mark: "
 				"pos: %d, acked: %d, high: %d, max: %d",
@@ -69,8 +76,19 @@ bool ioremap::grape::chunk_meta::ack(int32_t pos, int state)
 				pos, m_ptr->acked, m_ptr->high, m_ptr->max);
 	}
 
-	m_ptr->entries[pos].state = state;
-	m_ptr->acked++;
+	if (m_ptr->acked >= m_ptr->low) {
+		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: acked can not be more than low mark: "
+				"pos: %d, acked: %d, low: %d, high: %d, max: %d",
+				pos, m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
+	}
+
+	chunk_entry &entry = m_ptr->entries[pos];
+	if (entry.state != state && state == STATE_ACKED) {
+		m_ptr->acked++;
+	} else {
+		LOG_INFO("\tmeta.ack: pos: %d, was already acked", pos, entry.state);
+	}
+	entry.state = state;
 	LOG_DEBUG("\tmeta.ack: pos: %d, acked: %d, low: %d, high: %d, max: %d", pos, m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
 
 	return complete();
@@ -119,6 +137,17 @@ void ioremap::grape::chunk_meta::assign(char *data, size_t size)
 
 	m_data.assign(data, size);
 	m_ptr = (struct chunk_disk *)m_data.data();
+
+	// // acked count validation
+	// int acked = 0;
+	// for (int i = 0; i < m_ptr->high; ++i) {
+	// 	if (m_ptr->entries[i].state == 1) {
+	// 		++acked;
+	// 	}
+	// }
+	// if (acked != m_ptr->acked) {
+	// 	LOG_ERROR("invalid acked count: read %d, actual %d", m_ptr->acked, acked);
+	// }
 }
 
 ioremap::grape::chunk_entry ioremap::grape::chunk_meta::operator[] (int32_t pos) const
@@ -155,10 +184,22 @@ ioremap::grape::chunk::chunk(ioremap::elliptics::session &session, const std::st
 	, m_meta(max)
 	, m_fire_time(0)
 {
+	m_traceid = cocaine::format("%s, chunk %d", queue_id, m_chunk_id);
+
 	m_session_data.set_ioflags(DNET_IO_FLAGS_APPEND | DNET_IO_FLAGS_NOCSUM);
 	m_session_meta.set_ioflags(DNET_IO_FLAGS_NOCSUM | DNET_IO_FLAGS_OVERWRITE);
 
-	memset(&m_stat, 0, sizeof(struct chunk_stat));
+	// prepare io attrs for data and meta
+	auto init_io_attr = [] (dnet_io_attr *io, ioremap::elliptics::session &session, const std::string &key) {
+		memset(io, 0, sizeof(dnet_io_attr));
+		dnet_id tmp;
+		session.transform(key, tmp);
+		memcpy(&io->id, tmp.id, DNET_ID_SIZE);
+	};
+	init_io_attr(&m_data_io, m_session_data, m_data_key.remote());
+	init_io_attr(&m_meta_io, m_session_meta, m_meta_key.remote());
+
+	memset(&m_stat, 0, sizeof(chunk_stat));
 }
 
 ioremap::grape::chunk::~chunk()
@@ -169,6 +210,9 @@ ioremap::grape::chunk::~chunk()
 
 bool ioremap::grape::chunk::load_meta()
 {
+	//DEBUG
+	LOG_INFO("%s, load_meta, reading %s - %s", m_traceid.c_str(), dnet_dump_id_str(m_meta_io.id), m_meta_key.remote().c_str());
+
 	try {
 		ioremap::elliptics::data_pointer d = m_session_meta.read_data(m_meta_key, 0, 0).get_one().file();
 		m_meta.assign((char *)d.data(), d.size());
@@ -178,18 +222,27 @@ bool ioremap::grape::chunk::load_meta()
 
 	} catch (const ioremap::elliptics::not_found_error &e) {
 		// ignore not-found exception - create empty chunk
-		LOG_ERROR("chunk %d, load_meta, ERROR: meta not found: %s", m_chunk_id, e.what());
+		LOG_ERROR("%s, load_meta, ERROR: meta not found: %s", m_traceid.c_str(), e.what());
 
 	} catch (const ioremap::elliptics::error &e) {
 		// special case to ignore bad chunk meta format error
 		// (raised by chunk_clt::assign())
-		LOG_ERROR("chunk %d, load_meta, ERROR: error reading meta: %s", m_chunk_id, e.what());
+		LOG_ERROR("%s, load_meta, ERROR: error reading meta: %s", m_traceid.c_str(), e.what());
 		if (e.error_code() != -ERANGE) {
 			throw;
 		}
 	}
 
 	return false;
+}
+
+void ioremap::grape::chunk::write_meta()
+{
+	//DEBUG
+	LOG_INFO("%s, write_meta, writing %s - %s", m_traceid.c_str(), dnet_dump_id_str(m_meta_io.id), m_meta_key.remote().c_str());
+
+	m_session_meta.write_data(m_meta_key, ioremap::elliptics::data_pointer::from_raw(m_meta.data()), 0);
+	++m_stat.write_meta;
 }
 
 bool ioremap::grape::chunk::expect_no_more()
@@ -205,22 +258,25 @@ bool ioremap::grape::chunk::update_data_cache()
 		// Metadata is read only at start (as it resides in memory and properly updated by push).
 		//
 		if (iteration_state.byte_offset >= m_data.size()) {
-			LOG_INFO("chunk %d, update_data_cache, (re)reading data, iteration.byte_offset %lld, m_data.size() %ld", m_chunk_id, iteration_state.byte_offset, m_data.size());
+			LOG_INFO("%s, update_data_cache, (re)reading data, iteration.byte_offset %lld, m_data.size() %ld", m_traceid.c_str(), iteration_state.byte_offset, m_data.size());
 			
+			//DEBUG
+			LOG_INFO("%s, update_data_cache, reading %s - %s", m_traceid.c_str(), dnet_dump_id_str(m_data_io.id), m_data_key.remote().c_str());
+
 			m_data = m_session_data.read_data(m_data_key, 0, 0).get_one().file();
 
-			LOG_INFO("chunk %d, update_data_cache, read m_data, size %ld", m_chunk_id, m_data.size());
+			LOG_INFO("%s, update_data_cache, read m_data, size %ld", m_traceid.c_str(), m_data.size());
 		}
 
 		return true;
 
 	} catch (const ioremap::elliptics::not_found_error &e) {
 		// Do not explode on not-found-error, return empty data pointer
-		LOG_ERROR("chunk %d, update_data_cache, ERROR: %s", m_chunk_id, e.what());
+		LOG_ERROR("%s, update_data_cache, ERROR: %s", m_traceid.c_str(), e.what());
 
 	} catch (const ioremap::elliptics::timeout_error &e) {
 		// Do not explode on timeout-error, return empty data pointer
-		LOG_ERROR("chunk %d, update_data_cache, ERROR: %s", m_chunk_id, e.what());
+		LOG_ERROR("%s, update_data_cache, ERROR: %s", m_traceid.c_str(), e.what());
 
 		//XXX: this means we silently ignore unreachable data,
 		// and it can't be good
@@ -228,7 +284,7 @@ bool ioremap::grape::chunk::update_data_cache()
 	} catch (const ioremap::elliptics::error &e) {
 		// Special case to ignore bad chunk meta format error
 		// (raised by chunk_clt::assign())
-		LOG_ERROR("chunk %d, update_data_cache, ERROR: %s", m_chunk_id, e.what());
+		LOG_ERROR("%s, update_data_cache, ERROR: %s", m_traceid.c_str(), e.what());
 		if (e.error_code() != -ERANGE) {
 			throw;
 		}
@@ -245,26 +301,26 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(int *pos)
 	// Fast track for the case when chunk is empty (not exist).
 	// Its valid to check only metadata as push() updates metadata in memory
 	if (m_meta.high_mark() == 0) {
-		LOG_INFO("chunk %d, pop-single, empty", m_chunk_id);
+		LOG_INFO("%s, pop-single, empty", m_traceid.c_str());
 		return d;
 	}
 
 	if (!iter) {
-		LOG_INFO("chunk %d, pop, initializing iterator", m_chunk_id);
+		LOG_INFO("%s, pop, initializing iterator", m_traceid.c_str());
 		reset_iteration_mode();
 	}
 
-	LOG_INFO("chunk %d, pop-single, iter: mode %d, index %d, offset %lld", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
+	LOG_INFO("%s, pop-single, iter: mode %d, index %d, offset %lld", m_traceid.c_str(), iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
 
 	if (iter->mode == iterator::REPLAY && iter->at_end()) {
-		LOG_INFO("chunk %d, pop-single, iter: mode %d, index %d, offset %lld, switching to mode %d", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset, iterator::FORWARD);
+		LOG_INFO("%s, pop-single, iter: mode %d, index %d, offset %lld, switching to mode %d", m_traceid.c_str(), iter->mode, iteration_state.entry_index, iteration_state.byte_offset, iterator::FORWARD);
 
 		iter.reset(new forward_iterator(iteration_state, m_meta));
 		iter->begin();
 	}
 
 	if (iter->at_end()) {
-		LOG_INFO("chunk %d, pop-single, iter: mode %d, index %d, offset %lld, is at end", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
+		LOG_INFO("%s, pop-single, iter: mode %d, index %d, offset %lld, is at end", m_traceid.c_str(), iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
 		return d;
 	}
 
@@ -272,12 +328,12 @@ ioremap::elliptics::data_pointer ioremap::grape::chunk::pop(int *pos)
 	if (!update_data_cache()) {
 		// There was data read error, so for now meta and data are inconsistent,
 		// but next try could fix that.
-		LOG_INFO("chunk %d, pop, chunk temporarily exhausted", m_chunk_id);
+		LOG_INFO("%s, pop, chunk temporarily exhausted", m_traceid.c_str());
 		return d;
 	}
 
 	if (m_data.empty()) {
-		LOG_INFO("chunk %d, pop, chunk temporarily unavailable", m_chunk_id);
+		LOG_INFO("%s, pop, chunk temporarily unavailable", m_traceid.c_str());
 		return d;
 	}
 
@@ -299,12 +355,12 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 	// Fast track for the case when chunk is empty (not exist).
 	// Its valid to check only metadata as push() updates metadata in memory
 	if (m_meta.high_mark() == 0) {
-		LOG_INFO("chunk %d, pop, empty", m_chunk_id);
+		LOG_INFO("%s, pop, empty", m_traceid.c_str());
 		return ret;
 	}
 
 	if (!iter) {
-		LOG_INFO("chunk %d, pop, initializing iterator", m_chunk_id);
+		LOG_INFO("%s, pop, initializing iterator", m_traceid.c_str());
 		reset_iteration_mode();
 	}
 
@@ -313,14 +369,14 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 
 	while(num > 0) {
 		if (iter->mode == iterator::REPLAY && iter->at_end()) {
-			LOG_INFO("chunk %d, pop, iter: mode %d, index %d, offset %lld, switching to mode %d", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset, iterator::FORWARD);
+			LOG_INFO("%s, pop, iter: mode %d, index %d, offset %lld, switching to mode %d", m_traceid.c_str(), iter->mode, iteration_state.entry_index, iteration_state.byte_offset, iterator::FORWARD);
 
 			iter.reset(new forward_iterator(iteration_state, m_meta));
 			iter->begin();
 		}
 
 		if (iter->at_end()) {
-			LOG_INFO("chunk %d, pop, iter: mode %d, index %d, offset %lld, is at end", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
+			LOG_INFO("%s, pop, iter: mode %d, index %d, offset %lld, is at end", m_traceid.c_str(), iter->mode, iteration_state.entry_index, iteration_state.byte_offset);
 			break;
 		}
 
@@ -328,12 +384,12 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 		if (!update_data_cache()) {
 			// There was data read error, so for now meta and data are inconsistent,
 			// but next try could fix that.
-			LOG_INFO("chunk %d, pop, chunk temporarily exhausted", m_chunk_id);
+			LOG_INFO("%s, pop, chunk temporarily exhausted", m_traceid.c_str());
 			break;
 		}
 
 		if (m_data.empty()) {
-			LOG_INFO("chunk %d, pop, chunk temporarily unavailable", m_chunk_id);
+			LOG_INFO("%s, pop, chunk temporarily unavailable", m_traceid.c_str());
 			break;
 		}
 
@@ -341,7 +397,7 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 		entry_id.pos = iteration_state.entry_index;
 		ret.append((char *)m_data.data() + iteration_state.byte_offset, size, entry_id);
 
-		//LOG_INFO("chunk %d, pop, iter: mode %d, index %d, offset %lld", m_chunk_id, iter->mode, iteration_state.entry_index, iteration_state.byte_offset));
+		//LOG_INFO("%a, pop, iter: mode %d, index %d, offset %lld", m_traceid.c_str(), iter->mode, iteration_state.entry_index, iteration_state.byte_offset));
 		
 		iter->advance();
 
@@ -358,12 +414,6 @@ const ioremap::grape::chunk_meta &ioremap::grape::chunk::meta()
 	return m_meta;
 }
 
-void ioremap::grape::chunk::write_meta()
-{
-	m_session_meta.write_data(m_meta_key, ioremap::elliptics::data_pointer::from_raw(m_meta.data()), 0);
-	++m_stat.write_meta;
-}
-
 void ioremap::grape::chunk::remove()
 {
 	m_session_meta.remove(m_meta_key);
@@ -373,7 +423,7 @@ void ioremap::grape::chunk::remove()
 
 bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 {
-	LOG_INFO("chunk %d, push-single, index %d, offset %ld", m_chunk_id, m_meta.high_mark(), m_data.size());
+	LOG_INFO("%s, push-single, index %d, offset %ld", m_traceid.c_str(), m_meta.high_mark(), m_data.size());
 
 	// if given chunk already has some cached data, update it too
 	if (m_data.size()) {
@@ -382,6 +432,8 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 
 		m_data = ioremap::elliptics::data_pointer::copy(tmp.data(), tmp.size());
 	}
+
+	LOG_INFO("%s, push-single, appending %s - %s", m_traceid.c_str(), dnet_dump_id_str(m_data_io.id), m_data_key.remote().c_str());
 
 	m_session_data.write_data(m_data_key, d, 0);
 	++m_stat.write_data;
@@ -397,11 +449,13 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 	return m_meta.full();
 }
 
-bool ioremap::grape::chunk::ack(int pos)
+bool ioremap::grape::chunk::ack(int pos, bool write)
 {
 	//FIXME: check if pos < low < high 
-	m_meta.ack(pos, 1);
-	write_meta();
+	m_meta.ack(pos, STATE_ACKED);
+	if (write) {
+		write_meta();
+	}
 
 	++m_stat.ack;
 
@@ -447,15 +501,13 @@ int ioremap::grape::chunk::id(void) const
 	return m_chunk_id;
 }
 
-void ioremap::grape::chunk::reset_time(double timeout)
+void ioremap::grape::chunk::reset_time(uint64_t timeout)
 {
-	struct timeval tv;
-
-	gettimeofday(&tv, NULL);
-	m_fire_time = tv.tv_sec + timeout;
+	uint64_t now = microseconds_now();
+	m_fire_time = now + timeout;
 }
 
-double ioremap::grape::chunk::get_time(void)
+uint64_t ioremap::grape::chunk::get_time(void)
 {
 	return m_fire_time;
 }

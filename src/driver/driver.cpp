@@ -133,7 +133,7 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 	{
 		char *ptr = strchr((char *)m_worker_event.c_str(), '@');
 		if (!ptr)
-			throw configuration_error("invalid worker event ('emit' config entry), it must contain '@' character");
+			throw configuration_error("worker-emit-event: must contain '@' character");
 
 		std::string app_name(m_worker_event.c_str(), ptr - m_worker_event.c_str());
 		std::string event_name(ptr+1);
@@ -148,8 +148,18 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 
 	// Request timer will fire immediately
 	m_request_timer.set<queue_driver, &queue_driver::on_request_timer_event>(this);
-	last_request_time = microseconds_now();
-	m_request_timer.set(0.0, (STAT_INTERVAL / 100));
+	{
+		double initial_rate = (m_initial_rate_boost > 0.0 ? m_initial_rate_boost : 5.0);
+		initial_rate = std::max(1.0, std::min(initial_rate, m_rate_upper_limit));
+		double request_interval_seconds = STAT_INTERVAL / initial_rate;
+
+		m_request_timer.set(0.0, request_interval_seconds);
+
+		//XXX: this repeats and disables rate_focus initialize clause in on_rate_control_timer_event
+		rate_focus = initial_rate;
+		growth_time = 5.0;
+		last_request_time = microseconds_now();
+	}
 	m_request_timer.start();
 
 	// Rate control timer will fire after stat collection interval allowing
@@ -191,7 +201,7 @@ void queue_driver::on_rate_control_timer_event(ev::timer &, int)
 //		COCAINE_LOG_INFO(m_log, "values: process count %d, time %ld", process_count, processed_time);
 		int count = std::atomic_exchange<int>(&process_count, 0);
 		uint64_t time = std::atomic_exchange<uint64_t>(&processed_time, 0);
-//		COCAINE_LOG_INFO(m_log, "swapped: process count %d, time %ld (%d, %ld)", count, time, process_count, processed_time);
+		COCAINE_LOG_INFO(m_log, "swapped: process count %d, time %ld (%d, %ld)", count, time, process_count, processed_time);
 		if (count > 0) {
 			process_speed = STAT_INTERVAL * count / seconds(time);
 		}
@@ -419,15 +429,16 @@ void queue_driver::on_worker_complete(uint64_t start_time, bool success)
 		++process_count;
 
 		uint64_t now = microseconds_now();
+		uint64_t time_spent = now - start_time;
+
 		uint64_t last_time = std::atomic_exchange<uint64_t>(&last_process_done_time, now);
 		// skip it on the first run
 		if (last_time != 0) {
 			uint64_t time_from_previous = now - last_time;
-			uint64_t time_spent = now - start_time;
-			processed_time += std::min(time_spent, time_from_previous);
+			time_spent = std::min(time_spent, time_from_previous);
 		}
 
-//		get_more_data();
+		processed_time += time_spent;
 	}
 }
 
@@ -442,7 +453,7 @@ void queue_driver::queue_inc(int num)
 }
 
 queue_driver::downstream_t::downstream_t(queue_driver *parent)
-	: parent(parent)
+	: parent(parent), success(true)
 {
 	start_time = microseconds_now();
 }
@@ -462,11 +473,11 @@ void queue_driver::downstream_t::error(int code, const std::string &msg)
 {
 	COCAINE_LOG_ERROR(parent->m_log, "%s: from worker: error: %s [%d]",
 			parent->m_queue_name.c_str(), msg.c_str(), code);
-	parent->on_worker_complete(start_time, false);
+	success = false;
 }
 
 void queue_driver::downstream_t::close()
 {
-	//COCAINE_LOG_INFO(parent->m_log, "%s: downstream: close", parent->m_queue_name.c_str());
-	parent->on_worker_complete(start_time, true);
+	COCAINE_LOG_INFO(parent->m_log, "%s: from worker: %s", parent->m_queue_name.c_str(), (success ? "done" : "failed"));
+	parent->on_worker_complete(start_time, success);
 }
