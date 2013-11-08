@@ -154,8 +154,8 @@ class ya_concurrent_queue_reader
 
 			client.exec(&req->id, req->src_key, queue_name + "@peek-multi", std::to_string(arg))
 					.connect(
-						std::bind(&concurrent_reader::data_received, this, req, std::placeholders::_1),
-						std::bind(&concurrent_reader::request_complete, this, req, std::placeholders::_1)
+						std::bind(&ya_concurrent_queue_reader::data_received, this, req, std::placeholders::_1),
+						std::bind(&ya_concurrent_queue_reader::request_complete, this, req, std::placeholders::_1)
 					);
 		}
 
