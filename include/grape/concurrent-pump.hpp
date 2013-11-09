@@ -5,6 +5,7 @@
 #include <mutex>
 #include <condition_variable>
 
+#include <elliptics/session.hpp>
 #include <grape/data_array.hpp>
 #include <grape/entry_id.hpp>
 
@@ -20,36 +21,46 @@ private:
 
 public:
 	int concurrency_limit;
+	bool block_while_has_running;
 
 	concurrent_pump()
 		: running_requests(0)
 		, cont(true)
 		, concurrency_limit(1)
+		, block_while_has_running(true)
 	{}
 
-	void run(std::function<void ()> make_request) {
+	void run(std::function<void ()> make_request) 
+	{
 		cont = true;
-		while(cont) {
-			while(running_requests < concurrency_limit) {
-				++running_requests;
-				make_request();
-				//fprintf(stderr, "%d running_requests\n", (int)running_requests);
-			}
+		while (true) {
 			std::unique_lock<std::mutex> lock(mutex);
 			condition.wait(lock, [this]{return running_requests < concurrency_limit;});
+
+			if (!cont) break;
+
+			++running_requests;
+
+			lock.unlock();
+
+			make_request();
 		}
+
 		std::unique_lock<std::mutex> lock(mutex);
-		condition.wait(lock, [this]{return running_requests == 0;});
+		condition.wait(lock, [this]{return !block_while_has_running || running_requests == 0;});
 	}
 
 	// Should be called when response on request is received
-	void complete_request() {
+	void complete_request() 
+	{
+		std::unique_lock<std::mutex> lock(mutex);
 		--running_requests;
 		condition.notify_one();
 	}
 
 	// Should be called if runloop must be stopped
-	void stop() {
+	void stop() 
+	{
 		cont = false;
 	}
 };
