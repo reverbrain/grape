@@ -5,6 +5,7 @@
 #include <mutex>
 #include <condition_variable>
 
+#include <elliptics/session.hpp>
 #include <grape/data_array.hpp>
 #include <grape/entry_id.hpp>
 
