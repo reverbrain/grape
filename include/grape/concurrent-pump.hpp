@@ -5,6 +5,7 @@
 #include <mutex>
 #include <condition_variable>
 
+#include <elliptics/session.hpp>
 #include <grape/data_array.hpp>
 #include <grape/entry_id.hpp>
 
@@ -20,36 +21,45 @@ private:
 
 public:
 	int concurrency_limit;
+	bool block_while_has_running;
 
 	concurrent_pump()
 		: running_requests(0)
 		, cont(true)
 		, concurrency_limit(1)
+		, block_while_has_running(true)
 	{}
 
-	void run(std::function<void ()> make_request) {
+	void run(std::function<void ()> make_request) 
+	{
 		cont = true;
-		while(cont) {
-			while(running_requests < concurrency_limit) {
-				++running_requests;
-				make_request();
-				//fprintf(stderr, "%d running_requests\n", (int)running_requests);
-			}
+		while (true) {
 			std::unique_lock<std::mutex> lock(mutex);
 			condition.wait(lock, [this]{return running_requests < concurrency_limit;});
+			if (!cont) {
+				break;
+			}
+			++running_requests;
+			lock.unlock();
+
+			make_request();
 		}
+
 		std::unique_lock<std::mutex> lock(mutex);
-		condition.wait(lock, [this]{return running_requests == 0;});
+		condition.wait(lock, [this]{return !block_while_has_running || running_requests == 0;});
 	}
 
 	// Should be called when response on request is received
-	void complete_request() {
+	void complete_request() 
+	{
+		std::unique_lock<std::mutex> lock(mutex);
 		--running_requests;
 		condition.notify_one();
 	}
 
 	// Should be called if runloop must be stopped
-	void stop() {
+	void stop() 
+	{
 		cont = false;
 	}
 };
@@ -63,6 +73,150 @@ struct request {
 	}
 	request(int src_key) : src_key(src_key) {
 		memset(&id, 0, sizeof(dnet_id));
+	}
+};
+
+class ya_concurrent_queue_reader
+{
+public:
+	typedef std::function<int (ioremap::elliptics::exec_context, ioremap::grape::data_array)> processing_function;
+
+	static const int ACK = 0x1;
+	static const int STOP = 0x10;
+
+private:
+	concurrent_pump runloop;
+
+	ioremap::elliptics::session client;
+	const std::string queue_name;
+	const int request_size;
+	std::atomic_int next_request_id;
+
+	int concurrency_limit;
+	processing_function proc;
+
+public:
+	ya_concurrent_queue_reader(ioremap::elliptics::session client, const std::string &queue_name, int request_size, int concurrency_limit)
+		: client(client)
+		, queue_name(queue_name)
+		, request_size(request_size)
+		, next_request_id(0)
+		, concurrency_limit(concurrency_limit)
+	{
+		srand(time(NULL));
+	}
+
+	static void queue_ack(ioremap::elliptics::session client,
+			const std::string &queue_name,
+			std::shared_ptr<request> req,
+			ioremap::elliptics::exec_context context,
+			const std::vector<ioremap::grape::entry_id> &ids)
+	{
+		client.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
+
+		size_t count = ids.size();
+		client.exec(context, queue_name + "@ack-multi", ioremap::grape::serialize(ids))
+				.connect(ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
+					[req, count] (const ioremap::elliptics::error_info &error) {
+						if (error) {
+							fprintf(stderr, "%s %d, %ld entries not acked: %s\n", dnet_dump_id(&req->id), req->src_key, count, error.message().c_str());
+						} else {
+							fprintf(stderr, "%s %d, %ld entries acked\n", dnet_dump_id(&req->id), req->src_key, count);
+						}
+					}
+				);
+	}
+
+	void process_result(int result, std::shared_ptr<request> req, ioremap::elliptics::exec_context context, ioremap::grape::data_array array) {
+		if (result & STOP) {
+			runloop.stop();
+		}
+		if (result & ACK) {
+			queue_ack(client, queue_name, req, context, array.ids());
+		}
+	}
+
+	void run(processing_function func) 
+	{
+		proc = func;
+		runloop.concurrency_limit = concurrency_limit;
+		runloop.run([this] () {
+					queue_peek(client, next_request_id++, request_size);
+				});
+	}
+
+	void queue_peek(ioremap::elliptics::session client, int req_unique_id, int arg)
+	{
+		client.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
+
+		std::string queue_key = std::to_string(req_unique_id) + std::to_string(rand());
+
+		auto req = std::make_shared<request>(req_unique_id);
+		client.transform(queue_key, req->id);
+
+		client.exec(&req->id, req->src_key, queue_name + "@peek-multi", std::to_string(arg))
+				.connect(
+					std::bind(&ya_concurrent_queue_reader::data_received, this, req, std::placeholders::_1),
+					std::bind(&ya_concurrent_queue_reader::complete_request, this, req, std::placeholders::_1)
+				);
+	}
+
+	void data_received(std::shared_ptr<request> req, const ioremap::elliptics::exec_result_entry &result)
+	{
+		if (result.error()) {
+			fprintf(stderr, "%s %d: error: %s\n", dnet_dump_id(&req->id), req->src_key, result.error().message().c_str());
+			return;
+		}
+
+		ioremap::elliptics::exec_context context = result.context();
+
+		// queue.peek returns no data when queue is empty.
+		if (context.data().empty()) {
+			return;
+		}
+
+		// Received context must be used for acking to the same queue instance.
+		//
+		// But before that context.src_key must be restored back
+		// to the original src_key used in the original request to the queue,
+		// or else our worker's ack will not be routed to the exact same
+		// queue worker that issued reply with this context.
+		//
+		// (src_key of the request gets replaced by job id server side,
+		// so reply does not carries the same src_key as a request.
+		// Which is unfortunate.)
+		context.set_src_key(req->src_key);
+
+		fprintf(stderr, "%s %d, received data, byte size %ld\n",
+				dnet_dump_id_str(context.src_id()->id), context.src_key(),
+				context.data().size()
+			   );
+
+		auto array = ioremap::grape::deserialize<ioremap::grape::data_array>(context.data());
+
+		ioremap::elliptics::data_pointer d = array.data();
+		size_t count = array.sizes().size();
+		fprintf(stderr, "%s %d, processing %ld entries\n",
+				dnet_dump_id_str(context.src_id()->id), context.src_key(),
+				count
+				);
+		fprintf(stderr, "array %p\n", d.data());
+
+		int proc_result = proc(context, array);
+		process_result(proc_result, req, context, array);
+	}
+
+	void complete_request(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error)
+	{
+		//TODO: add reaction to hard errors like No such device or address: -6
+
+		if (error) {
+			fprintf(stderr, "%s %d: queue request completion error: %s\n", dnet_dump_id(&req->id), req->src_key, error.message().c_str());
+		} else {
+			//fprintf(stderr, "%s %d: queue request completed\n", dnet_dump_id(&req->id), req->src_key);
+		}
+
+		runloop.complete_request();
 	}
 };
 
@@ -113,7 +267,7 @@ public:
 		client.exec(&req->id, req->src_key, "queue@peek-multi", std::to_string(arg))
 			.connect(
 				std::bind(&concurrent_queue_reader::data_received, this, req, std::placeholders::_1),
-				std::bind(&concurrent_queue_reader::request_complete, this, req, std::placeholders::_1)
+				std::bind(&concurrent_queue_reader::complete_request, this, req, std::placeholders::_1)
 			);
 	}
 
@@ -167,7 +321,7 @@ public:
 		process_block(req, context);
 	}
 
-	void request_complete(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error)
+	void complete_request(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error)
 	{
 		//TODO: add reaction to hard errors like No such device or address: -6
 
@@ -270,11 +424,11 @@ public:
 		client.exec(&req->id, req->src_key, "queue@push", d)
 			.connect(
 				ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
-				std::bind(&concurrent_queue_writer::request_complete, this, req, std::placeholders::_1)
+				std::bind(&concurrent_queue_writer::complete_request, this, req, std::placeholders::_1)
 			);
 	}
 
-	void request_complete(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error)
+	void complete_request(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error)
 	{
 		if (error) {
 			fprintf(stderr, "%s %d: queue request completion error: %s\n", dnet_dump_id(&req->id), req->src_key, error.message().c_str());
