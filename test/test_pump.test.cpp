@@ -6,15 +6,15 @@
 #include <gtest/gtest.h>
 #include <grape/concurrent-pump.hpp>
 
-TEST(PumpTest, InitWorks) {
+TEST(PumpTest, DISABLED_InitWorks) {
 	ioremap::grape::concurrent_pump pump;
 	pump.concurrency_limit = 10;
 }
 
 TEST(PumpTest, QueueRandomSleep) {
-	std::atomic_int queue_size {0};
-	const int messages_limit {21};
-	const int concurrency_limit {25};
+	std::atomic_int queue_size(0);
+	const int messages_limit(21);
+	const int concurrency_limit(5);
 
 	std::atomic_int received_messages;
 	std::atomic_int sent_messages;
@@ -27,11 +27,14 @@ TEST(PumpTest, QueueRandomSleep) {
 
 	auto reader = [&] {
 		received_messages = 0;
-		while(true) {
-			std::unique_lock<std::mutex> lock{mutex};
-			if(received_messages >= messages_limit && queue_size == 0)
+		while (true) {
+			std::unique_lock<std::mutex> lock(mutex);
+			if (received_messages >= messages_limit && queue_size == 0) {
 				break;
-			if(queue_size == 0) continue;
+			}
+			if (queue_size == 0) {
+				continue;
+			}
 
 			// read message
 			++received_messages;
@@ -39,14 +42,14 @@ TEST(PumpTest, QueueRandomSleep) {
 			pump.complete_request();
 			lock.unlock();
 
-			std::this_thread::sleep_for(std::chrono::milliseconds{rand() % 500});
+			std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 50));
 		}
 	};
 
 	sent_messages = 0;
 	auto writer = [&] {
-		std::unique_lock<std::mutex> lock{mutex};
-		if(sent_messages >= messages_limit) {
+		std::unique_lock<std::mutex> lock(mutex);
+		if (sent_messages >= messages_limit) {
 			pump.stop();
 			pump.complete_request();
 			return;
@@ -58,13 +61,13 @@ TEST(PumpTest, QueueRandomSleep) {
 		++queue_size;
 		lock.unlock();
 
-		std::this_thread::sleep_for(std::chrono::milliseconds{rand() % 500});
+		std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 50));
 	};
 
-	std::thread tReader{reader};
-	std::thread tWriter{[&]{ pump.run(writer);}};
+	std::thread tReader(reader);
 
-	tWriter.join();
+	pump.run(writer);
+
 	tReader.join();
 
 	EXPECT_EQ(sent_messages, messages_limit);
