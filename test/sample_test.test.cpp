@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <iostream>
 
-TEST(MathTest, TwoPlusTwoEqualsFour) {
+TEST(DISABLED_MathTest, TwoPlusTwoEqualsFour) {
     EXPECT_EQ(2 + 2, 4);
 }
 
