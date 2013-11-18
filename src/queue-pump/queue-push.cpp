@@ -68,7 +68,7 @@ int main(int argc, char** argv)
 	const std::string queue_name("queue");
 	
 	// write queue indefinitely, with ever increasing number
-	concurrent_queue_writer pump(clientlib.create_session(), queue_name, concurrency);
+	queue_writer pump(clientlib.create_session(), queue_name, concurrency);
 	int counter = 0;
 	pump.run([&counter, &limit] () {
 		if (limit > 0 && counter >= limit) {

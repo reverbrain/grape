@@ -24,6 +24,8 @@ int main(int argc, char** argv)
 	other.add_options()
 		("concurrency,n", value<int>()->default_value(1), "concurrency limit")
 		("request-size,s", value<int>()->default_value(100), "request size")
+		("limit,l", value<int>()->default_value(0), "data pull limit")
+		("bulk-mode,b", "use bulk queue reader instead of queue reader")
 		;
 
 	options_description opts;
@@ -62,17 +64,40 @@ int main(int argc, char** argv)
 
 	int concurrency = args["concurrency"].as<int>();
 	int request_size = args["request-size"].as<int>();;
+	int limit = args["limit"].as<int>();
 
 	auto clientlib = elliptics_client_state::create(remotes, groups, logfile, loglevel);
 
 	const std::string queue_name("queue");
 
-	// read queue indefinitely
-	concurrent_queue_reader pump(clientlib.create_session(), queue_name, request_size, concurrency);
-	pump.run([] (ioremap::grape::entry_id entry_id, ioremap::elliptics::data_pointer data) -> bool {
-		fprintf(stderr, "entry %d-%d, byte size %ld\n", entry_id.chunk, entry_id.pos, data.size());
-		return true;
-	});
+	if (args.count("bulk-mode")) {
+		int counter = 0;
+		bulk_queue_reader pump(clientlib.create_session(), queue_name, request_size, concurrency);
+		pump.run([&limit, &counter] (ioremap::elliptics::exec_context context, ioremap::grape::data_array array) -> int {
+			fprintf(stderr, "processing %ld entries\n", array.sizes().size());
+			if (limit > 0) {
+				counter += array.sizes().size();
+			}
+			auto result = bulk_queue_reader::REQUEST_CONTINUE;
+			if (limit > 0 && counter >= limit) {
+				result = bulk_queue_reader::REQUEST_STOP;
+			}
+			result |= bulk_queue_reader::REQUEST_ACK;
+			return result;
+		});
+
+		if (limit > 0) {
+			fprintf(stderr, "specified limit %d, actually read %d\n", limit, counter);
+		}
+
+	} else {
+		// read queue indefinitely
+		queue_reader pump(clientlib.create_session(), queue_name, request_size, concurrency);
+		pump.run([] (ioremap::grape::entry_id entry_id, ioremap::elliptics::data_pointer data) -> bool {
+			fprintf(stderr, "entry %d-%d, byte size %ld\n", entry_id.chunk, entry_id.pos, data.size());
+			return true;
+		});
+	}
 
 	return 0;
 }
