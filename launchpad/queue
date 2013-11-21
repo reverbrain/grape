@@ -1,0 +1,98 @@
+#!/bin/bash
+
+DIR=$(dirname $(readlink -f $0))
+
+# elliptics endpoint
+REMOTE_HOST=${REMOTE_HOST:-bscoll08.rt.bstest.yandex.net}
+REMOTE_PORT=${REMOTE_PORT:-1025}
+REMOTE=$REMOTE_HOST:$REMOTE_PORT:2
+GROUP=${GROUP:-1}
+
+# cocaine endpoint
+# REMOTE_HOST plus
+LOCATOR_PORT=${LOCATOR_PORT:-10056}
+
+DIOC="dnet_ioclient -r $REMOTE -g $GROUP"
+
+APP=queue
+
+APPMANIFEST=${APPMANIFEST:-/etc/elliptics/apps/$APP.conf}
+APPPROFILE=${APPPROFILE:-/etc/elliptics/apps/$APP.profile}
+
+function sha() {
+    printf -- $1 | sha512sum | cut -f1 -d' '
+}
+
+#queue_id_hash=$(sha $queue_id)
+
+pack() {
+    TARFILE=$1/$APP.tar
+    tar -C $2 -cvf $TARFILE $APP
+    tar -C $(dirname $APPMANIFEST) -rvf $TARFILE $(basename $APPMANIFEST)
+    rm -f $TARFILE.bz2
+    bzip2 $TARFILE
+}
+
+case $1 in
+    pack-dev)
+        #pack $DIR $DIR/../grape/build-debug/src/queue
+        pack $DIR /home/ijon/proj/grape/build-debug/src/queue
+        ;;
+    pack)
+        pack $DIR /usr/lib/grape
+        ;;
+    upload)
+        cocaine-tool app upload --host $REMOTE_HOST --port $LOCATOR_PORT -n $APP --manifest $APPMANIFEST --package $APP.tar.bz2
+        cocaine-tool profile upload --host $REMOTE_HOST --port $LOCATOR_PORT -n $APP --profile $APPPROFILE
+        ;;
+    start)
+	# send start event to every distinct node in the group
+        IDS=$(./nodes.py $REMOTE id)
+        N=0
+        for i in $IDS; do
+            dnet_ioclient -r $REMOTE -g $GROUP -I $i -c "$APP@start-multiple-task ${PREFIX}$((N++))"
+        done
+       	;;
+    stop)
+        $DIOC -c "$APP@stop-task"
+        ;;
+    info)
+        $DIOC -c "$APP@info" ${2:+-I$2}
+        ;;
+    stats_)
+        $DIOC -c "$APP@stats" ${2:+-I$2}
+        ;;
+    stats)
+        ./_queue_stats.py -r $REMOTE -g $GROUP
+        ;;
+    clear_)
+        $DIOC -c "$APP@clear"
+        ;;
+    clear)
+        ./_queue_clear.py -r $REMOTE -g $GROUP
+        ;;
+    push)
+        $DIOC -c "$APP@push ${2:-abcdef}"
+        ;;
+    pop)
+        $DIOC -c "$APP@pop"
+        ;;
+    peek)
+        $DIOC -c "$APP@peek"
+        ;;
+    ack)
+        $DIOC -c "$APP@ack" -I$queue_id_hash
+        ;;
+    ping)
+        $DIOC -c "$APP@ping"
+        ;;
+    loglevel)
+	$DIOC -U0 -M$2
+	;;
+    _)
+        $DIOC -c "$APP@$2" -I$queue_id_hash
+        ;;
+    *)  
+        echo "usage: $(basename $0) {pack|upload|start|stop|info|log|new-id|ping}" ;;
+esac
+#exit 0
