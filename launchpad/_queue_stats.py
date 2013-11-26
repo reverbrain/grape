@@ -8,16 +8,16 @@ from nodes import connect, node_id
 import prettytable
 
 def get_app_worker_count(s, id, app):
-    info = json.loads(s.exec_event(id, '%s@info' % (app), ''))
+    result = s.exec_event(id, '%s@info' % (app), '').get()[0]
+    info = json.loads(str(result.context.data))
     return info['slaves']['capacity']
 
 def app_worker_info(s, app):
-    node_ids = node_id(s.get_routes())
     result = []
-    for ip, id in node_ids:
+    for id, addr in s.routes.routes[:-1]:
         worker_count = get_app_worker_count(s, id, app)
         for worker in range(worker_count):
-            result.append((ip, id, worker))
+            result.append((addr, id, worker))
     return result
 
 # Exec on single worker with dnet_ioclient:
@@ -32,28 +32,32 @@ def exec_on_all_workers(s, event, data=None, ordered=True):
 
     worker_info = app_worker_info(s, app)
     if ordered:
-        # retain order by worker number and order by ip addresses
-        worker_info = sorted(worker_info, key=lambda x: x[0] + str(x[2]))
+        # retain existing order by worker number and add order by ip addresses
+        worker_info = sorted(worker_info, key=lambda x: str(x[0]) + str(x[2]))
 
     asyncs = []
     for addr, direct_id, worker in worker_info:
-        asyncs.append((s.exec_async(direct_id, event, src_key=worker, data=data or ''), addr, worker))
+        asyncs.append((s.exec_event(direct_id, src_key=worker, event=event, data=data or ''), addr, worker))
 
     results = []
     for async_result, addr, worker in asyncs:
         try:
-	    async_result.wait()
-            r = async_result.get()[0]
-            #print r.address, i[1]
-            results.append(r.data)
+            async_result.wait()
+            rlist = async_result.get()
+            if len(rlist) > 0:
+                r = rlist[0]
+                #print r.address, r.context.data
+                results.append(r.context.data)
+            else:
+                print 'ERROR: %s, worker %d: no data returned' % (addr, worker)
         except elliptics.Error, e:
-            print 'ERROR: %s, worker %d: %s ' % (addr, worker, e)
+            print 'ERROR: %s, worker %d: %s' % (addr, worker, e)
             #results.append(None)
 
     return results
 
 def get_stats(s):
-    return [json.loads(i) for i in exec_on_all_workers(s, 'queue@stats')]
+    return [json.loads(str(i)) for i in exec_on_all_workers(s, 'queue@stats')]
 
 def select_stats(stats, names):
     return [ifilter(lambda x: x[0] in names, i.iteritems()) for i in stats]

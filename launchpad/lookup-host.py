@@ -41,14 +41,13 @@ if __name__ == '__main__':
 	def find_responsible(a, x):
 		'''Find responsible routing item in the circular routing table.
 		Find righmost value less then or equal to x.
-		And last entry is responsible for [0, a[0]) span.  
+		And last entry is responsible for [0, a[0]) span.
 		'''
 		keys = [i[0].id for i in a]
 		i = bisect_right(keys, x)
 		return a[i-1]
 
 	id, addr = find_responsible(sorted_ids, eid)
-	ip, port = addr.split(':')
 
 	if args.verbose > 0:
 		print 'Responsible entry:'
@@ -56,5 +55,5 @@ if __name__ == '__main__':
 		print
 		print 'Answer:'
 
-	print '%s:%s' % (socket.gethostbyaddr(ip)[0], port)
+	print '%s:%s' % (socket.gethostbyaddr(addr.host)[0], addr.port)
 
