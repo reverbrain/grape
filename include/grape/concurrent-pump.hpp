@@ -110,23 +110,41 @@ public:
 		});
 	}
 
-	static void queue_ack(ioremap::elliptics::session client,
-			const std::string &queue_name,
+	void queue_ack(ioremap::elliptics::exec_context context,
 			std::shared_ptr<request> req,
-			ioremap::elliptics::exec_context context,
 			const std::vector<ioremap::grape::entry_id> &ids)
 	{
-		client.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
+		std::string log_prefix = cocaine::format("%s %d", dnet_dump_id(&req->id), req->src_key);
+		base_queue_ack(client, queue_name, context, log, ids, log_prefix);
+	}
+
+	static void queue_ack(ioremap::elliptics::session client,
+			const std::string &queue_name,
+			ioremap::elliptics::exec_context context,
+			const std::vector<ioremap::grape::entry_id> &ids,
+			const std::string& log_prefix = "")
+	{
 		auto log = std::make_shared<logger_adapter>(client.get_node().get_log());
+		base_queue_ack(client, queue_name, context, log, ids, log_prefix);
+	}
+
+	static inline void base_queue_ack(ioremap::elliptics::session client,
+			const std::string &queue_name,
+			ioremap::elliptics::exec_context context,
+			std::shared_ptr<cocaine::framework::logger> log,
+			const std::vector<entry_id> &ids,
+			const std::string &log_prefix)
+	{
+		client.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
 
 		size_t count = ids.size();
-		client.exec(context, queue_name + "@ack-multi", ioremap::grape::serialize(ids))
+		client.exec(context, queue_name + "@ack-multi", serialize(ids))
 				.connect(ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
-					[log, req, count] (const ioremap::elliptics::error_info &error) {
+					[log, &log_prefix, &count] (const ioremap::elliptics::error_info &error) {
 						if (error) {
-							COCAINE_LOG_ERROR(log, "%s %d, %ld entries not acked: %s\n", dnet_dump_id(&req->id), req->src_key, count, error.message().c_str());
+							COCAINE_LOG_ERROR(log, "%s: %ld entries not acked: %s", log_prefix.c_str(), count, error.message().c_str());
 						} else {
-							COCAINE_LOG_INFO(log, "%s %d, %ld entries acked\n", dnet_dump_id(&req->id), req->src_key, count);
+							COCAINE_LOG_INFO(log, "%s: %ld entries acked", log_prefix.c_str(), count);
 						}
 					}
 				);
@@ -151,7 +169,7 @@ public:
 	void data_received(std::shared_ptr<request> req, const ioremap::elliptics::exec_result_entry &result)
 	{
 		if (result.error()) {
-			COCAINE_LOG_ERROR(log, "%s %d: error: %s\n", dnet_dump_id(&req->id), req->src_key, result.error().message().c_str());
+			COCAINE_LOG_ERROR(log, "%s %d: error: %s", dnet_dump_id(&req->id), req->src_key, result.error().message().c_str());
 			return;
 		}
 
@@ -174,7 +192,7 @@ public:
 		// Which is unfortunate.)
 		context.set_src_key(req->src_key);
 
-		COCAINE_LOG_INFO(log, "%s %d, received data, byte size %ld\n", 
+		COCAINE_LOG_INFO(log, "%s %d: received data, byte size %ld",
 				dnet_dump_id_str(context.src_id()->id), context.src_key(),
 				context.data().size()
 				);
@@ -183,11 +201,11 @@ public:
 
 		ioremap::elliptics::data_pointer d = array.data();
 		size_t count = array.sizes().size();
-		COCAINE_LOG_INFO(log, "%s %d, processing %ld entries\n",
+		COCAINE_LOG_INFO(log, "%s %d: processing %ld entries",
 				dnet_dump_id_str(context.src_id()->id), context.src_key(),
 				count
 				);
-		COCAINE_LOG_INFO(log, "array %p\n", d.data());
+		COCAINE_LOG_INFO(log, "%s %d: array %p", dnet_dump_id_str(context.src_id()->id), context.src_key(), d.data());
 
 		static_cast<queue_reader_impl*>(this)->process_data_array(req, context, array);
 	}
@@ -195,9 +213,9 @@ public:
 	void request_complete(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error) {
 		//TODO: add reaction to hard errors like No such device or address: -6
 		if (error) {
-			COCAINE_LOG_ERROR(log, "%s %d: queue request completion error: %s\n", dnet_dump_id(&req->id), req->src_key, error.message().c_str());
+			COCAINE_LOG_ERROR(log, "%s %d: queue request completion error: %s", dnet_dump_id(&req->id), req->src_key, error.message().c_str());
 		} else {
-			COCAINE_LOG_INFO(log, "%s %d: queue request completed\n", dnet_dump_id(&req->id), req->src_key);
+			COCAINE_LOG_INFO(log, "%s %d: queue request completed", dnet_dump_id(&req->id), req->src_key);
 		}
 
 		runloop.complete_request();
@@ -211,7 +229,7 @@ public:
 	processing_function proc;
 
 	queue_reader(ioremap::elliptics::session client, const std::string &queue_name, int request_size, int concurrency_limit)
-		: base_queue_reader(client, queue_name, request_size, concurrency_limit) 
+		: base_queue_reader(client, queue_name, request_size, concurrency_limit)
 	{}
 
 	void run(processing_function func) {
@@ -239,12 +257,12 @@ public:
 		}
 
 		// acknowledge entries
-		COCAINE_LOG_INFO(log, "%s %d, acking %ld entries\n",
+		COCAINE_LOG_INFO(log, "%s %d: acking %ld entries",
 				dnet_dump_id_str(context.src_id()->id), context.src_key(),
 				ack_ids.size()
 				);
 
-		queue_ack(client, queue_name, req, context, ack_ids);
+		queue_ack(context, req, ack_ids);
 	}
 };
 
@@ -269,7 +287,7 @@ public:
 
 	void handle_process_result(int result, std::shared_ptr<request> req, ioremap::elliptics::exec_context context, ioremap::grape::data_array array) {
 		if (result & REQUEST_ACK) {
-			queue_ack(client, queue_name, req, context, array.ids());
+			queue_ack(context, req, array.ids());
 		}
 		if (result & REQUEST_STOP) {
 			runloop.stop();
@@ -332,7 +350,7 @@ public:
 		auto req = std::make_shared<request>(req_unique_id);
 		client.transform(queue_key, req->id);
 
-		client.exec(&req->id, req->src_key, "queue@push", d)
+		client.exec(&req->id, req->src_key, queue_name + "@push", d)
 			.connect(
 				ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
 				std::bind(&queue_writer::request_complete, this, req, std::placeholders::_1)
@@ -342,9 +360,9 @@ public:
 	void request_complete(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error)
 	{
 		if (error) {
-			COCAINE_LOG_ERROR(log, "%s %d: queue request completion error: %s\n", dnet_dump_id(&req->id), req->src_key, error.message().c_str());
+			COCAINE_LOG_ERROR(log, "%s %d: queue request completion error: %s", dnet_dump_id(&req->id), req->src_key, error.message().c_str());
 		} else {
-			COCAINE_LOG_INFO(log, "%s %d: queue request completed\n", dnet_dump_id(&req->id), req->src_key);
+			COCAINE_LOG_INFO(log, "%s %d: queue request completed", dnet_dump_id(&req->id), req->src_key);
 		}
 
 		runloop.complete_request();
