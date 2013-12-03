@@ -8,6 +8,7 @@
 #include <elliptics/session.hpp>
 #include <grape/data_array.hpp>
 #include <grape/entry_id.hpp>
+#include <grape/logger_adapter.hpp>
 
 namespace ioremap { namespace grape {
 
@@ -86,6 +87,8 @@ protected:
 	const int request_size;
 	std::atomic_int next_request_id;
 
+	std::shared_ptr<cocaine::framework::logger_t> log;
+
 	int concurrency_limit;
 
 public:
@@ -97,6 +100,7 @@ public:
 		, concurrency_limit(concurrency_limit)
 	{
 		srand(time(NULL));
+		log = std::make_shared<logger_adapter>(client.get_node().get_log());
 	}
 
 	void run() {
@@ -113,15 +117,16 @@ public:
 			const std::vector<ioremap::grape::entry_id> &ids)
 	{
 		client.set_exceptions_policy(ioremap::elliptics::session::no_exceptions);
+		auto log = std::make_shared<logger_adapter>(client.get_node().get_log());
 
 		size_t count = ids.size();
 		client.exec(context, queue_name + "@ack-multi", ioremap::grape::serialize(ids))
 				.connect(ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
-					[req, count] (const ioremap::elliptics::error_info &error) {
+					[log, req, count] (const ioremap::elliptics::error_info &error) {
 						if (error) {
-							fprintf(stderr, "%s %d, %ld entries not acked: %s\n", dnet_dump_id(&req->id), req->src_key, count, error.message().c_str());
+							COCAINE_LOG_ERROR(log, "%s %d, %ld entries not acked: %s\n", dnet_dump_id(&req->id), req->src_key, count, error.message().c_str());
 						} else {
-							fprintf(stderr, "%s %d, %ld entries acked\n", dnet_dump_id(&req->id), req->src_key, count);
+							COCAINE_LOG_INFO(log, "%s %d, %ld entries acked\n", dnet_dump_id(&req->id), req->src_key, count);
 						}
 					}
 				);
@@ -146,7 +151,7 @@ public:
 	void data_received(std::shared_ptr<request> req, const ioremap::elliptics::exec_result_entry &result)
 	{
 		if (result.error()) {
-			fprintf(stderr, "%s %d: error: %s\n", dnet_dump_id(&req->id), req->src_key, result.error().message().c_str());
+			COCAINE_LOG_ERROR(log, "%s %d: error: %s\n", dnet_dump_id(&req->id), req->src_key, result.error().message().c_str());
 			return;
 		}
 
@@ -169,20 +174,20 @@ public:
 		// Which is unfortunate.)
 		context.set_src_key(req->src_key);
 
-		fprintf(stderr, "%s %d, received data, byte size %ld\n",
+		COCAINE_LOG_INFO(log, "%s %d, received data, byte size %ld\n", 
 				dnet_dump_id_str(context.src_id()->id), context.src_key(),
 				context.data().size()
-			   );
+				);
 
 		auto array = ioremap::grape::deserialize<ioremap::grape::data_array>(context.data());
 
 		ioremap::elliptics::data_pointer d = array.data();
 		size_t count = array.sizes().size();
-		fprintf(stderr, "%s %d, processing %ld entries\n",
+		COCAINE_LOG_INFO(log, "%s %d, processing %ld entries\n",
 				dnet_dump_id_str(context.src_id()->id), context.src_key(),
 				count
 				);
-		fprintf(stderr, "array %p\n", d.data());
+		COCAINE_LOG_INFO(log, "array %p\n", d.data());
 
 		static_cast<queue_reader_impl*>(this)->process_data_array(req, context, array);
 	}
@@ -190,9 +195,9 @@ public:
 	void request_complete(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error) {
 		//TODO: add reaction to hard errors like No such device or address: -6
 		if (error) {
-			fprintf(stderr, "%s %d: queue request completion error: %s\n", dnet_dump_id(&req->id), req->src_key, error.message().c_str());
+			COCAINE_LOG_ERROR(log, "%s %d: queue request completion error: %s\n", dnet_dump_id(&req->id), req->src_key, error.message().c_str());
 		} else {
-			//fprintf(stderr, "%s %d: queue request completed\n", dnet_dump_id(&req->id), req->src_key);
+			COCAINE_LOG_INFO(log, "%s %d: queue request completed\n", dnet_dump_id(&req->id), req->src_key);
 		}
 
 		runloop.complete_request();
@@ -234,7 +239,7 @@ public:
 		}
 
 		// acknowledge entries
-		fprintf(stderr, "%s %d, acking %ld entries\n",
+		COCAINE_LOG_INFO(log, "%s %d, acking %ld entries\n",
 				dnet_dump_id_str(context.src_id()->id), context.src_key(),
 				ack_ids.size()
 				);
@@ -289,6 +294,7 @@ private:
 	ioremap::elliptics::session client;
 	const std::string queue_name;
 	std::atomic_int next_request_id;
+	std::shared_ptr<cocaine::framework::logger_t> log;
 
 	int concurrency_limit;
 
@@ -301,6 +307,7 @@ public:
 		, next_request_id(0)
 		, concurrency_limit(concurrency_limit)
 	{
+		log = std::make_shared<logger_adapter>(client.get_node().get_log());
 		srand(time(NULL));
 	}
 
@@ -335,9 +342,9 @@ public:
 	void request_complete(std::shared_ptr<request> req, const ioremap::elliptics::error_info &error)
 	{
 		if (error) {
-			fprintf(stderr, "%s %d: queue request completion error: %s\n", dnet_dump_id(&req->id), req->src_key, error.message().c_str());
+			COCAINE_LOG_ERROR(log, "%s %d: queue request completion error: %s\n", dnet_dump_id(&req->id), req->src_key, error.message().c_str());
 		} else {
-			//fprintf(stderr, "%s %d: queue request completed\n", dnet_dump_id(&req->id), req->src_key);
+			COCAINE_LOG_INFO(log, "%s %d: queue request completed\n", dnet_dump_id(&req->id), req->src_key);
 		}
 
 		runloop.complete_request();
