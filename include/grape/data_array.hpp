@@ -28,7 +28,7 @@ public:
 		grape::entry_id entry_id;
 	};
 
-	class iterator : public std::iterator<std::input_iterator_tag, entry>
+	class iterator : public std::iterator<std::forward_iterator_tag, entry>
 	{
 	public:
 		iterator(const iterator &other);
@@ -45,9 +45,9 @@ public:
 		iterator operator ++(int);
 
 	private:
-		iterator(data_array &array, bool at_end);
+		iterator(const data_array *array, bool at_end);
 	
-		data_array &array;
+		const data_array *array;
 		int index;
 		size_t offset;
 
@@ -58,6 +58,7 @@ public:
 	};
 
 	void append(const char *data, size_t size, const entry_id &id);
+	void append(const std::string &data, const entry_id &id);
 	void append(const data_array::entry &entry);
 	void extend(const data_array &d);
 
@@ -70,8 +71,8 @@ public:
 
 	// iteration interface
 
-	iterator begin();
-	iterator end();
+	iterator begin() const;
+	iterator end() const;
 
 	MSGPACK_DEFINE(m_id, m_size, m_data);
 };

@@ -39,9 +39,11 @@ include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
 file(GLOB_RECURSE test_src_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.test.cpp")
 
 foreach(test_src_file IN LISTS test_src_files)
-    string(REGEX REPLACE "[.]test[.]cpp$" "" test_exec_file ${test_src_file})
+    string(REGEX REPLACE "[.]test[.]cpp$" "_test" test_exec_file ${test_src_file})
     add_executable(${test_exec_file} ${test_src_file})
-    target_link_libraries(${test_exec_file} ${CMAKE_THREAD_LIBS_INIT} ${GTEST_BOTH_LIBRARIES})
+    target_link_libraries(${test_exec_file} ${CMAKE_THREAD_LIBS_INIT} ${GTEST_BOTH_LIBRARIES}
+            queue grape_data_array
+            )
     add_test(${test_exec_file} ${test_exec_file})
     add_dependencies(${test_exec_file} ${GTEST_TARGETS})
 endforeach(test_src_file)

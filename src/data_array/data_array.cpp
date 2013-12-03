@@ -15,6 +15,12 @@ void data_array::append(const char *data, size_t size, const entry_id &id)
 		throw;
 	}
 }
+
+void data_array::append(const std::string &data, const entry_id &id)
+{
+	append(data.data(), data.size(), id);
+}
+
 void data_array::append(const data_array::entry &entry)
 {
 	append(entry.data, entry.size, entry.entry_id);
@@ -58,12 +64,12 @@ bool data_array::empty(void) const
 	return m_size.empty();
 }
 
-data_array::iterator::iterator(data_array &array, bool at_end)
+data_array::iterator::iterator(const data_array *array, bool at_end)
 	: array(array), index(0), offset(0)
 {
 	if (at_end) {
-		index = array.sizes().size();
-		offset = array.data().size();
+		index = array->sizes().size();
+		offset = array->data().size();
 	}
 }
 
@@ -82,7 +88,7 @@ data_array::iterator &data_array::iterator::operator =(const iterator &other)
 
 bool data_array::iterator::operator ==(const iterator &other) const
 {
-	return &array == &other.array && index == other.index && offset == other.offset;
+	return array == other.array && index == other.index && offset == other.offset;
 }
 
 bool data_array::iterator::operator !=(const iterator &other) const
@@ -92,9 +98,9 @@ bool data_array::iterator::operator !=(const iterator &other) const
 
 void data_array::iterator::prepare_value() const
 {
-	value.data = (const char *)array.data().data() + offset;
-	value.size = array.sizes()[index];
-	value.entry_id = array.ids()[index];
+	value.data = (const char *)array->data().data() + offset;
+	value.size = array->sizes()[index];
+	value.entry_id = array->ids()[index];
 }
 
 data_array::iterator::value_type data_array::iterator::operator *() const
@@ -111,7 +117,7 @@ data_array::iterator::value_type *data_array::iterator::operator ->() const
 
 data_array::iterator &data_array::iterator::operator ++()
 {
-	int size = array.sizes()[index];
+	int size = array->sizes()[index];
 	offset += size;
 	++index;
 	return *this;
@@ -124,14 +130,14 @@ data_array::iterator data_array::iterator::operator ++(int)
 	return tmp;
 }
 
-data_array::iterator data_array::begin()
+data_array::iterator data_array::begin() const
 {
-	return iterator(*this, false);
+	return iterator(this, false);
 }
 
-data_array::iterator data_array::end()
+data_array::iterator data_array::end() const
 {
-	return iterator(*this, true);
+	return iterator(this, true);
 }
 
 }}

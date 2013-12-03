@@ -35,13 +35,6 @@ install(DIRECTORY include/ DESTINATION include)
 
 include_directories(${PROJECT_SOURCE_DIR}/include ${elliptics_INCLUDE_DIRS} ${CocaineNative_INCLUDE_DIRS} ${LIBEV_INCLUDE_DIRS})
 
-########################
-# TESTING
-########################
-
-enable_testing()
-add_subdirectory(test)
-
 add_subdirectory(src/data_array)
 add_subdirectory(src/driver)
 add_subdirectory(src/queue)
@@ -49,6 +42,10 @@ add_subdirectory(src/queue-pump)
 add_subdirectory(src/testerhead-cpp)
 
 #add_subdirectory(example)
+
+# testing
+enable_testing()
+add_subdirectory(test)
 
 #set(ARCHIVE_NAME ${CMAKE_PROJECT_NAME})
 #add_custom_target(dist
