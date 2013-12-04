@@ -1,3 +1,10 @@
+grape (0.7.6+elliptics2.24.13.5) unstable; urgency=low
+
+  * version modifier +elliptics2.24.13.5 marks focused elliptics version
+  * data_array iterator fixes
+
+ -- Ivan Chelubeev <ijon@yandex-team.ru>  Wed, 04 Dec 2013 21:05:00 +0400
+
 grape (0.7.5) unstable; urgency=low
 
   * python scripts to manage queue
