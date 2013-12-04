@@ -6,6 +6,8 @@
 #include <condition_variable>
 
 #include <elliptics/session.hpp>
+#include <cocaine/framework/logging.hpp>
+
 #include <grape/data_array.hpp>
 #include <grape/entry_id.hpp>
 #include <grape/logger_adapter.hpp>
@@ -112,7 +114,7 @@ public:
 
 	void queue_ack(ioremap::elliptics::exec_context context,
 			std::shared_ptr<request> req,
-			const std::vector<ioremap::grape::entry_id> &ids)
+			const std::vector<entry_id> &ids)
 	{
 		std::string log_prefix = cocaine::format("%s %d", dnet_dump_id(&req->id), req->src_key);
 		base_queue_ack(client, queue_name, context, log, ids, log_prefix);
@@ -121,7 +123,7 @@ public:
 	static void queue_ack(ioremap::elliptics::session client,
 			const std::string &queue_name,
 			ioremap::elliptics::exec_context context,
-			const std::vector<ioremap::grape::entry_id> &ids,
+			const std::vector<entry_id> &ids,
 			const std::string& log_prefix = "")
 	{
 		auto log = std::make_shared<logger_adapter>(client.get_node().get_log());
@@ -131,7 +133,7 @@ public:
 	static inline void base_queue_ack(ioremap::elliptics::session client,
 			const std::string &queue_name,
 			ioremap::elliptics::exec_context context,
-			std::shared_ptr<cocaine::framework::logger> log,
+			std::shared_ptr<cocaine::framework::logger_t> log,
 			const std::vector<entry_id> &ids,
 			const std::string &log_prefix)
 	{
@@ -197,7 +199,7 @@ public:
 				context.data().size()
 				);
 
-		auto array = ioremap::grape::deserialize<ioremap::grape::data_array>(context.data());
+		auto array = deserialize<data_array>(context.data());
 
 		ioremap::elliptics::data_pointer d = array.data();
 		size_t count = array.sizes().size();
@@ -225,7 +227,7 @@ public:
 class queue_reader: public base_queue_reader<queue_reader>
 {
 public:
-	typedef std::function<bool (ioremap::grape::entry_id, ioremap::elliptics::data_pointer data)> processing_function;
+	typedef std::function<bool (entry_id, ioremap::elliptics::data_pointer data)> processing_function;
 	processing_function proc;
 
 	queue_reader(ioremap::elliptics::session client, const std::string &queue_name, int request_size, int concurrency_limit)
@@ -237,20 +239,20 @@ public:
 		base_queue_reader::run();
 	}
 
-	void process_data_array(std::shared_ptr<request> req, ioremap::elliptics::exec_context context, ioremap::grape::data_array &array) {
+	void process_data_array(std::shared_ptr<request> req, ioremap::elliptics::exec_context context, data_array &array) {
 		ioremap::elliptics::data_pointer d = array.data();
 		size_t count = array.sizes().size();
 
-		std::vector<ioremap::grape::entry_id> ack_ids;
+		std::vector<entry_id> ack_ids;
 
 		size_t offset = 0;
 		for (size_t i = 0; i < count; ++i) {
-			const ioremap::grape::entry_id &entry_id = array.ids()[i];
+			const entry_id &id = array.ids()[i];
 			int bytesize = array.sizes()[i];
 
 			//TODO: check result of the proc()
-			if (proc(entry_id, d.slice(offset, bytesize))) {
-				ack_ids.push_back(entry_id);
+			if (proc(id, d.slice(offset, bytesize))) {
+				ack_ids.push_back(id);
 			}
 
 			offset += bytesize;
@@ -269,7 +271,7 @@ public:
 class bulk_queue_reader: public base_queue_reader<bulk_queue_reader>
 {
 public:
-	typedef std::function<int (ioremap::elliptics::exec_context, ioremap::grape::data_array)> processing_function;
+	typedef std::function<int (ioremap::elliptics::exec_context, data_array)> processing_function;
 	processing_function proc;
 
 	static const int REQUEST_CONTINUE = 0;
@@ -285,7 +287,7 @@ public:
 		base_queue_reader::run();
 	}
 
-	void handle_process_result(int result, std::shared_ptr<request> req, ioremap::elliptics::exec_context context, ioremap::grape::data_array array) {
+	void handle_process_result(int result, std::shared_ptr<request> req, ioremap::elliptics::exec_context context, data_array array) {
 		if (result & REQUEST_ACK) {
 			queue_ack(context, req, array.ids());
 		}
@@ -294,7 +296,7 @@ public:
 		}
 	}
 
-	void process_data_array(std::shared_ptr<request> req, ioremap::elliptics::exec_context context, ioremap::grape::data_array &array) {
+	void process_data_array(std::shared_ptr<request> req, ioremap::elliptics::exec_context context, data_array &array) {
 		int proc_result = proc(context, array);
 		handle_process_result(proc_result, req, context, array);
 	}
