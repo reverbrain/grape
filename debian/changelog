@@ -1,3 +1,10 @@
+grape (0.7.7+elliptics2.24.13.5) unstable; urgency=low
+
+  * concurrent-pump: proper logging
+  * slighty imcompatible changes in concurrent reader interface
+
+ -- Ivan Chelubeev <ijon@yandex-team.ru>  Thu, 05 Dec 2013 16:21:37 +0400
+
 grape (0.7.6+elliptics2.24.13.5) unstable; urgency=low
 
   * version modifier +elliptics2.24.13.5 marks focused elliptics version
