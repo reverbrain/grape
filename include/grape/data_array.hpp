@@ -46,7 +46,7 @@ public:
 
 	private:
 		iterator(const data_array *array, bool at_end);
-	
+
 		const data_array *array;
 		int index;
 		size_t offset;
