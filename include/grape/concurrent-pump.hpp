@@ -272,7 +272,7 @@ public:
 class bulk_queue_reader: public base_queue_reader<bulk_queue_reader>
 {
 public:
-	typedef std::function<int (ioremap::elliptics::exec_context, data_array)> processing_function;
+	typedef std::function<int (ioremap::elliptics::exec_context, data_array&)> processing_function;
 	processing_function proc;
 
 	static const int REQUEST_CONTINUE = 0;
@@ -288,7 +288,7 @@ public:
 		base_queue_reader::run();
 	}
 
-	void handle_process_result(int result, std::shared_ptr<request> req, ioremap::elliptics::exec_context context, data_array array) {
+	void handle_process_result(int result, std::shared_ptr<request> req, ioremap::elliptics::exec_context context, data_array &array) {
 		if (result & REQUEST_ACK) {
 			queue_ack(context, req, array.ids());
 		}
