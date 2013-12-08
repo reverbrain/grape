@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "queue.hpp"
 
 extern std::shared_ptr<cocaine::framework::logger_t> grape_queue_module_get_logger();
@@ -14,7 +12,7 @@ ioremap::grape::chunk_meta::chunk_meta(int max)
 {
 	m_data.resize(sizeof(struct chunk_disk) + max * sizeof(struct chunk_entry));
 	m_ptr = (struct chunk_disk *)m_data.data();
-	
+
 	m_ptr->max = max;
 }
 
@@ -128,6 +126,7 @@ bool ioremap::grape::chunk_meta::complete() const
 {
 	return m_ptr->acked == m_ptr->max;
 }
+
 void ioremap::grape::chunk_meta::assign(char *data, size_t size)
 {
 	if (size != m_data.size()) {
@@ -259,7 +258,7 @@ bool ioremap::grape::chunk::update_data_cache()
 		//
 		if (iteration_state.byte_offset >= m_data.size()) {
 			LOG_INFO("%s, update_data_cache, (re)reading data, iteration.byte_offset %lld, m_data.size() %ld", m_traceid.c_str(), iteration_state.byte_offset, m_data.size());
-			
+
 			//DEBUG
 			LOG_INFO("%s, update_data_cache, reading %s - %s", m_traceid.c_str(), dnet_dump_id_str(m_data_io.id), m_data_key.remote().c_str());
 
@@ -398,7 +397,7 @@ ioremap::grape::data_array ioremap::grape::chunk::pop(int num)
 		ret.append((char *)m_data.data() + iteration_state.byte_offset, size, entry_id);
 
 		//LOG_INFO("%a, pop, iter: mode %d, index %d, offset %lld", m_traceid.c_str(), iter->mode, iteration_state.entry_index, iteration_state.byte_offset));
-		
+
 		iter->advance();
 
 		++m_stat.pop;
@@ -451,7 +450,7 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 
 bool ioremap::grape::chunk::ack(int pos, bool write)
 {
-	//FIXME: check if pos < low < high 
+	//FIXME: check if pos < low < high
 	m_meta.ack(pos, STATE_ACKED);
 	if (write) {
 		write_meta();

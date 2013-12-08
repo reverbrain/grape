@@ -108,7 +108,7 @@ public:
 	void run() {
 		runloop.concurrency_limit = concurrency_limit;
 		runloop.run([this] () {
-				base_queue_reader::queue_peek(client, next_request_id++, request_size);
+			base_queue_reader::queue_peek(client, next_request_id++, request_size);
 		});
 	}
 
@@ -201,13 +201,14 @@ public:
 
 		auto array = deserialize<data_array>(context.data());
 
-		ioremap::elliptics::data_pointer d = array.data();
-		size_t count = array.sizes().size();
-		COCAINE_LOG_INFO(log, "%s %d: processing %ld entries",
-				dnet_dump_id_str(context.src_id()->id), context.src_key(),
-				count
-				);
-		COCAINE_LOG_INFO(log, "%s %d: array %p", dnet_dump_id_str(context.src_id()->id), context.src_key(), d.data());
+		{
+			size_t count = array.sizes().size();
+			COCAINE_LOG_INFO(log, "%s %d: processing %ld entries",
+					dnet_dump_id_str(context.src_id()->id), context.src_key(),
+					count
+					);
+			COCAINE_LOG_INFO(log, "%s %d: array %p", dnet_dump_id_str(context.src_id()->id), context.src_key(), array.data().data());
+		}
 
 		static_cast<queue_reader_impl*>(this)->process_data_array(req, context, array);
 	}

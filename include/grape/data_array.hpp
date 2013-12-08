@@ -20,7 +20,7 @@ private:
 	std::string m_data;
 
 public:
-	// virtual view onto single array's item
+	// virtual view into single array item
 	struct entry
 	{
 		const char *data;

@@ -89,7 +89,7 @@ void queue::initialize(const std::string &config)
 	try {
 		ioremap::elliptics::data_pointer d = m_data_client->read_data(m_queue_state_id, 0, 0).get_one().file();
 		auto *state = d.data<queue_state>();
-	
+
 		m_state.chunk_id_push = state->chunk_id_push;
 		m_state.chunk_id_ack = state->chunk_id_ack;
 
@@ -235,7 +235,7 @@ void queue::update_chunk_timeout(int chunk_id, shared_chunk chunk)
 	// add chunk to the waiting list and postpone its deadline time
 	m_wait_ack.insert({chunk_id, chunk});
 	//TODO: make acking timeout value configurable
-	chunk->reset_time(m_ack_wait_timeout);	
+	chunk->reset_time(m_ack_wait_timeout);
 }
 
 void queue::check_timeouts()
@@ -325,7 +325,7 @@ void queue::ack(const entry_id id)
 			m_state.chunk_id_ack = std::min(m_state.chunk_id_ack, m_chunks.begin()->first);
 		}
 		if (!m_wait_ack.empty()) {
-			m_state.chunk_id_ack = std::min(m_state.chunk_id_ack, m_wait_ack.begin()->first);	
+			m_state.chunk_id_ack = std::min(m_state.chunk_id_ack, m_wait_ack.begin()->first);
 		}
 
 		write_state();
