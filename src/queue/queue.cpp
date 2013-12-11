@@ -475,15 +475,24 @@ void queue::ack(const std::vector<entry_id> &ids)
 	}
 }
 
-void queue::reply(const ioremap::elliptics::exec_context &context,
+void queue::reply(cocaine::framework::response_ptr response, const ioremap::elliptics::exec_context &context,
 		const ioremap::elliptics::data_pointer &d, ioremap::elliptics::exec_context::final_state state)
 {
-	m_reply_client->reply(context, d, state);
+	m_reply_client->reply(context, d, state).connect(
+		ioremap::elliptics::async_reply_result::result_function(),
+		[this, response] (const ioremap::elliptics::error_info &error) {
+			if (error) {
+				LOG_ERROR("%s, reply error: %s", m_queue_id.c_str(), error.message().c_str());
+			} else {
+				//LOG_INFO("%s, replied", m_queue_id.c_str());
+			}
+		}
+	);
 }
 
-void queue::final(const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d)
+void queue::final(cocaine::framework::response_ptr response, const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d)
 {
-	reply(context, d, ioremap::elliptics::exec_context::final);
+	reply(response, context, d, ioremap::elliptics::exec_context::final);
 }
 
 const std::string &queue::queue_id() const

@@ -98,7 +98,7 @@ queue_app_context::queue_app_context(cocaine::framework::dispatch_t& dispatch)
 	//FIXME: pass logger explicitly everywhere
 	extern void grape_queue_module_set_logger(std::shared_ptr<cocaine::framework::logger_t>);
 	grape_queue_module_set_logger(m_log);
-	
+
     m_queue.reset(new ioremap::grape::queue(m_id));
 	m_queue->initialize("queue.conf");
 	COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured", m_id.c_str());
@@ -142,7 +142,7 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 			);
 
 	if (event == "ping") {
-		m_queue->final(context, std::string("ok"));
+		m_queue->final(response, context, std::string("ok"));
 
 	} else if (event == "push") {
 		ioremap::elliptics::data_pointer d = context.data();
@@ -159,7 +159,7 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 					);
 			m_push_rate.update(1);
 		}
-		m_queue->final(context, ioremap::elliptics::data_pointer());
+		m_queue->final(response, context, ioremap::elliptics::data_pointer());
 
 	} else if (event == "pop-multi") {
 		int num = stoi(context.data().to_string());
@@ -170,11 +170,11 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		m_ack_time.stop();
 		m_pop_time.stop();
 		if (!d.empty()) {
-			m_queue->final(context, ioremap::grape::serialize(d));
+			m_queue->final(response, context, ioremap::grape::serialize(d));
 			m_pop_rate.update(d.sizes().size());
 			m_ack_rate.update(d.sizes().size());
 		} else {
-			m_queue->final(context, ioremap::elliptics::data_pointer());
+			m_queue->final(response, context, ioremap::elliptics::data_pointer());
 		}
 
 		COCAINE_LOG_INFO(m_log, "%s, completed event: %s, size: %ld, popped: %d/%d (multiple: '%s')",
@@ -186,7 +186,7 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 	} else if (event == "pop") {
 		m_pop_time.start();
 		m_ack_time.start();
-		m_queue->final(context, m_queue->pop());
+		m_queue->final(response, context, m_queue->pop());
 		m_ack_time.stop();
 		m_pop_time.stop();
 		m_pop_rate.update(1);
@@ -206,7 +206,7 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		dnet_raw_id *src = context.src_id();
 		memcpy(&src->id[DNET_ID_SIZE - sizeof(entry_id)], &entry_id, sizeof(entry_id));
 
-		m_queue->final(context, d);
+		m_queue->final(response, context, d);
 
 		m_pop_time.stop();
 		m_pop_rate.update(1);
@@ -218,10 +218,10 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		peek_multi_type d = m_queue->peek(num);
 
 		if (!d.empty()) {
-			m_queue->final(context, ioremap::grape::serialize(d));
+			m_queue->final(response, context, ioremap::grape::serialize(d));
 			m_pop_rate.update(d.sizes().size());
 		} else {
-			m_queue->final(context, ioremap::elliptics::data_pointer());
+			m_queue->final(response, context, ioremap::elliptics::data_pointer());
 		}
 
 		m_pop_time.stop();
@@ -237,7 +237,7 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		ioremap::grape::entry_id entry_id = ioremap::grape::entry_id::from_dnet_raw_id(context.src_id());
 
 		m_queue->ack(entry_id);
-		m_queue->final(context, ioremap::elliptics::data_pointer());
+		m_queue->final(response, context, ioremap::elliptics::data_pointer());
 
 		m_ack_time.stop();
 		m_ack_rate.update(1);
@@ -252,7 +252,7 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		auto d = ioremap::grape::deserialize<ack_multi_type>(context.data());
 
 		m_queue->ack(d);
-		m_queue->final(context, ioremap::elliptics::data_pointer());
+		m_queue->final(response, context, ioremap::elliptics::data_pointer());
 
 		m_ack_time.stop();
 		m_ack_rate.update(d.size());
@@ -265,11 +265,11 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 	} else if (event == "clear") {
 		// clear queue content
 		m_queue->clear();
-		m_queue->final(context, ioremap::elliptics::data_pointer("ok"));
+		m_queue->final(response, context, std::string("ok"));
 
 	} else if (event == "stats-clear") {
 		m_queue->clear_counters();
-		m_queue->final(context, ioremap::elliptics::data_pointer("ok"));
+		m_queue->final(response, context, std::string("ok"));
 
 	} else if (event == "stats") {
 		rapidjson::StringBuffer stream;
@@ -323,11 +323,11 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 		std::string text;
 		text.assign(stream.GetString(), stream.GetSize());
 
-		m_queue->final(context, text);
+		m_queue->final(response, context, text);
 
 	} else {
 		std::string msg = event + ": unknown event";
-		m_queue->final(context, msg);
+		m_queue->final(response, context, msg);
 	}
 
 	COCAINE_LOG_INFO(m_log, "%s, event: %s, data-size: %ld, completed",

@@ -3,11 +3,10 @@
 
 #include <map>
 
-#include <msgpack.hpp>
-
 #include <elliptics/session.hpp>
 
 #include <cocaine/framework/logging.hpp>
+#include <cocaine/framework/handlers/functional.hpp>
 
 #include <grape/elliptics_client_state.hpp>
 #include <grape/data_array.hpp>
@@ -56,10 +55,10 @@ class queue {
 		// content manipulation
 		void clear();
 
-		void reply(const ioremap::elliptics::exec_context &context,
+		void reply(cocaine::framework::response_ptr response, const ioremap::elliptics::exec_context &context,
 				const ioremap::elliptics::data_pointer &d,
 				ioremap::elliptics::exec_context::final_state state);
-		void final(const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d);
+		void final(cocaine::framework::response_ptr response, const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d);
 
 		const std::string &queue_id() const;
 		const queue_state &state();
