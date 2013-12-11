@@ -66,20 +66,20 @@ bool ioremap::grape::chunk_meta::ack(int32_t pos, int state)
 				pos, m_ptr->acked, m_ptr->high, m_ptr->max);
 	}
 
-	if (m_ptr->acked >= m_ptr->high) {
-		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: acked can not be more than high mark: "
-				"pos: %d, acked: %d, high: %d, max: %d",
-				pos, m_ptr->acked, m_ptr->high, m_ptr->max);
-	}
-
-	if (m_ptr->acked >= m_ptr->low) {
-		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: acked can not be more than low mark: "
-				"pos: %d, acked: %d, low: %d, high: %d, max: %d",
-				pos, m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
-	}
-
 	chunk_entry &entry = m_ptr->entries[pos];
 	if (entry.state != state && state == chunk_entry::STATE_ACKED) {
+		if (m_ptr->acked >= m_ptr->high) {
+			ioremap::elliptics::throw_error(-ERANGE, "invalid ack: acked can not be more than high mark: "
+					"pos: %d, acked: %d, high: %d, max: %d",
+					pos, m_ptr->acked, m_ptr->high, m_ptr->max);
+		}
+
+		if (m_ptr->acked >= m_ptr->low) {
+			ioremap::elliptics::throw_error(-ERANGE, "invalid ack: acked can not be more than low mark: "
+					"pos: %d, acked: %d, low: %d, high: %d, max: %d",
+					pos, m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
+		}
+
 		m_ptr->acked++;
 	} else {
 		LOG_INFO("\tmeta.ack: pos: %d, was already acked", pos, entry.state);
