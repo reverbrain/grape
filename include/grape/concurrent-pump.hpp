@@ -159,7 +159,7 @@ public:
 		size_t count = ids.size();
 		client.exec(context, queue_name + "@ack-multi", serialize(ids))
 				.connect(ioremap::elliptics::async_result<ioremap::elliptics::exec_result_entry>::result_function(),
-					[log, &log_prefix, &count] (const ioremap::elliptics::error_info &error) {
+					[log, log_prefix, count] (const ioremap::elliptics::error_info &error) {
 						if (error) {
 							COCAINE_LOG_ERROR(log, "%s: %ld entries not acked: %s", log_prefix.c_str(), count, error.message().c_str());
 						} else {
