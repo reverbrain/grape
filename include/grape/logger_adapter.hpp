@@ -31,7 +31,12 @@ public:
 	virtual
 	void emit(cocaine::logging::priorities priority,
 			const std::string &message) {
-		base_logger->log(prio_to_dnet_log_level(priority), message.c_str());
+		if (message.back() != '\n') {
+			base_logger->log(prio_to_dnet_log_level(priority), (message + "\n").c_str());
+		}
+		else {
+			base_logger->log(prio_to_dnet_log_level(priority), message.c_str());
+		}
 	}
 
 	virtual
