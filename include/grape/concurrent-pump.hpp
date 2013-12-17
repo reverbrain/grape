@@ -130,6 +130,23 @@ public:
 		base_queue_ack(client, queue_name, context, log, ids, log_prefix);
 	}
 
+	static void queue_ack(ioremap::elliptics::session client,
+			const std::string &queue_name,
+			ioremap::elliptics::exec_context context,
+			const std::vector<data_array::entry> &entries,
+			const std::string& log_prefix = "")
+	{
+		auto log = std::make_shared<logger_adapter>(client.get_node().get_log());
+
+		std::vector<entry_id> entry_ids;
+		std::transform(entries.begin(), entries.end(),
+				std::back_inserter(entry_ids),
+				[] (const data_array::entry &entry) { return entry.entry_id; }
+				);
+
+		base_queue_ack(client, queue_name, context, log, entry_ids, log_prefix);
+	}
+
 	static inline void base_queue_ack(ioremap::elliptics::session client,
 			const std::string &queue_name,
 			ioremap::elliptics::exec_context context,
