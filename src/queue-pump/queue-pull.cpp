@@ -15,9 +15,11 @@ int main(int argc, char** argv)
 
 	options_description elliptics("Elliptics options");
 	elliptics.add_options()
-		("remote,r", value<std::string>(), "remote elliptics node addr to connect to")
+		("remote,r", value<std::string>(), "remote addr to initially connect to")
 		("group,g", value<std::vector<int>>()->multitoken(), "group(s) to connect to")
-		("loglevel", value<int>()->default_value(0), "elliptics node loglevel")
+		("loglevel", value<int>()->default_value(0), "client loglevel")
+		("net-thread-num", value<int>()->default_value(0), "client 'net thread' pool size")
+		("io-thread-num", value<int>()->default_value(0), "client 'io thread' pool size")
 		;
 
 	options_description other("Options");
@@ -61,12 +63,17 @@ int main(int argc, char** argv)
 	std::string logfile = "/dev/stderr";
 
 	int loglevel = args["loglevel"].as<int>();
+	int net_thread_num = args["net-thread-num"].as<int>();
+	int io_thread_num = args["io-thread-num"].as<int>();
 
 	int concurrency = args["concurrency"].as<int>();
 	int request_size = args["request-size"].as<int>();;
 	int limit = args["limit"].as<int>();
 
-	auto clientlib = elliptics_client_state::create(remotes, groups, logfile, loglevel);
+	auto clientlib = elliptics_client_state::create(
+			remotes, groups, logfile, loglevel,
+			0, 0, net_thread_num, io_thread_num
+			);
 
 	const std::string queue_name("queue");
 

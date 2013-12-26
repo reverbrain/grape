@@ -64,6 +64,8 @@ struct elliptics_client_state {
 		std::vector<int> groups;
 		int wait_timeout = 0;
 		int check_timeout = 0;
+		int net_thread_num = 0;
+		int io_thread_num = 0;
 
 		try {
 			{
@@ -90,6 +92,18 @@ struct elliptics_client_state {
 					check_timeout = m->value.GetInt();
 				}
 			}
+			{
+				const auto *m = args.FindMember("net-thread-num");
+				if (m && m->value.IsInt()) {
+					net_thread_num = m->value.GetInt();
+				}
+			}
+			{
+				const auto *m = args.FindMember("io-thread-num");
+				if (m && m->value.IsInt()) {
+					io_thread_num = m->value.GetInt();
+				}
+			}
 
 			const rapidjson::Value &remotesArray = args["remotes"];
 			std::transform(remotesArray.Begin(), remotesArray.End(),
@@ -105,7 +119,7 @@ struct elliptics_client_state {
 			throw configuration_error(e.what());
 		}
 
-		return create(remotes, groups, logfile, loglevel, wait_timeout, check_timeout);
+		return create(remotes, groups, logfile, loglevel, wait_timeout, check_timeout, net_thread_num, io_thread_num);
 	}
 
 	static elliptics_client_state create(const std::string &conf, rapidjson::Document &doc) {
@@ -142,7 +156,8 @@ struct elliptics_client_state {
 
 	static elliptics_client_state create(const std::vector<std::string> &remotes,
 			const std::vector<int> &groups, const std::string &logfile, int loglevel,
-			int wait_timeout = 0, int check_timeout = 0) {
+			int wait_timeout = 0, int check_timeout = 0,
+			int net_thread_num = 0, int io_thread_num = 0) {
 		if (remotes.size() == 0) {
 			throw configuration_error("no remotes have been specified");
 		}
@@ -150,9 +165,18 @@ struct elliptics_client_state {
 			throw configuration_error("no groups have been specified");
 		}
 
+		dnet_config cfg;
+		memset(&cfg, 0, sizeof(cfg));
+		if (net_thread_num) {
+			cfg.net_thread_num = net_thread_num;
+		}
+		if (io_thread_num) {
+			cfg.io_thread_num = io_thread_num;
+		}
+
 		elliptics_client_state result;
 		result.logger.reset(new elliptics::file_logger(logfile.c_str(), loglevel));
-		result.node.reset(new elliptics::node(*result.logger));
+		result.node.reset(new elliptics::node(*result.logger, cfg));
 		result.groups = groups;
 
 		if (wait_timeout != 0 || check_timeout != 0) {
