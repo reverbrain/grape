@@ -50,9 +50,9 @@ void queue::initialize(const std::string &config)
 	memset(&m_statistics, 0, sizeof(m_statistics));
 
 	rapidjson::Document doc;
-	auto client_factory = elliptics_client_state::create(config, doc);
+	m_client_proto = elliptics_client_state::create(config, doc);
 
-	m_reply_client = std::make_shared<elliptics::session>(client_factory.create_session());
+	m_reply_client = std::make_shared<elliptics::session>(m_client_proto.create_session());
 	m_data_client = std::make_shared<elliptics::session>(m_reply_client->clone());
 	m_data_client->set_ioflags(DNET_IO_FLAGS_NOCSUM | DNET_IO_FLAGS_OVERWRITE);
 
