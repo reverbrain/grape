@@ -258,7 +258,7 @@ public:
 	}
 
 	void process_data_array(std::shared_ptr<request> req, ioremap::elliptics::exec_context context, data_array &array) {
-		ioremap::elliptics::data_pointer d = array.data();
+		auto d = ioremap::elliptics::data_pointer::from_raw(array.data());
 		size_t count = array.sizes().size();
 
 		std::vector<entry_id> ack_ids;

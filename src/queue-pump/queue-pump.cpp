@@ -151,7 +151,7 @@ public:
 				);
 
 		auto array = ioremap::grape::deserialize<ioremap::grape::data_array>(context.data());
-		ioremap::elliptics::data_pointer d = array.data();
+		auto d = ioremap::elliptics::data_pointer::from_raw(array.data());
 		size_t count = array.sizes().size();
 
 		// process entries
@@ -259,7 +259,7 @@ int main(int argc, char** argv)
 
 	const std::string queue_name("queue");
 	const int request_size = 100;
-	
+
 	// read queue indefinitely
 	queue_pump pump(clientlib.create_session(), queue_name, request_size);
 	pump.run([] (ioremap::grape::entry_id entry_id, ioremap::elliptics::data_pointer data) -> bool {

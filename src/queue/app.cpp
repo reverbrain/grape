@@ -142,7 +142,7 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 			);
 
 	if (event == "ping") {
-		m_queue->final(response, context, std::string("ok"));
+		m_queue->final(response, context, "ok");
 
 	} else if (event == "push") {
 		ioremap::elliptics::data_pointer d = context.data();
@@ -265,11 +265,11 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 	} else if (event == "clear") {
 		// clear queue content
 		m_queue->clear();
-		m_queue->final(response, context, std::string("ok"));
+		m_queue->final(response, context, "ok");
 
 	} else if (event == "stats-clear") {
 		m_queue->clear_counters();
-		m_queue->final(response, context, std::string("ok"));
+		m_queue->final(response, context, "ok");
 
 	} else if (event == "stats") {
 		rapidjson::StringBuffer stream;
@@ -320,10 +320,7 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 
 		root.Accept(writer);
 
-		std::string text;
-		text.assign(stream.GetString(), stream.GetSize());
-
-		m_queue->final(response, context, text);
+		m_queue->final(response, context, ioremap::elliptics::data_pointer::from_raw(const_cast<char*>(stream.GetString()), stream.GetSize()));
 
 	} else {
 		std::string msg = event + ": unknown event";

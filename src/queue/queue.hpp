@@ -56,9 +56,9 @@ class queue {
 		void clear();
 
 		void reply(cocaine::framework::response_ptr response, const ioremap::elliptics::exec_context &context,
-				const ioremap::elliptics::data_pointer &d,
+				const ioremap::elliptics::argument_data &d,
 				ioremap::elliptics::exec_context::final_state state);
-		void final(cocaine::framework::response_ptr response, const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d);
+		void final(cocaine::framework::response_ptr response, const ioremap::elliptics::exec_context &context, const ioremap::elliptics::argument_data &d);
 
 		const std::string &queue_id() const;
 		const queue_state &state();

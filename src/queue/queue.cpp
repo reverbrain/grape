@@ -476,7 +476,7 @@ void queue::ack(const std::vector<entry_id> &ids)
 }
 
 void queue::reply(cocaine::framework::response_ptr response, const ioremap::elliptics::exec_context &context,
-		const ioremap::elliptics::data_pointer &d, ioremap::elliptics::exec_context::final_state state)
+		const ioremap::elliptics::argument_data &d, ioremap::elliptics::exec_context::final_state state)
 {
 	m_reply_client->reply(context, d, state).connect(
 		ioremap::elliptics::async_reply_result::result_function(),
@@ -490,7 +490,7 @@ void queue::reply(cocaine::framework::response_ptr response, const ioremap::elli
 	);
 }
 
-void queue::final(cocaine::framework::response_ptr response, const ioremap::elliptics::exec_context &context, const ioremap::elliptics::data_pointer &d)
+void queue::final(cocaine::framework::response_ptr response, const ioremap::elliptics::exec_context &context, const ioremap::elliptics::argument_data &d)
 {
 	reply(response, context, d, ioremap::elliptics::exec_context::final);
 }
