@@ -7,25 +7,19 @@ import elliptics
 from nodes import connect, node_id
 import prettytable
 
-def get_app_worker_count(s, id, app):
-    result = s.exec_event(id, '%s@info' % (app), '').get()[0]
-    info = json.loads(str(result.context.data))
-    return info['slaves']['capacity']
+# def get_app_worker_count(s, id, app):
+#     result = s.exec_(id, '%s@info' % (app), '').get()[0]
+#     info = json.loads(str(result.context.data))
+#     return info['slaves']['capacity']
 
 def app_worker_info(s, app):
     result = []
-    for id, addr in s.routes.routes[:-1]:
-        worker_count = get_app_worker_count(s, id, app)
+    for i in s.exec_(None, '%s@info' % (app)).get():
+        info = json.loads(i.context.data)
+        worker_count = info['slaves']['capacity']
         for worker in range(worker_count):
-            result.append((addr, id, worker))
+            result.append((i.context.address, i.context.src_id, worker))
     return result
-
-# Exec on single worker with dnet_ioclient:
-#import subprocess, shlex
-#cmd = './dnet_ioclient -r %s:2 -g %d -k %d -q -c queue@stats -I%s' % (
-#        ip, id.group_id, worker, str(id)
-#        )
-#result = subprocess.check_output(shlex.split(cmd))
 
 def exec_on_all_workers(s, event, data=None, ordered=True):
     app, command = event.split('@')
@@ -37,7 +31,7 @@ def exec_on_all_workers(s, event, data=None, ordered=True):
 
     asyncs = []
     for addr, direct_id, worker in worker_info:
-        asyncs.append((s.exec_event(direct_id, src_key=worker, event=event, data=data or ''), addr, worker))
+        asyncs.append((s.exec_(direct_id, src_key=worker, event=event, data=data or ''), addr, worker))
 
     results = []
     for async_result, addr, worker in asyncs:
@@ -64,7 +58,7 @@ def select_stats(stats, names):
 
 def accumulate(*args):
     raw = [i[1] for i in args]
-    return args[0][0], sum(raw), raw 
+    return args[0][0], sum(raw), raw
 
 def summarize(stats):
     return stats and imap(accumulate, *stats)
@@ -81,16 +75,17 @@ def pass_raw(stats):
         raw = [i[1] for i in args]
         return args[0][0], None, raw
     return stats and imap(none, *stats)
-    
+
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--remote', help='address of seed node')
-    parser.add_argument('-g', '--group', help='elliptics group')
+    parser.add_argument('-g', '--group', type=int, help='elliptics group')
+    parser.add_argument('--loglevel', type=int, choices=xrange(5), default=1)
     args = parser.parse_args()
 
-    session = connect([args.remote], [int(args.group)])
+    session = connect([args.remote], [args.group], loglevel=args.loglevel)
     stats = get_stats(session)
 
 
@@ -118,7 +113,7 @@ if __name__ == '__main__':
         x = None
         for name, proc in attrs:
             for name, acc, raw in proc(select_stats(stats, [name])):
-	        #print '%s\t= %r\t: %r' % (name, acc, raw)
+                #print '%s\t= %r\t: %r' % (name, acc, raw)
                 if firsttime:
                     x = prettytable.PrettyTable(['Name', 'Aggregate'] + ['Sub'] * len(raw))
                     x.aligns = ['l', 'r'] + ['r'] * len(raw)
@@ -135,7 +130,7 @@ if __name__ == '__main__':
 #        for name, acc, raw in sorted(proc(select_stats(stats, ATTRS)), key=lambda x: x[0]):
 #            print '%s\t= %r\t: %r' % (name, acc, raw)
 #
-#    print_attrs(summarize, 
+#    print_attrs(summarize,
 #    for name, acc, raw in sorted(average(stats, ['push.time', 'pop.time', 'ack.time']):
 #        print '%s\t= %r\t: %r' % (name, acc, raw)
 #
