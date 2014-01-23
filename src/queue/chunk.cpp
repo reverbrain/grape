@@ -5,8 +5,6 @@ extern std::shared_ptr<cocaine::framework::logger_t> grape_queue_module_get_logg
 #define LOG_ERROR(...) COCAINE_LOG_ERROR(grape_queue_module_get_logger(), __VA_ARGS__)
 #define LOG_DEBUG(...) COCAINE_LOG_DEBUG(grape_queue_module_get_logger(), __VA_ARGS__)
 
-const int STATE_ACKED = 1;
-
 ioremap::grape::chunk_meta::chunk_meta(int max)
 	: m_ptr(NULL)
 {
@@ -68,20 +66,20 @@ bool ioremap::grape::chunk_meta::ack(int32_t pos, int state)
 				pos, m_ptr->acked, m_ptr->high, m_ptr->max);
 	}
 
-	if (m_ptr->acked >= m_ptr->high) {
-		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: acked can not be more than high mark: "
-				"pos: %d, acked: %d, high: %d, max: %d",
-				pos, m_ptr->acked, m_ptr->high, m_ptr->max);
-	}
-
-	if (m_ptr->acked >= m_ptr->low) {
-		ioremap::elliptics::throw_error(-ERANGE, "invalid ack: acked can not be more than low mark: "
-				"pos: %d, acked: %d, low: %d, high: %d, max: %d",
-				pos, m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
-	}
-
 	chunk_entry &entry = m_ptr->entries[pos];
-	if (entry.state != state && state == STATE_ACKED) {
+	if (entry.state != state && state == chunk_entry::STATE_ACKED) {
+		if (m_ptr->acked >= m_ptr->high) {
+			ioremap::elliptics::throw_error(-ERANGE, "invalid ack: acked can not be more than high mark: "
+					"pos: %d, acked: %d, high: %d, max: %d",
+					pos, m_ptr->acked, m_ptr->high, m_ptr->max);
+		}
+
+		if (m_ptr->acked >= m_ptr->low) {
+			ioremap::elliptics::throw_error(-ERANGE, "invalid ack: acked can not be more than low mark: "
+					"pos: %d, acked: %d, low: %d, high: %d, max: %d",
+					pos, m_ptr->acked, m_ptr->low, m_ptr->high, m_ptr->max);
+		}
+
 		m_ptr->acked++;
 	} else {
 		LOG_INFO("\tmeta.ack: pos: %d, was already acked", pos, entry.state);
@@ -451,7 +449,7 @@ bool ioremap::grape::chunk::push(const ioremap::elliptics::data_pointer &d)
 bool ioremap::grape::chunk::ack(int pos, bool write)
 {
 	//FIXME: check if pos < low < high
-	m_meta.ack(pos, STATE_ACKED);
+	m_meta.ack(pos, chunk_entry::STATE_ACKED);
 	if (write) {
 		write_meta();
 	}

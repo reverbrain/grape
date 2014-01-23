@@ -79,8 +79,9 @@ int main(int argc, char** argv)
 
 	if (args.count("bulk-mode")) {
 		int counter = 0;
-		bulk_queue_reader pump(clientlib.create_session(), queue_name, request_size, concurrency);
-		pump.run([&limit, &counter] (ioremap::elliptics::exec_context context, ioremap::grape::data_array array) -> int {
+		auto session = clientlib.create_session();
+		bulk_queue_reader pump(session, queue_name, request_size, concurrency);
+		pump.run([&limit, &counter, &session, &queue_name] (ioremap::elliptics::exec_context context, ioremap::grape::data_array array) -> int {
 			fprintf(stderr, "processing %ld entries\n", array.sizes().size());
 			if (limit > 0) {
 				counter += array.sizes().size();
@@ -89,7 +90,10 @@ int main(int argc, char** argv)
 			if (limit > 0 && counter >= limit) {
 				result = bulk_queue_reader::REQUEST_STOP;
 			}
-			result |= bulk_queue_reader::REQUEST_ACK;
+
+			std::vector<ioremap::grape::data_array::entry> entries(array.begin(), array.end());
+			ioremap::grape::bulk_queue_reader::queue_ack(session, queue_name, context, entries);
+
 			return result;
 		});
 
