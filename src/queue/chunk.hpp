@@ -127,11 +127,8 @@ struct replay_iterator : public iterator {
 		state.byte_offset += size;
 	}
 	void skip_acked() {
-		while (meta[state.entry_index].state == 1) {
+		while (!at_end() && meta[state.entry_index].state == chunk_entry::STATE_ACKED) {
 			step();
-			if (at_end()) {
-				break;
-			}
 		}
 	}
 
@@ -141,10 +138,7 @@ struct replay_iterator : public iterator {
 		skip_acked();
 	}
 	virtual void advance() {
-		//XXX: at_end() guard could be removed?
-		if (!at_end()) {
-			step();
-		}
+		step();
 		skip_acked();
 	}
 	virtual bool at_end() {

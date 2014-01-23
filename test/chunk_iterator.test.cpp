@@ -12,10 +12,11 @@
 #include <grape/logger_adapter.hpp>
 #include "src/queue/chunk.hpp"
 
+const int meta_size = 100;
+
 class ChunkIterator : public ::testing::Test {
 public:
-	static const int meta_size = 100;
-	static const int max_chunk_size = 1000;
+	static const int max_entry_size = 1000;
 	ioremap::grape::chunk_meta meta;
 	ioremap::grape::iteration state;
 
@@ -32,7 +33,7 @@ public:
 
 		chunk_sizes.resize(meta_size);
 		for (int i = 0; i < meta_size; ++i) {
-			chunk_sizes[i] = (rand() % max_chunk_size) + 1;
+			chunk_sizes[i] = (rand() % max_entry_size) + 1;
 		}
 
 		for (int i = 0; i < meta_size; ++i) {
@@ -48,6 +49,8 @@ TEST_F(ChunkIterator, CheckForwardIteratorPassesMeta) {
 		ASSERT_EQ(state.byte_offset, meta.byte_offset(state.entry_index));
 		ASSERT_EQ(chunk_sizes[state.entry_index], meta[state.entry_index].size);
 	}
+
+	ASSERT_EQ(state.entry_index, meta_size);
 }
 
 TEST_F(ChunkIterator, CheckForwardIteratorReusesState) {
@@ -60,6 +63,7 @@ TEST_F(ChunkIterator, CheckForwardIteratorReusesState) {
 		ASSERT_EQ(passed_count, state.entry_index);
 
 		if (forward_iter.at_end()) {
+			ASSERT_EQ(state.entry_index, meta_size);
 			break;
 		}
 
@@ -76,6 +80,7 @@ TEST_F(ChunkIterator, CheckForwardIteratorReusesState) {
 TEST_F(ChunkIterator, CheckReplayIteratorIsAtEndOnEmptyMeta) {
 	ioremap::grape::replay_iterator replay_iter(state, meta);
 
+	ASSERT_EQ(state.entry_index, 0);
 	ASSERT_TRUE(replay_iter.at_end());
 }
 
@@ -88,6 +93,28 @@ TEST_F(ChunkIterator, CheckReplayIteratorIsAtEndOnCompleteMeta) {
 	ioremap::grape::replay_iterator replay_iter(state, meta);
 	replay_iter.begin();
 	ASSERT_TRUE(replay_iter.at_end());
+	ASSERT_EQ(state.entry_index, meta_size);
+}
+
+TEST_F(ChunkIterator, CheckReplayIteratorStopsOnUnackedEntry) {
+	const int acked_entry_count = meta_size / 2;
+	const int nonacked_entry_count = 5;
+	for (int i = 0; i < acked_entry_count; ++i) {
+		meta.pop();
+		meta.ack(i, ioremap::grape::chunk_entry::STATE_ACKED);
+	}
+	for (int i = 0; i < nonacked_entry_count; ++i) {
+		meta.pop();
+	}
+
+	ioremap::grape::replay_iterator replay_iter(state, meta);
+	replay_iter.begin();
+	ASSERT_EQ(state.entry_index, acked_entry_count);
+	while (!replay_iter.at_end()) {
+		replay_iter.advance();
+	}
+	ASSERT_TRUE(replay_iter.at_end());
+	ASSERT_EQ(state.entry_index, acked_entry_count + nonacked_entry_count);
 }
 
 TEST_F(ChunkIterator, CheckReplayIteratorPassesExhausted) {
@@ -98,15 +125,19 @@ TEST_F(ChunkIterator, CheckReplayIteratorPassesExhausted) {
 	ioremap::grape::replay_iterator replay_iter(state, meta);
 
 	int passed_count = 0;
-	for (replay_iter.begin(); !replay_iter.at_end(); replay_iter.advance()) {
+	replay_iter.begin();
+	while(!replay_iter.at_end()) {
 		ASSERT_EQ(passed_count, state.entry_index);
 		ASSERT_EQ(state.byte_offset, meta.byte_offset(state.entry_index));
 		ASSERT_EQ(chunk_sizes[passed_count], meta[state.entry_index].size);
 		++passed_count;
+		replay_iter.advance();
 	}
 
 	int expect_passed = meta_size;
 	ASSERT_EQ(passed_count, expect_passed);
+
+	ASSERT_EQ(state.entry_index, meta_size);
 	ASSERT_EQ(state.entry_index, meta.low_mark());
 }
 
@@ -159,3 +190,4 @@ TEST_F(ChunkIterator, CheckForwardAndReplayIteratorsWorkTogether) {
 	int expect_passed = meta_size;
 	ASSERT_EQ(expect_passed, passed_count);
 }
+
