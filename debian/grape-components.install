@@ -1,1 +1,1 @@
-usr/lib/grape/*
+usr/lib/grape/{queue,testerhead-cpp}

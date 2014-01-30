@@ -31,8 +31,6 @@ set(GRAPE_COMMON_LIBRARIES
   ${Boost_THREAD_LIBRARY}
 )
 
-install(DIRECTORY include/ DESTINATION include)
-
 include_directories(${PROJECT_SOURCE_DIR}/include ${elliptics_INCLUDE_DIRS} ${CocaineNative_INCLUDE_DIRS} ${LIBEV_INCLUDE_DIRS})
 
 add_subdirectory(src/data_array)
@@ -42,10 +40,13 @@ add_subdirectory(src/queue-pump)
 add_subdirectory(src/testerhead-cpp)
 
 #add_subdirectory(example)
+add_subdirectory(launchpad)
 
 # testing
 enable_testing()
 add_subdirectory(test)
+
+install(DIRECTORY include/ DESTINATION include)
 
 #set(ARCHIVE_NAME ${CMAKE_PROJECT_NAME})
 #add_custom_target(dist
