@@ -7,19 +7,32 @@ import elliptics
 from nodes import connect, node_id
 import prettytable
 
-# def get_app_worker_count(s, id, app):
-#     result = s.exec_(id, '%s@info' % (app), '').get()[0]
-#     info = json.loads(str(result.context.data))
-#     return info['slaves']['capacity']
+def get_app_worker_count(s, key, app):
+    result = s.exec_(key, '%s@info' % (app), '').get()[0]
+    info = json.loads(str(result.context.data))
+    return info['slaves']['capacity']
 
+#NOTE: manually sends separate commands to each node
 def app_worker_info(s, app):
     result = []
-    for i in s.exec_(None, '%s@info' % (app)).get():
-        info = json.loads(i.context.data)
-        worker_count = info['slaves']['capacity']
+    for addr, key in s.routes.addresses_with_id():
+        worker_count = get_app_worker_count(s, key, app)
         for worker in range(worker_count):
-            result.append((i.context.address, i.context.src_id, worker))
+            result.append((addr, key, worker))
     return result
+
+#NOTE: fanout sending using key=None
+#FIXME: still does not work: context.src_id is empty, address is broken
+#def app_worker_info(s, app):
+#    result = []
+#    for i in s.exec_(None, '%s@info' % (app)).get():
+#        c = i.context
+#        print i.address, c.src_id, c.src_key
+#        info = json.loads(i.context.data)
+#        worker_count = info['slaves']['capacity']
+#        for worker in range(worker_count):
+#            result.append((i.context.address, i.context.src_id, worker))
+#    return result
 
 def exec_on_all_workers(s, event, data=None, ordered=True):
     app, command = event.split('@')
@@ -123,17 +136,4 @@ if __name__ == '__main__':
             x.printt(border=False)
 
     print_attrs(stats, ATTRS)
-
-#        for name, acc, raw in proc(select_stats(stats, ATTRS)):
-#            print '%s\t= %r\t: %r' % (name, acc, raw)
-#
-#        for name, acc, raw in sorted(proc(select_stats(stats, ATTRS)), key=lambda x: x[0]):
-#            print '%s\t= %r\t: %r' % (name, acc, raw)
-#
-#    print_attrs(summarize,
-#    for name, acc, raw in sorted(average(stats, ['push.time', 'pop.time', 'ack.time']):
-#        print '%s\t= %r\t: %r' % (name, acc, raw)
-#
-#    for name, raw in select(stats, ['high-id', 'low-id', 'queue-id']):
-#        print '%s\t= %r\t: %r' % (name, acc, raw)
 
