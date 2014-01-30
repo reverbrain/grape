@@ -1,0 +1,52 @@
+#!/bin/bash
+
+DIR=$(dirname $(readlink -f $0))
+
+REMOTE_HOST=bscoll08.rt.bstest.yandex.net
+REMOTE=$REMOTE_HOST:1030:2
+LOCATOR_PORT=10060
+GROUP=4
+
+DIOC="dnet_ioclient -r $REMOTE -g $GROUP"
+
+APP=testerhead-cpp
+
+APPMANIFEST=${APPMANIFEST:-/etc/elliptics/apps/$APP.conf}
+APPPROFILE=${APPPROFILE:-/etc/elliptics/apps/$APP.profile}
+
+pack() {
+    TARFILE=$1/$APP.tar
+    tar -C $2 -cvf $TARFILE $APP
+    tar -C $(dirname $APPMANIFEST) -rvf $TARFILE $(basename $APPMANIFEST)
+    rm -f $TARFILE.bz2
+    bzip2 $TARFILE
+}
+
+case $1 in
+    pack-dev)
+        pack $DIR $DIR/../grape/build-debug/src/testerhead-cpp
+        ;;
+    pack)
+        pack $DIR /usr/lib/grape
+        ;;
+    upload)
+        cocaine-tool app upload --host $REMOTE_HOST --port $LOCATOR_PORT -n $APP --manifest $APPMANIFEST --package $APP.tar.bz2
+        cocaine-tool profile upload --host $REMOTE_HOST --port $LOCATOR_PORT -n $APP --profile $APPPROFILE
+        ;;
+    start)
+       $DIOC -c "$APP@start-task"
+        ;;
+    stop)
+        $DIOC -c "$APP@stop-task"
+        ;;
+    info)
+        $DIOC -c "$APP@info"
+        ;;
+    ping)
+        $DIOC -c "$APP@ping"
+        echo
+        ;;
+    *)  
+        echo "usage: $(basename $0) {pack|upload|start|stop|info}" ;;
+esac
+#exit 0
