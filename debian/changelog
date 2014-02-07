@@ -1,9 +1,9 @@
-grape (0.7.9+elliptics2.24.13.5) unstable; urgency=low
+grape (0.7.9+lts) unstable; urgency=low
 
   * chunk: fixed replay_iterator meta's end checking
   * included launchpad scripts to the grape package
 
- -- Ivan Chelubeev <ijon@yandex-team.ru>  Thu, 30 Jan 2014 20:45:40 +0400
+ -- Ivan Chelubeev <ijon@yandex-team.ru>  Fri, 07 Feb 2014 18:42:39 +0400
 
 grape (0.7.8+elliptics2.24.13.5) unstable; urgency=low
 
