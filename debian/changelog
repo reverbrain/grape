@@ -1,3 +1,10 @@
+grape (0.7.9+elliptics2.24.13.5) unstable; urgency=low
+
+  * chunk: fixed replay_iterator meta's end checking
+  * included launchpad scripts to the grape package
+
+ -- Ivan Chelubeev <ijon@yandex-team.ru>  Thu, 30 Jan 2014 20:45:40 +0400
+
 grape (0.7.8+elliptics2.24.13.5) unstable; urgency=low
 
   * elliptics_client_state: added {net,io}-thread-num support
