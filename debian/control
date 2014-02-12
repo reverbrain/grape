@@ -5,14 +5,14 @@ Maintainer: Ivan Chelyubeev <ijon@yandex-team.ru>
 Build-Depends: debhelper (>= 7),
 		cmake,
 		cdbs,
-		elliptics-dev (>> 2.24.13.4),
-		elliptics-client (>> 2.24.13.4),
-		cocaine-framework-native-dev (>= 0.10.4-2),
-		libcocaine-dev (>= 0.10.5-17),
+		elliptics-dev (>= 2.24.15.2), elliptics-dev (<< 2.25),
+		elliptics-client (>= 2.24.15.2), elliptics-client (<< 2.25),
+		cocaine-framework-native-dev (>= 0.11), cocaine-framework-native-dev (<< 0.12),
+		libcocaine-dev (>= 0.11), libcocaine-dev (<< 0.12),
 		libboost-dev,
 		libboost-system-dev,
 		libboost-program-options-dev,
-        libgtest-dev,
+		libgtest-dev,
 Standards-Version: 3.8.0
 Homepage: https://github.com/reverbrain/grape
 Vcs-Git: git://github.com/reverbrain/grape.git
@@ -20,7 +20,7 @@ Vcs-Browser: https://github.com/reverbrain/grape
 
 Package: grape
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, python-prettytable
 Description: Realtime pipeline processing engine
 
 #Package: grape-dbg
@@ -37,13 +37,13 @@ Description: Realtime pipeline processing engine (includes)
 
 Package: libcocaine-plugin-queue-driver
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, elliptics-client (>> 2.24.13.4), grape (= ${binary:Version})
+Depends: ${shlibs:Depends}, ${misc:Depends}, elliptics-client (>= 2.24.15.2), elliptics-client (<< 2.25), grape (= ${binary:Version})
 Description: Grape queue driver (cocaine plugin)
  Grape queue driver runs as a cocaine plugin and can be turned on for applications,
  which want to pop events from persistent queue (application named 'queue')
 
 Package: grape-components
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, grape (= ${binary:Version}), cocaine-framework-native (>= 0.10.4-2)
+Depends: ${shlibs:Depends}, ${misc:Depends}, grape (= ${binary:Version}), cocaine-framework-native (>= 0.11), cocaine-framework-native (<< 0.12)
 Description: Grape queue and other components (cocaine apps)
  Grape queue and other component apps
