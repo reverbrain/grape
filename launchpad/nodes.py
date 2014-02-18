@@ -5,7 +5,7 @@ import sys
 sys.path.append('bindings/python/')
 import elliptics
 
-class PassthrowWrapper(object):
+class PassthroughWrapper(object):
     ''' Wrapper to assure session/node destroy sequence: session first, node last '''
     def __init__(self, node, session):
         self.node = node
@@ -51,7 +51,7 @@ def connect(endpoints, groups, **kw):
 
 	s = elliptics.Session(n)
 	s.add_groups(groups)
-	return PassthrowWrapper(n, s)
+	return PassthroughWrapper(n, s)
 
 def node_id_map(routes):
 	return dict([(i[1], i[0]) for i in routes])
