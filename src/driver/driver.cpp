@@ -92,6 +92,11 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 	// rate control
 	, m_request_timer(reactor.native())
 	, m_rate_control_timer(reactor.native())
+	, m_rate_focus_backoff(args.get("rate-focus-backoff", 0.9f).asDouble())
+	, m_request_speed_backoff(args.get("request-speed-backoff", 0.8f).asDouble())
+	, m_delay_safe_interval(args.get("delay-safe-interval", 0.05f).asDouble())
+	, m_initial_growth_time(args.get("initial-growth-time", 5.0f).asDouble())
+	, m_exponential_factor(args.get("exponential-factor", 1.0f).asDouble())
 	, last_process_done_time(0)
 	, processed_time(0)
 	, process_count(0)
@@ -222,25 +227,25 @@ void queue_driver::on_rate_control_timer_event(ev::timer &, int)
 
 	if (rate_focus == 0) {
 		rate_focus = (m_initial_rate_boost > 0.0 ? m_initial_rate_boost : process_speed * 0.5);
-		growth_time = 5.0;
+		growth_time = m_initial_growth_time;
 	}
 
-	const double C = 1.0; //0.4;
+	const double C = m_exponential_factor;
 
 	double projected_request_speed = 1.0;
-	if (delta > -0.05) {
+	if (delta > -m_delay_safe_interval) {
 		projected_request_speed = rate_focus + C * pow(growth_step - growth_time, 3);
 		++growth_step;
 	} else {
 		growth_step = 0;
 		if ((rate_focus - receive_speed) >= 0.0) {
-			rate_focus = receive_speed * 0.9;
+			rate_focus = receive_speed * m_rate_focus_backoff;
 			growth_time = cbrt((receive_speed - rate_focus) / C);
 		} else {
 			rate_focus = std::min(receive_speed, process_speed);
 			growth_time = 0.0;
 		}
-		projected_request_speed = receive_speed * 0.8;
+		projected_request_speed = receive_speed * m_request_speed_backoff;
 	}
 
 	projected_request_speed = std::max(1.0, projected_request_speed);

@@ -117,6 +117,12 @@ class queue_driver: public api::driver_t {
 		ev::timer m_request_timer;
 		ev::timer m_rate_control_timer;
 
+		double m_rate_focus_backoff;
+		double m_request_speed_backoff;
+		double m_delay_safe_interval;
+		double m_initial_growth_time;
+		double m_exponential_factor;
+
 		std::atomic<uint64_t> last_process_done_time; // in microseconds
 		std::atomic<uint64_t> processed_time; // in microseconds
 		std::atomic<int> process_count;
