@@ -8,7 +8,7 @@ from nodes import connect, node_id
 import prettytable
 
 def get_app_worker_count(s, key, app):
-    result = s.exec_(key, '%s@info' % (app), '').get()[0]
+    result = s.exec_(key, event='%s@info' % (app)).get()[0]
     info = json.loads(str(result.context.data))
     return info['slaves']['capacity']
 
