@@ -14,10 +14,12 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('remote', help='address of seed node')
 	parser.add_argument('id', help='hexadecimal id (or prefix of) to lookup responsible host for')
+	parser.add_argument('-g', '--group', type=int, help='elliptics group')
+	parser.add_argument('--loglevel', type=int, choices=xrange(5), default=1)
 	parser.add_argument('--verbose', '-v', action='count')
+	parser.set_defaults(group=1)
 	args = parser.parse_args()
 
-	remote = args.remote
 	# supplement id to even number of chars
 	# (as hex form must represent whole number bytes)
 	if len(args.id) % 2 != 0:
@@ -28,7 +30,9 @@ if __name__ == '__main__':
 		print 'Invalid id:', e
 		exit(1)
 
-	session = connect([remote], [1])
+	session = connect([args.remote], [args.group],
+			loglevel=args.loglevel,
+			)
 
 	routing_table = session.get_routes()
 	sorted_ids = sorted(routing_table, key=lambda x: x[0].id)

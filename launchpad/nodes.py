@@ -51,6 +51,7 @@ def connect(endpoints, groups, **kw):
 
 	s = elliptics.Session(n)
 	s.add_groups(groups)
+	#XXX: Is it time to drop PassthroughWrapper binder?
 	return PassthroughWrapper(n, s)
 
 def node_id_map(routes):
