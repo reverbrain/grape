@@ -9,7 +9,7 @@ target_link_libraries(testerhead-cpp
 )
 
 install(TARGETS testerhead-cpp
-    RUNTIME DESTINATION lib/grape
+    RUNTIME DESTINATION lib${LIB_SUFFIX}/grape
     COMPONENT runtime
 )
 

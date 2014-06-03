@@ -8,6 +8,6 @@ add_executable(queue-pull queue-pull.cpp)
 target_link_libraries(queue-pull grape_data_array boost_program_options ${GRAPE_COMMON_LIBRARIES})
 
 install(TARGETS queue-push queue-pull
-    RUNTIME DESTINATION lib/grape/launchpad
+    RUNTIME DESTINATION lib${LIB_SUFFIX}/grape/launchpad
     COMPONENT runtime
 )

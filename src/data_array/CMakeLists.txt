@@ -7,5 +7,5 @@ set_target_properties(grape_data_array PROPERTIES
 )
 
 install(TARGETS grape_data_array
-	LIBRARY DESTINATION lib
+	LIBRARY DESTINATION lib${LIB_SUFFIX}
 )
