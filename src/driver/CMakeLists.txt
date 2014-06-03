@@ -13,6 +13,6 @@ target_link_libraries(queue-driver
 )
 
 install(TARGETS queue-driver
-	LIBRARY DESTINATION lib/cocaine
+	LIBRARY DESTINATION lib${LIB_SUFFIX}/cocaine
 	COMPONENT runtime
 )

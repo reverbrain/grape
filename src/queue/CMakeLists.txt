@@ -8,6 +8,6 @@ set_target_properties(queue-app PROPERTIES
 target_link_libraries(queue-app queue ${GRAPE_COMMON_LIBRARIES} rt)
 
 install(TARGETS queue-app
-    RUNTIME DESTINATION lib/grape
+    RUNTIME DESTINATION lib${LIB_SUFFIX}/grape
     COMPONENT runtime
 )

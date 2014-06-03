@@ -1,4 +1,4 @@
-install(DIRECTORY . DESTINATION lib/grape/launchpad
+install(DIRECTORY . DESTINATION lib${LIB_SUFFIX}/grape/launchpad
     COMPONENT runtime
     USE_SOURCE_PERMISSIONS
     PATTERN "*.pyc" EXCLUDE
