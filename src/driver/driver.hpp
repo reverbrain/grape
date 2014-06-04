@@ -105,6 +105,7 @@ class queue_driver: public api::driver_t {
 
 		const std::string m_queue_name;
 		std::string m_worker_event;
+		std::string m_event_name;
 		const std::string m_queue_pop_event;
 
 		const double m_timeout;

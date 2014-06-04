@@ -104,18 +104,18 @@ queue_app_context::queue_app_context(cocaine::framework::dispatch_t& dispatch)
 	COCAINE_LOG_INFO(m_log, "%s: queue has been successfully configured", m_id.c_str());
 
 	// register event handlers
-	dispatch.on("queue@ping", this, &queue_app_context::process);
-	dispatch.on("queue@push", this, &queue_app_context::process);
-	dispatch.on("queue@pop-multi", this, &queue_app_context::process);
-	dispatch.on("queue@pop-multiple-string", this, &queue_app_context::process);
-	dispatch.on("queue@pop", this, &queue_app_context::process);
-	dispatch.on("queue@peek", this, &queue_app_context::process);
-	dispatch.on("queue@peek-multi", this, &queue_app_context::process);
-	dispatch.on("queue@ack", this, &queue_app_context::process);
-	dispatch.on("queue@ack-multi", this, &queue_app_context::process);
-	dispatch.on("queue@clear", this, &queue_app_context::process);
-	dispatch.on("queue@stats-clear", this, &queue_app_context::process);
-	dispatch.on("queue@stats", this, &queue_app_context::process);
+	dispatch.on("ping", this, &queue_app_context::process);
+	dispatch.on("push", this, &queue_app_context::process);
+	dispatch.on("pop-multi", this, &queue_app_context::process);
+	dispatch.on("pop-multiple-string", this, &queue_app_context::process);
+	dispatch.on("pop", this, &queue_app_context::process);
+	dispatch.on("peek", this, &queue_app_context::process);
+	dispatch.on("peek-multi", this, &queue_app_context::process);
+	dispatch.on("ack", this, &queue_app_context::process);
+	dispatch.on("ack-multi", this, &queue_app_context::process);
+	dispatch.on("clear", this, &queue_app_context::process);
+	dispatch.on("stats-clear", this, &queue_app_context::process);
+	dispatch.on("stats", this, &queue_app_context::process);
 }
 
 queue_app_context::~queue_app_context()
@@ -126,13 +126,7 @@ void queue_app_context::process(const std::string &cocaine_event, const std::vec
 {
 	ioremap::elliptics::exec_context context = ioremap::elliptics::exec_context::from_raw(chunks[0].c_str(), chunks[0].size());
 
-	std::string app;
-	std::string event;
-	{
-		char *p = strchr((char*)context.event().c_str(), '@');
-		app.assign(context.event().c_str(), p - context.event().c_str());
-		event.assign(p + 1);
-	}
+	const std::string &event = cocaine_event;
 
 	const std::string action_id = cocaine::format("%s %d, %s", dnet_dump_id_str(context.src_id()->id), context.src_key(), m_id.c_str());
 
