@@ -136,7 +136,7 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 			throw configuration_error("worker-emit-event: must contain '@' character");
 
 		std::string app_name(m_worker_event.c_str(), ptr - m_worker_event.c_str());
-		std::string event_name(ptr+1);
+		m_event_name = (ptr+1);
 
 		auto storage = cocaine::api::storage(context, "core");
 		Json::Value profile = storage->get<Json::Value>("profiles", app_name);
@@ -402,7 +402,7 @@ bool queue_driver::enqueue_data(const ioremap::elliptics::exec_context &context)
 		ioremap::elliptics::data_pointer packet = context.native_data();
 		api::policy_t policy(false, m_timeout, m_deadline);
 		auto downstream = std::make_shared<downstream_t>(this);
-		auto upstream = m_app.enqueue(api::event_t(m_worker_event, policy), downstream);
+		auto upstream = m_app.enqueue(api::event_t(m_event_name, policy), downstream);
 		upstream->write((char *)packet.data(), packet.size());
 
 		return true;
