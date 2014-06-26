@@ -33,7 +33,12 @@
 
 #include "cocaine-json-trait.hpp"
 
+//XXX: work around rapidjson's filth
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #include "grape/rapidjson/document.h"
+#pragma GCC diagnostic pop
 
 #include <grape/data_array.hpp>
 #include <grape/entry_id.hpp>
@@ -46,11 +51,11 @@ const int MICROSECONDS_IN_SECOND = 1000000;
 
 inline uint64_t microseconds(double seconds) {
 	return uint64_t(seconds * MICROSECONDS_IN_SECOND);
-} 
+}
 
 inline double seconds(uint64_t microseconds) {
 	return double(microseconds) / MICROSECONDS_IN_SECOND;
-} 
+}
 
 inline uint64_t microseconds_now() {
 	timespec t;
@@ -110,7 +115,7 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 		m_client = elliptics_client_state::create(doc);
 
 		//TODO: remove extra code with queue-groups: driver doesn't need group set override
-		// 
+		//
 		std::string groups_key = "groups";
 		if (doc.HasMember("queue-groups"))
 			groups_key = "queue-groups";
@@ -140,7 +145,7 @@ queue_driver::queue_driver(cocaine::context_t& context, cocaine::io::reactor_t &
 
 		auto storage = cocaine::api::storage(context, "core");
 		Json::Value profile = storage->get<Json::Value>("profiles", app_name);
-		
+
 		int queue_limit = profile["queue-limit"].asInt();
 
 		m_queue_length_max = queue_limit * 9 / 10;
@@ -250,7 +255,7 @@ void queue_driver::on_rate_control_timer_event(ev::timer &, int)
 	// Setting request timer to new interval.
 	// Timer will fire first time immediately, it is important
 	// so that even with borderline speed of 1 rps there will be at least
-	// one request made between calibration points  
+	// one request made between calibration points
 	double request_interval_seconds = STAT_INTERVAL / projected_request_speed;
 	m_request_timer.stop();
 	last_request_time = microseconds_now();
@@ -421,9 +426,9 @@ void queue_driver::on_worker_complete(uint64_t start_time, bool success)
 	queue_dec(1);
 
 	// Measure time between consecutive completions to get an estimation on
-	// worker's possible processing speed.   
+	// worker's possible processing speed.
 	// Take into account successful processings only, to slow things down
-	// if there is something wrong between driver and a workers 
+	// if there is something wrong between driver and a workers
 
 	if (success) {
 		++process_count;

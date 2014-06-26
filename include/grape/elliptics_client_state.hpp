@@ -3,10 +3,15 @@
 
 #include <algorithm>
 
-#include "rapidjson/document.h"
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/filestream.h"
+//XXX: work around rapidjson's filth
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+#include "grape/rapidjson/document.h"
+#include "grape/rapidjson/prettywriter.h"
+#include "grape/rapidjson/stringbuffer.h"
+#include "grape/rapidjson/filestream.h"
+#pragma GCC diagnostic pop
 
 #include <elliptics/error.hpp>
 #include <elliptics/session.hpp>

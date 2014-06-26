@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include <boost/program_options.hpp>
 
 #include <grape/elliptics_client_state.hpp>
