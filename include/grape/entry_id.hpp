@@ -11,7 +11,9 @@ struct entry_id {
     int32_t pos;
 
     static entry_id from_dnet_raw_id(const dnet_raw_id *id) {
-        return *(entry_id *)(id->id + DNET_ID_SIZE - sizeof(entry_id));
+        entry_id result;
+        memcpy(&result, id->id + DNET_ID_SIZE - sizeof(entry_id), sizeof(entry_id));
+        return result;
     }
 
     MSGPACK_DEFINE(chunk, pos);
