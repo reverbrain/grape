@@ -28,7 +28,7 @@ set(GTEST_TARGETS gtest gtest_main)
 add_custom_target(check_tests ALL touch ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt)
 
 # Show tests printouts
-set(CMAKE_CTEST_COMMAND ctest -V)
+set(CMAKE_CTEST_COMMAND ctest --output-on-failure)
 add_custom_target(run_tests ${CMAKE_CTEST_COMMAND})
 
 #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "bin/")
@@ -40,11 +40,16 @@ file(GLOB_RECURSE test_src_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.test.cp
 
 foreach(test_src_file IN LISTS test_src_files)
     string(REGEX REPLACE "[.]test[.]cpp$" "_test" test_exec_file ${test_src_file})
+
     add_executable(${test_exec_file} ${test_src_file})
     target_link_libraries(${test_exec_file} ${CMAKE_THREAD_LIBS_INIT} ${GTEST_BOTH_LIBRARIES}
             queue grape_data_array rt
             )
-    add_test(${test_exec_file} ${test_exec_file})
     add_dependencies(${test_exec_file} ${GTEST_TARGETS})
+
+    add_test(${test_exec_file} ${test_exec_file})
+    list(APPEND test_list ${test_exec_file})
 endforeach(test_src_file)
+
+add_dependencies(run_tests ${test_list})
 
