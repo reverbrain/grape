@@ -7,16 +7,26 @@ import elliptics
 from nodes import connect, node_id
 import prettytable
 
+class Error(Exception):
+    pass
+
 def get_app_worker_count(s, key, app):
     result = s.exec_(key, event='%s@info' % (app)).get()[0]
     info = json.loads(str(result.context.data))
-    return info['slaves']['capacity']
+    if 'slaves' in info:
+        return info['slaves']['capacity']
+    else:
+        raise Error(info['error'])
 
 #NOTE: manually sends separate commands to each node
 def app_worker_info(s, app):
     result = []
     for addr, key in s.routes.addresses_with_id():
-        worker_count = get_app_worker_count(s, key, app)
+        try:
+            worker_count = get_app_worker_count(s, key, app)
+        except Error, e:
+            print 'ERROR: %s, %s' % (addr, e)
+            worker_count = 1
         for worker in range(worker_count):
             result.append((addr, key, worker))
     return result
