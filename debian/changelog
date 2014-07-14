@@ -1,3 +1,9 @@
+grape (0.7.12) unstable; urgency=low
+
+  * stats: handle absence of cocaine data in @info response
+
+ -- Ivan Chelubeev <ijon@yandex-team.ru>  Mon, 14 Jul 2014 18:40:30 +0400
+
 grape (0.7.11) unstable; urgency=low
 
   * updated to event name passing change in elliptics: 'app@event' -> 'event'
