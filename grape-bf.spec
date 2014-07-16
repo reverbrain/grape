@@ -18,9 +18,9 @@ BuildRequires:	gcc44 gcc44-c++
 BuildRequires: cmake, cdbs
 BuildRequires: elliptics-devel >= 2.25, elliptics-client-devel >= 2.25
 BuildRequires: cocaine-framework-native-devel >= 0.11, cocaine-framework-native-devel < 0.12
-BuildRequires: libcocaine-devel >= 0.11, libcocaine-devel < 0.12
+BuildRequires: libcocaine-core2-devel >= 0.11, libcocaine-core2-devel < 0.12
 BuildRequires: boost%{boost_ver}-devel
-BuildRequires: libgtest-devel
+BuildRequires: gtest-devel
 
 Obsoletes: srw
 
@@ -44,6 +44,8 @@ Summary: Grape queue and other components (cocaine apps)
 Group: Development/Libraries
 Requires: %{name} = %{version}-%{release}
 
+%description components
+Grape queue and other component apps
 
 %package -n cocaine-plugin-queue-driver
 Summary: Grape queue driver (cocaine plugin)
