@@ -1,6 +1,6 @@
 Summary:	Grape
 Name:		grape
-Version:	0.7.10
+Version:	0.7.12
 Release:	1%{?dist}
 
 License:	GPLv2+
@@ -15,12 +15,16 @@ BuildRequires:	gcc44 gcc44-c++
 %else
 %define boost_ver %{nil}
 %endif
-BuildRequires:  libxml2-devel libev-devel
-BuildRequires:	boost%{boost_ver}-devel, boost%{boost_ver}-iostreams, boost%{boost_ver}-system, boost%{boost_ver}-thread
-BuildRequires:  curl-devel
-BuildRequires:	cmake uriparser-devel
+BuildRequires: cmake, cdbs
+BuildRequires: elliptics-devel >= 2.25, elliptics-client-devel >= 2.25
+BuildRequires: cocaine-framework-native-devel >= 0.11, cocaine-framework-native-devel < 0.12
+BuildRequires: libcocaine-devel >= 0.11, libcocaine-devel < 0.12
+BuildRequires: boost%{boost_ver}-devel
+BuildRequires: libgtest-devel
 
 Obsoletes: srw
+
+Requires: python-prettytable
 
 %description
 Realtime pipeline processing engine
@@ -31,9 +35,25 @@ Summary: Development files for %{name}
 Group: Development/Libraries
 Requires: %{name} = %{version}-%{release}
 
-
 %description devel
-Realtime pipeline processing engine. Development files
+Realtime pipeline processing engine (development files)
+
+
+%package components
+Summary: Grape queue and other components (cocaine apps)
+Group: Development/Libraries
+Requires: %{name} = %{version}-%{release}
+
+
+%package -n cocaine-plugin-queue-driver
+Summary: Grape queue driver (cocaine plugin)
+Group: Development/Libraries
+Requires: %{name} = %{version}-%{release}
+
+%description -n cocaine-plugin-queue-driver
+Grape queue driver runs as a cocaine plugin and can be turned on for applications,
+which want to pop events from persistent queue (application named 'queue')
+
 
 %prep
 %setup -q
@@ -64,19 +84,28 @@ make install DESTDIR=%{buildroot} -C %{_target_platform}
 %clean
 rm -rf %{buildroot}
 
+
 %files
 %defattr(-,root,root,-)
 %{_libdir}/*grape*.so*
-%{_libdir}/grape/*
-%{_libdir}/cocaine/queue-driver.cocaine-plugin
+%{_libdir}/grape/launchpad/*
 
 %files devel
 %defattr(-,root,root,-)
 %{_includedir}/grape/*
 %{_libdir}/*grape*.so
 
+%files components
+%defattr(-,root,root,-)
+%{_libdir}/queue
+%{_libdir}/testerhead-cpp
 
-%changelog
+%files -n cocaine-plugin-queue-driver
+%defattr(-,root,root,-)
+%{_libdir}/cocaine/queue-driver.cocaine-plugin
 
-* Wed Feb 12 2014 Ivan Chelubeev <ijon@yandex-team.ru> - 0.7.10
-- initial spec
+
+# Primary place for the changelog is debian/changelog,
+# there is no tool to convert debian/changelog to rpm one and
+# it's silly to do that by hand -- so, no changelog at all
+#%changelog
