@@ -3,8 +3,8 @@ Section: net
 Priority: optional
 Maintainer: Ivan Chelyubeev <ijon@yandex-team.ru>
 Build-Depends: debhelper (>= 7),
-		cmake,
 		cdbs,
+		cmake,
 		elliptics-dev (>= 2.25),
 		elliptics-client (>= 2.25),
 		cocaine-framework-native-dev (>= 0.11), cocaine-framework-native-dev (<< 0.12),
@@ -13,6 +13,8 @@ Build-Depends: debhelper (>= 7),
 		libboost-system-dev,
 		libboost-program-options-dev,
 		libgtest-dev,
+		libmsgpack-dev,
+		libev4-dev,
 Standards-Version: 3.8.0
 Homepage: https://github.com/reverbrain/grape
 Vcs-Git: git://github.com/reverbrain/grape.git

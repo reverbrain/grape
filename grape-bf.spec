@@ -21,6 +21,11 @@ BuildRequires: cocaine-framework-native-devel >= 0.11, cocaine-framework-native-
 BuildRequires: libcocaine-core2-devel >= 0.11, libcocaine-core2-devel < 0.12
 BuildRequires: boost%{boost_ver}-devel
 BuildRequires: gtest-devel
+BuildRequires: msgpack-devel
+
+#FIXME: This is proxy dependency for cocaine-framework-native,
+# we only need to be able to link apps with binary libev4
+BuildRequires: libev-devel
 
 Obsoletes: srw
 
