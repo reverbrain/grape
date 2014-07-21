@@ -291,7 +291,7 @@ void queue_driver::get_more_data()
 void queue_driver::send_request()
 {
 	ioremap::elliptics::session sess = m_client.create_session();
-	if (!m_wait_timeout) {
+	if (m_wait_timeout > 0) {
 		sess.set_timeout(m_wait_timeout);
 	}
 
